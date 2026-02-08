@@ -20,45 +20,94 @@ type CategoryTabsProps = {
   allLabel?: string;
 };
 
+const ROTATE_MS = 2000;
+const FADE_MS = 600;
+
+function hash(value: string): number {
+  let h = 0;
+  for (let i = 0; i < value.length; i++) h = (h * 31 + value.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+function RotatingImage({
+  images,
+  offsetMs,
+  className,
+  sizes,
+}: {
+  images: string[];
+  offsetMs: number;
+  className: string;
+  sizes: string;
+}) {
+  const [index, setIndex] = useState(0);
+  const [prevIndex, setPrevIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!images || images.length <= 1) return;
+
+    let intervalId: number | null = null;
+    let fadeTimeoutId: number | null = null;
+    let startTimeoutId: number | null = null;
+
+    const tick = () => {
+      setPrevIndex(index);
+      setIndex((i) => (i + 1) % images.length);
+      if (fadeTimeoutId) window.clearTimeout(fadeTimeoutId);
+      fadeTimeoutId = window.setTimeout(() => setPrevIndex(null), FADE_MS + 50);
+    };
+
+    startTimeoutId = window.setTimeout(() => {
+      intervalId = window.setInterval(tick, ROTATE_MS);
+      tick();
+    }, offsetMs);
+
+    return () => {
+      if (startTimeoutId) window.clearTimeout(startTimeoutId);
+      if (intervalId) window.clearInterval(intervalId);
+      if (fadeTimeoutId) window.clearTimeout(fadeTimeoutId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [images.join("|"), offsetMs]);
+
+  const currentSrc = images[index];
+  const prevSrc = prevIndex != null ? images[prevIndex] : null;
+
+  return (
+    <>
+      {prevSrc ? (
+        <Image
+          key={`prev-${prevSrc}`}
+          src={prevSrc}
+          alt=""
+          fill
+          unoptimized
+          className={`${className} opacity-0 transition-opacity`}
+          style={{ transitionDuration: `${FADE_MS}ms` }}
+          sizes={sizes}
+          priority={false}
+        />
+      ) : null}
+      <Image
+        key={`cur-${currentSrc}`}
+        src={currentSrc}
+        alt=""
+        fill
+        unoptimized
+        className={`${className} opacity-100`}
+        sizes={sizes}
+        priority={false}
+      />
+    </>
+  );
+}
+
 export function CategoryTabs({ categories, active, onSelect, allLabel = "All" }: CategoryTabsProps) {
   const tabs = useMemo(
     () => [{ value: "All", label: allLabel, icon: undefined }, ...categories],
     [allLabel, categories]
   );
   const isAllActive = active === "All";
-
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    const id = window.setInterval(() => setTick((t) => t + 1), 2000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  const hash = (s: string): number => {
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-    return Math.abs(h);
-  };
-
-  const imageForTab = useMemo(() => {
-    const out: Record<string, string | undefined> = {};
-    for (const tab of tabs) {
-      if (tab.value === "All") continue;
-      const list =
-        Array.isArray(tab.previewImages) && tab.previewImages.length > 0
-          ? tab.previewImages
-          : tab.previewImageUrl
-            ? [tab.previewImageUrl]
-            : [];
-      if (list.length === 0) {
-        out[tab.value] = undefined;
-        continue;
-      }
-      const start = hash(tab.value) % list.length;
-      out[tab.value] = list[(start + tick) % list.length];
-    }
-    return out;
-  }, [tabs, tick]);
 
   return (
     <nav
@@ -70,7 +119,15 @@ export function CategoryTabs({ categories, active, onSelect, allLabel = "All" }:
         <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {tabs.map((tab) => {
             const isActive = active === tab.value;
-            const img = tab.value === "All" ? undefined : imageForTab[tab.value];
+            const images =
+              tab.value === "All"
+                ? []
+                : Array.isArray(tab.previewImages) && tab.previewImages.length > 0
+                  ? tab.previewImages
+                  : tab.previewImageUrl
+                    ? [tab.previewImageUrl]
+                    : [];
+            const offsetMs = tab.value === "All" ? 0 : hash(tab.value) % ROTATE_MS;
             return (
               <button
                 key={tab.value}
@@ -84,15 +141,12 @@ export function CategoryTabs({ categories, active, onSelect, allLabel = "All" }:
                   backgroundColor: "rgb(9 9 11)",
                 }}
               >
-                {img ? (
-                  <Image
-                    src={img}
-                    alt=""
-                    fill
-                    unoptimized
-                    className="object-cover opacity-90 transition group-hover:opacity-100"
+                {images.length > 0 ? (
+                  <RotatingImage
+                    images={images}
+                    offsetMs={offsetMs}
+                    className="object-cover opacity-90 group-hover:opacity-100"
                     sizes="148px"
-                    priority={false}
                   />
                 ) : (
                   <div className="absolute inset-0 bg-zinc-900" />
@@ -129,7 +183,15 @@ export function CategoryTabs({ categories, active, onSelect, allLabel = "All" }:
         <div className="mx-auto flex max-w-6xl flex-wrap justify-center gap-1 px-4 py-3 sm:gap-2">
           {tabs.map((tab) => {
             const isActive = active === tab.value;
-            const img = tab.value === "All" ? undefined : imageForTab[tab.value];
+            const images =
+              tab.value === "All"
+                ? []
+                : Array.isArray(tab.previewImages) && tab.previewImages.length > 0
+                  ? tab.previewImages
+                  : tab.previewImageUrl
+                    ? [tab.previewImageUrl]
+                    : [];
+            const offsetMs = tab.value === "All" ? 0 : hash(tab.value) % ROTATE_MS;
             return (
               <button
                 key={tab.value}
@@ -144,16 +206,13 @@ export function CategoryTabs({ categories, active, onSelect, allLabel = "All" }:
                   color: isActive ? "rgb(245 158 11)" : "rgb(161 161 170)",
                 }}
               >
-                {img ? (
+                {images.length > 0 ? (
                   <span className="relative h-6 w-6 overflow-hidden rounded-full border border-zinc-700">
-                    <Image
-                      src={img}
-                      alt=""
-                      fill
-                      unoptimized
+                    <RotatingImage
+                      images={images}
+                      offsetMs={offsetMs}
                       className="object-cover"
                       sizes="24px"
-                      priority={false}
                     />
                   </span>
                 ) : null}
