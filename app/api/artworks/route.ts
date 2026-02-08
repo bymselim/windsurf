@@ -69,11 +69,41 @@ function toResponseItem(item: ArtworkJson) {
   };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const entries = await readArtworksFromFile();
-  const dailySeed = getDailySeed();
-  const shuffled = shuffleWithSeed(entries, dailySeed);
-  return NextResponse.json(shuffled.map(toResponseItem));
+
+  const url = new URL(request.url);
+  const pageRaw = url.searchParams.get("page");
+  const limitRaw = url.searchParams.get("limit");
+  const categoryRaw = url.searchParams.get("category");
+  const seedRaw = url.searchParams.get("seed");
+
+  const page = pageRaw ? Math.max(1, Number(pageRaw) || 1) : null;
+  const limit = limitRaw ? Math.max(1, Math.min(200, Number(limitRaw) || 0)) : null;
+  const category = categoryRaw ? categoryRaw.trim() : "";
+  const seed = (seedRaw && seedRaw.trim()) || getDailySeed();
+
+  const filtered = category ? entries.filter((e) => e.category === category) : entries;
+  const shuffled = shuffleWithSeed(filtered, seed);
+
+  // Backwards compatibility: if pagination not requested, return full list (admin relies on this).
+  if (!page || !limit) {
+    return NextResponse.json(shuffled.map(toResponseItem));
+  }
+
+  const total = shuffled.length;
+  const start = (page - 1) * limit;
+  const end = start + limit;
+  const slice = shuffled.slice(start, end);
+  return NextResponse.json({
+    items: slice.map(toResponseItem),
+    page,
+    limit,
+    total,
+    hasMore: end < total,
+    seed,
+    category: category || null,
+  });
 }
 
 export async function PUT(request: NextRequest) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CategoryTabs, type CategoryItem } from "@/components/CategoryTabs";
 import { MasonryGrid } from "@/components/MasonryGrid";
@@ -16,15 +16,83 @@ export default function GalleryPage() {
   const [ui, setUi] = useState<{ categoryPreviewRotateMs: number; categoryPreviewFadeMs: number } | null>(null);
   const [selected, setSelected] = useState<{ artwork: Artwork; index: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
+  const seedRef = useRef<string>("");
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const PAGE_LIMIT = 24;
+
+  const ensureSeed = useCallback(() => {
+    if (seedRef.current) return seedRef.current;
+    const arr = new Uint32Array(4);
+    if (typeof crypto !== "undefined" && crypto.getRandomValues) crypto.getRandomValues(arr);
+    seedRef.current = `${Date.now()}-${Array.from(arr).join("-")}`;
+    return seedRef.current;
+  }, []);
+
+  const fetchPage = useCallback(async (nextPage: number, forCategory: string) => {
+    const seed = ensureSeed();
+    const params = new URLSearchParams();
+    params.set("page", String(nextPage));
+    params.set("limit", String(PAGE_LIMIT));
+    params.set("seed", seed);
+    if (forCategory && forCategory !== "All") params.set("category", forCategory);
+    const res = await fetch(`/api/artworks?${params.toString()}`);
+    const json = await res.json();
+    const items = Array.isArray(json?.items) ? (json.items as ArtworkFull[]) : [];
+    return {
+      items: items.map((it) => mapFullToArtwork(it, "tr")),
+      hasMore: Boolean(json?.hasMore),
+    };
+  }, [ensureSeed]);
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/artworks").then((res) => res.json()),
-      fetch("/api/categories").then((res) => res.json()),
-    ])
-      .then(([artworksData, categoriesData]) => {
-        const raw = Array.isArray(artworksData) ? artworksData : [];
-        setArtworks(raw.map((item: ArtworkFull) => mapFullToArtwork(item, "tr")));
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then((categoriesData) => {
+        setCategories(
+          Array.isArray(categoriesData)
+            ? categoriesData.map((c: { name: string; icon?: string; previewImageUrl?: string }) => ({
+                value: c.name,
+                label: c.name,
+                icon: c.icon,
+                previewImageUrl: c.previewImageUrl,
+              }))
+            : []
+        );
+      })
+      .catch(() => setCategories([]));
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    setLoadingMore(false);
+    setHasMore(true);
+    setPage(1);
+    seedRef.current = "";
+    fetchPage(1, category)
+      .then((r) => {
+        setArtworks(r.items);
+        setHasMore(r.hasMore);
+      })
+      .catch(() => {
+        setArtworks([]);
+        setHasMore(false);
+      })
+      .finally(() => setLoading(false));
+  }, [category, fetchPage]);
+
+  useEffect(() => {
+    fetch("/api/artworks?limit=200&page=1&seed=preview")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        const raw = Array.isArray(json)
+          ? (json as ArtworkFull[])
+          : Array.isArray(json?.items)
+            ? (json.items as ArtworkFull[])
+            : [];
 
         const imageByCategory: Record<string, string[]> = {};
         for (const a of raw as ArtworkFull[]) {
@@ -48,24 +116,41 @@ export default function GalleryPage() {
           return shuffled.slice(0, 10);
         };
 
-        setCategories(
-          Array.isArray(categoriesData)
-            ? categoriesData.map((c: { name: string; icon?: string; previewImageUrl?: string }) => ({
-                value: c.name,
-                label: c.name,
-                icon: c.icon,
-                previewImageUrl: pickRandom(c.name) ?? c.previewImageUrl,
-                previewImages: pickSample(c.name),
-              }))
-            : []
+        setCategories((prev) =>
+          prev.map((c) => ({
+            ...c,
+            previewImageUrl: pickRandom(c.value) ?? c.previewImageUrl,
+            previewImages: pickSample(c.value),
+          }))
         );
       })
-      .catch(() => {
-        setArtworks([]);
-        setCategories([]);
-      })
-      .finally(() => setLoading(false));
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!hasMore || loadingMore) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (!first?.isIntersecting) return;
+        setLoadingMore(true);
+        const next = page + 1;
+        fetchPage(next, category)
+          .then((r) => {
+            setArtworks((prev) => [...prev, ...r.items]);
+            setHasMore(r.hasMore);
+            setPage(next);
+          })
+          .catch(() => setHasMore(false))
+          .finally(() => setLoadingMore(false));
+      },
+      { rootMargin: "800px 0px" }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [category, fetchPage, hasMore, loadingMore, page]);
 
   useEffect(() => {
     fetch("/api/settings/ui")
@@ -81,10 +166,7 @@ export default function GalleryPage() {
       .catch(() => {});
   }, []);
 
-  const filteredList = useMemo(() => {
-    if (category === "All") return artworks;
-    return artworks.filter((a) => a.category === category);
-  }, [artworks, category]);
+  const filteredList = artworks;
 
   const openModal = (artwork: Artwork, index: number) => {
     setSelected({ artwork, index });
@@ -111,10 +193,9 @@ export default function GalleryPage() {
         active={category}
         onSelect={setCategory}
         allPreviewImageUrl={process.env.NEXT_PUBLIC_ALL_PREVIEW_IMAGE_URL}
-      />
-
         rotateMs={ui?.categoryPreviewRotateMs}
         fadeMs={ui?.categoryPreviewFadeMs}
+      />
       {loading ? (
         <div className="flex min-h-[60vh] items-center justify-center">
           <motion.div
@@ -126,12 +207,14 @@ export default function GalleryPage() {
           </motion.div>
         </div>
       ) : (
-        <MasonryGrid
-          artworks={artworks}
-          category={category}
-          onSelect={openModal}
-        />
+        <MasonryGrid artworks={artworks} category={"All"} onSelect={openModal} />
       )}
+
+      <div ref={sentinelRef} />
+
+      {loadingMore ? (
+        <div className="pb-10 text-center text-sm text-zinc-500">Loading...</div>
+      ) : null}
 
       <AnimatePresence mode="wait">
         {selected ? (
