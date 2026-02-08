@@ -363,6 +363,13 @@ export default function TurkishGalleryPage() {
 
   return (
     <div ref={containerRef} className="min-h-screen bg-zinc-950">
+      {category !== "All" ? (
+        <div className="fixed left-1/2 top-2 z-50 -translate-x-1/2 pointer-events-none select-none">
+          <div className="rounded-full border border-zinc-800 bg-zinc-950/70 px-3 py-1 text-[11px] font-semibold tracking-[0.22em] text-zinc-300 backdrop-blur">
+            KATEGORİ
+          </div>
+        </div>
+      ) : null}
       {category === "All" && headerItem?.text ? (
         <div className="mx-auto max-w-3xl px-4 pt-8 pb-2 text-center">
           <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-300/90">
@@ -436,7 +443,7 @@ export default function TurkishGalleryPage() {
       {showNavHint ? (
         <div className="mx-auto max-w-3xl px-4 pt-3">
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-            Buradan diğer kategorilere ulaşabilirsiniz.
+            Buradan diğer kategorilere sağa kaydırarak ulaşabilirsiniz.
           </div>
         </div>
       ) : null}
