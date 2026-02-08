@@ -23,7 +23,11 @@ async function ensureCategoryFolder(categoryName: string): Promise<void> {
   const folder = folderNameForCategory(categoryName);
   if (!folder) return;
   const dir = path.join(ARTWORKS_PUBLIC, folder);
-  await fs.mkdir(dir, { recursive: true });
+  try {
+    await fs.mkdir(dir, { recursive: true });
+  } catch {
+    // Best-effort only: on serverless platforms (e.g. Vercel) the filesystem may be read-only.
+  }
 }
 
 function requireAdmin(request: NextRequest): boolean {

@@ -6,7 +6,7 @@ const PASSWORD_FILE = path.join(process.cwd(), "lib", "data", "admin-password.tx
 const KV_KEY = "luxury_gallery:admin_password";
 
 const DEFAULT_PASSWORD =
-  process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD ?? "admin123";
+  process.env.ADMIN_PASSWORD ?? "admin123";
 
 /**
  * Returns the current admin password (from file or env/default).

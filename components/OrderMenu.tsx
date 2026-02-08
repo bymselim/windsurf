@@ -9,7 +9,10 @@ import type { Artwork } from "@/lib/types";
 // Customize: set in .env.local or replace defaults
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "905551234567";
 const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "info@gallery.com";
-const INSTAGRAM_HANDLE = process.env.NEXT_PUBLIC_INSTAGRAM ?? "gallery";
+const INSTAGRAM_HANDLE =
+  process.env.NEXT_PUBLIC_INSTAGRAM ??
+  process.env.NEXT_PUBLIC_INSTAGRAM_USERNAME ??
+  "gallery";
 
 type OrderMenuProps = {
   artwork: Artwork;
