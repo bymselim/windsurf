@@ -60,7 +60,13 @@ export async function GET(request: NextRequest) {
   for (const a of artworks) {
     countByCategory[a.category] = (countByCategory[a.category] ?? 0) + 1;
   }
-  const list = categories.map((c) => ({
+  const sorted = [...categories].sort((a, b) => {
+    const ao = typeof a.order === "number" && Number.isFinite(a.order) ? a.order : 0;
+    const bo = typeof b.order === "number" && Number.isFinite(b.order) ? b.order : 0;
+    if (ao !== bo) return ao - bo;
+    return String(a.name).localeCompare(String(b.name));
+  });
+  const list = sorted.map((c) => ({
     ...c,
     artworkCount: countByCategory[c.name] ?? 0,
   }));

@@ -48,7 +48,14 @@ export default function AdminCategoriesPage() {
       const res = await fetch("/api/admin/categories", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load");
       const data = await res.json();
-      setCategories(Array.isArray(data) ? data : []);
+      const list: Category[] = Array.isArray(data) ? data : [];
+      const sorted = [...list].sort((a, b) => {
+        const ao = typeof a.order === "number" && Number.isFinite(a.order) ? a.order : 0;
+        const bo = typeof b.order === "number" && Number.isFinite(b.order) ? b.order : 0;
+        if (ao !== bo) return ao - bo;
+        return String(a.name).localeCompare(String(b.name));
+      });
+      setCategories(sorted);
     } catch {
       setCategories([]);
     } finally {
