@@ -25,7 +25,7 @@ export default function AdminCategoriesPage() {
   const [newColor, setNewColor] = useState("#3b82f6");
   const [newIcon, setNewIcon] = useState("🎨");
   const [newPreviewImageUrl, setNewPreviewImageUrl] = useState("");
-  const [newOrder, setNewOrder] = useState("0");
+  const [newOrder, setNewOrder] = useState("100");
   const [addError, setAddError] = useState("");
   const [adding, setAdding] = useState(false);
 
@@ -106,7 +106,7 @@ export default function AdminCategoriesPage() {
       setNewColor("#3b82f6");
       setNewIcon("🎨");
       setNewPreviewImageUrl("");
-      setNewOrder("0");
+      setNewOrder("100");
     } catch (err) {
       setAddError(err instanceof Error ? err.message : "Failed to add category");
     } finally {
