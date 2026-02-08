@@ -231,7 +231,7 @@ export default function TurkishGalleryPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950">
-      {ui?.galleryIntroTR ? (
+      {category === "All" && ui?.galleryIntroTR ? (
         <div className="mx-auto max-w-3xl px-4 pt-8 pb-2 text-center">
           <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-300/90">
             {ui.galleryIntroTR}
