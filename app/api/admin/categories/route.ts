@@ -7,6 +7,8 @@ import {
 } from "@/lib/categories-io";
 import { readArtworksFromFile, writeArtworksToFile } from "@/lib/artworks-io";
 
+export const dynamic = "force-dynamic";
+
 const COOKIE_NAME = "admin_session";
 const ARTWORKS_PUBLIC = path.join(process.cwd(), "public", "artworks");
 
@@ -16,6 +18,20 @@ function folderNameForCategory(name: string): string {
     .replace(/[^a-zA-Z0-9\s\-_]/g, "")
     .replace(/\s+/g, "-")
     .trim() || name;
+}
+
+function normalizePreviewImageUrl(raw: string): string {
+  const v = String(raw ?? "").trim();
+  if (!v) return "";
+  if (!v.includes("/_next/image")) return v;
+  try {
+    const u = new URL(v, "http://localhost");
+    const inner = u.searchParams.get("url");
+    if (!inner) return v;
+    return decodeURIComponent(inner);
+  } catch {
+    return v;
+  }
 }
 
 /** Ensure public/artworks/{categoryFolder} exists when adding a category. */
@@ -60,7 +76,7 @@ export async function POST(request: NextRequest) {
   const color = String(body?.color ?? "#3b82f6").trim();
   const icon = String(body?.icon ?? "📁").trim();
   const previewImageUrl =
-    typeof body?.previewImageUrl === "string" ? body.previewImageUrl.trim() : "";
+    typeof body?.previewImageUrl === "string" ? normalizePreviewImageUrl(body.previewImageUrl) : "";
   if (!name) {
     return NextResponse.json({ error: "Category name is required" }, { status: 400 });
   }
@@ -84,7 +100,7 @@ export async function PUT(request: NextRequest) {
   const color = String(body?.color ?? "#3b82f6").trim();
   const icon = String(body?.icon ?? "📁").trim();
   const previewImageUrl =
-    typeof body?.previewImageUrl === "string" ? body.previewImageUrl.trim() : undefined;
+    typeof body?.previewImageUrl === "string" ? normalizePreviewImageUrl(body.previewImageUrl) : undefined;
   if (!oldName || !name) {
     return NextResponse.json({ error: "oldName and name are required" }, { status: 400 });
   }
