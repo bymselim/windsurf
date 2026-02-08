@@ -110,6 +110,24 @@ export default function ArtworksAdminPage() {
     }
   }, []);
 
+  const loadArtworks = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/artworks", { credentials: "include" });
+      const data = await res.json();
+      const list = Array.isArray(data) ? (data as ArtworkRow[]) : [];
+      setArtworks(list);
+      const map: Record<string, ArtworkRow> = {};
+      for (const a of list) map[a.id] = a;
+      setOriginalById(map);
+    } catch {
+      setArtworks([]);
+      setOriginalById({});
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const clearAllArtworks = useCallback(async () => {
     if (clearAllConfirm !== "DELETE_ALL_ARTWORKS") {
       setClearAllMessage({ ok: false, text: "Onay için kutuya DELETE_ALL_ARTWORKS yazın." });
@@ -138,24 +156,6 @@ export default function ArtworksAdminPage() {
       setClearAllLoading(false);
     }
   }, [clearAllConfirm, loadArtworks]);
-
-  const loadArtworks = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/artworks", { credentials: "include" });
-      const data = await res.json();
-      const list = Array.isArray(data) ? (data as ArtworkRow[]) : [];
-      setArtworks(list);
-      const map: Record<string, ArtworkRow> = {};
-      for (const a of list) map[a.id] = a;
-      setOriginalById(map);
-    } catch {
-      setArtworks([]);
-      setOriginalById({});
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
     if (isAuthenticated === false) {
