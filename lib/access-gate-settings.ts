@@ -1,7 +1,9 @@
 import { promises as fs } from "fs";
 import path from "path";
+import { kvGetJson, kvSetJson, isKvAvailable } from "./kv-adapter";
 
 const SETTINGS_FILE = path.join(process.cwd(), "lib", "data", "settings.json");
+const KV_KEY = "luxury_gallery:settings";
 
 export type GalleryType = "turkish" | "international";
 
@@ -51,12 +53,34 @@ export interface AccessGateConfig {
 }
 
 async function readSettingsFile(): Promise<SettingsJson> {
+  const kvVal = await kvGetJson<SettingsJson>(KV_KEY);
+  if (kvVal && typeof kvVal === "object") {
+    return kvVal as SettingsJson;
+  }
   try {
     const raw = await fs.readFile(SETTINGS_FILE, "utf-8");
-    return JSON.parse(raw) as SettingsJson;
+    const parsed = JSON.parse(raw) as SettingsJson;
+    if (await isKvAvailable()) {
+      await kvSetJson(KV_KEY, parsed);
+    }
+    return parsed;
   } catch {
-    return { accessGate: { ...DEFAULT_ACCESS_GATE } };
+    const fallback: SettingsJson = { accessGate: { ...DEFAULT_ACCESS_GATE } };
+    if (await isKvAvailable()) {
+      await kvSetJson(KV_KEY, fallback);
+    }
+    return fallback;
   }
+}
+
+async function writeSettingsFile(next: SettingsJson): Promise<void> {
+  if (await isKvAvailable()) {
+    await kvSetJson(KV_KEY, next);
+    return;
+  }
+  const dir = path.dirname(SETTINGS_FILE);
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(SETTINGS_FILE, JSON.stringify(next, null, 2), "utf-8");
 }
 
 export async function getAccessGateSettings(): Promise<AccessGateSettings> {
@@ -90,8 +114,6 @@ export async function getPasswords(): Promise<PasswordsConfig> {
 
 /** Update only passwords in settings.json. Direct update, no old-password check. */
 export async function updatePasswords(updates: Partial<PasswordsConfig>): Promise<PasswordsConfig> {
-  const dir = path.dirname(SETTINGS_FILE);
-  await fs.mkdir(dir, { recursive: true });
   const data = await readSettingsFile();
   const current: PasswordsConfig = {
     turkish:
@@ -109,7 +131,7 @@ export async function updatePasswords(updates: Partial<PasswordsConfig>): Promis
       typeof updates.international === "string" ? updates.international : current.international,
   };
   const merged = { ...data, passwords: { ...data.passwords, ...next } };
-  await fs.writeFile(SETTINGS_FILE, JSON.stringify(merged, null, 2), "utf-8");
+  await writeSettingsFile(merged);
   return next;
 }
 
@@ -137,9 +159,6 @@ export async function getAccessGateConfig(): Promise<AccessGateConfig> {
 export async function updateAccessGateSettings(
   updates: Partial<Omit<AccessGateSettings, "updatedAt">>
 ): Promise<AccessGateSettings> {
-  const dir = path.dirname(SETTINGS_FILE);
-  await fs.mkdir(dir, { recursive: true });
-
   const current = await getAccessGateSettings();
   const next: AccessGateSettings = {
     ...current,
@@ -147,14 +166,8 @@ export async function updateAccessGateSettings(
     updatedAt: new Date().toISOString(),
   };
 
-  let data: SettingsJson;
-  try {
-    const raw = await fs.readFile(SETTINGS_FILE, "utf-8");
-    data = JSON.parse(raw) as SettingsJson;
-  } catch {
-    data = { accessGate: { ...DEFAULT_ACCESS_GATE } };
-  }
-  data.accessGate = next;
-  await fs.writeFile(SETTINGS_FILE, JSON.stringify(data, null, 2), "utf-8");
+  const data = await readSettingsFile();
+  const merged: SettingsJson = { ...data, accessGate: next };
+  await writeSettingsFile(merged);
   return next;
 }

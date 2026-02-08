@@ -1,8 +1,10 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
+import { kvGetJson, kvSetJson, isKvAvailable } from "./kv-adapter";
 
 const LOG_FILE = path.join(process.cwd(), "lib", "data", "access-logs.json");
+const KV_KEY = "luxury_gallery:access_logs";
 
 export interface AccessLogEntry {
   id: string;
@@ -56,6 +58,10 @@ function normalizeEntry(raw: Record<string, unknown>, index: number): AccessLogE
 }
 
 async function readLogs(): Promise<AccessLogEntry[]> {
+  const kvVal = await kvGetJson<unknown>(KV_KEY);
+  if (Array.isArray(kvVal)) {
+    return kvVal.map((item: Record<string, unknown>, i: number) => normalizeEntry(item, i));
+  }
   try {
     const data = await fs.readFile(LOG_FILE, "utf-8");
     const parsed = JSON.parse(data);
@@ -70,6 +76,10 @@ async function readLogs(): Promise<AccessLogEntry[]> {
 
 async function writeLogs(entries: AccessLogEntry[]): Promise<void> {
   try {
+    if (await isKvAvailable()) {
+      await kvSetJson(KV_KEY, entries);
+      return;
+    }
     const dir = path.dirname(LOG_FILE);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(LOG_FILE, JSON.stringify(entries, null, 2), "utf-8");
