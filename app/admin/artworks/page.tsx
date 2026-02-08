@@ -31,6 +31,9 @@ export default function ArtworksAdminPage() {
   const [saveStatus, setSaveStatus] = useState<Record<string, { ok: boolean; message: string }>>({});
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkStatus, setBulkStatus] = useState<string>("");
+  const [bulkPriceCategory, setBulkPriceCategory] = useState<string>("");
+  const [bulkPriceTRY, setBulkPriceTRY] = useState<string>("");
+  const [bulkPriceUSD, setBulkPriceUSD] = useState<string>("");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [featuredFilter, setFeaturedFilter] = useState<string>("");
@@ -204,6 +207,27 @@ export default function ArtworksAdminPage() {
       ? categoryOptions
       : Array.from(new Set(artworks.map((a) => a.category).filter(Boolean))).sort();
 
+  const applyBulkPrice = () => {
+    const categoryName = bulkPriceCategory.trim();
+    if (!categoryName) return;
+    const nextTRY = bulkPriceTRY.trim() === "" ? null : Number(bulkPriceTRY);
+    const nextUSD = bulkPriceUSD.trim() === "" ? null : Number(bulkPriceUSD);
+
+    if (nextTRY !== null && !Number.isFinite(nextTRY)) return;
+    if (nextUSD !== null && !Number.isFinite(nextUSD)) return;
+
+    setArtworks((prev) =>
+      prev.map((a) => {
+        if (a.category !== categoryName) return a;
+        return {
+          ...a,
+          priceTRY: nextTRY === null ? a.priceTRY : nextTRY,
+          priceUSD: nextUSD === null ? a.priceUSD : nextUSD,
+        };
+      })
+    );
+  };
+
   const filtered = artworks.filter((art) => {
     const searchLower = search.toLowerCase();
     const matchSearch =
@@ -297,6 +321,43 @@ export default function ArtworksAdminPage() {
               <option value="price">Sort by price (TRY)</option>
               <option value="category">Sort by category</option>
             </select>
+
+            <div className="flex flex-wrap gap-2 items-center rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
+              <select
+                value={bulkPriceCategory}
+                onChange={(e) => setBulkPriceCategory(e.target.value)}
+                className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 focus:border-amber-500/50"
+              >
+                <option value="">Kategori fiyatını değiştir...</option>
+                {categoryList.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={bulkPriceTRY}
+                onChange={(e) => setBulkPriceTRY(e.target.value)}
+                inputMode="decimal"
+                placeholder="TRY"
+                className="w-24 p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50"
+              />
+              <input
+                value={bulkPriceUSD}
+                onChange={(e) => setBulkPriceUSD(e.target.value)}
+                inputMode="decimal"
+                placeholder="USD"
+                className="w-24 p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50"
+              />
+              <button
+                type="button"
+                onClick={applyBulkPrice}
+                disabled={!bulkPriceCategory.trim()}
+                className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-3 py-2 text-sm font-medium transition disabled:opacity-50"
+              >
+                Uygula
+              </button>
+            </div>
 
             <button
               type="button"

@@ -90,7 +90,6 @@ export async function POST(request: NextRequest) {
       if (existingByFilename.has(u.url)) continue;
       existingByFilename.add(u.url);
 
-      const baseTitle = String(u.name || "Artwork").replace(/\.[^.]+$/, "").trim();
       const dimensionsCM = "";
       const dimensionsIN = dimensionsCMToIN(dimensionsCM);
       const id = randomUUID();
@@ -98,10 +97,10 @@ export async function POST(request: NextRequest) {
         id,
         category: categoryName,
         filename: u.url,
-        titleTR: baseTitle || "Yeni Eser",
-        titleEN: baseTitle || "New Artwork",
-        descriptionTR: null,
-        descriptionEN: null,
+        titleTR: "",
+        titleEN: "",
+        descriptionTR: "Detaylı bilgi ve sipariş için sipariş butonunu kullanabilirsiniz.",
+        descriptionEN: "For detailed information and to place an order, you can use the order button.",
         priceTRY: 0,
         priceUSD: 0,
         dimensionsCM,
