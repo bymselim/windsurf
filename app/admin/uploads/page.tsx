@@ -12,6 +12,12 @@ type UploadedFile = {
   url: string;
 };
 
+type CreatedArtwork = {
+  id: string;
+  filename: string;
+  category: string;
+};
+
 export default function AdminUploadsPage() {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -21,6 +27,7 @@ export default function AdminUploadsPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploaded, setUploaded] = useState<UploadedFile[]>([]);
+  const [createdArtworks, setCreatedArtworks] = useState<CreatedArtwork[]>([]);
 
   useEffect(() => {
     const saved = typeof window !== "undefined" && localStorage.getItem("admin-authenticated");
@@ -64,7 +71,11 @@ export default function AdminUploadsPage() {
         return;
       }
       const uploadedFiles = Array.isArray(json?.files) ? (json.files as UploadedFile[]) : [];
+      const created = Array.isArray(json?.createdArtworks)
+        ? (json.createdArtworks as CreatedArtwork[])
+        : [];
       setUploaded(uploadedFiles);
+      setCreatedArtworks(created);
       setFiles([]);
     } catch {
       setError("Upload failed");
@@ -171,6 +182,32 @@ export default function AdminUploadsPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        ) : null}
+
+        {createdArtworks.length > 0 ? (
+          <div className="mt-6 rounded-xl border border-zinc-800 overflow-hidden">
+            <div className="bg-zinc-900 px-4 py-3 flex items-center justify-between">
+              <h2 className="font-semibold">Artworks created</h2>
+              <span className="text-xs text-zinc-500">{createdArtworks.length} items</span>
+            </div>
+            <div className="divide-y divide-zinc-800">
+              {createdArtworks.map((a) => (
+                <div key={a.id} className="px-4 py-3">
+                  <div className="text-sm text-zinc-200 font-medium">
+                    <span className="font-mono">{a.id}</span>
+                    <span className="text-zinc-500"> • </span>
+                    <span className="text-zinc-300">{a.category}</span>
+                  </div>
+                  <div className="text-xs text-zinc-500 font-mono break-all">{a.filename}</div>
+                </div>
+              ))}
+            </div>
+            <div className="px-4 py-3 bg-zinc-950/40">
+              <p className="text-xs text-zinc-500">
+                You can edit titles, prices, descriptions, and dimensions in <span className="font-mono">/admin/artworks</span>.
+              </p>
             </div>
           </div>
         ) : null}

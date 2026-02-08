@@ -42,13 +42,20 @@ function shuffleWithSeed<T>(array: T[], seed: string): T[] {
 
 const VIDEO_EXT = /\.(mp4|webm|mov|ogg)$/i;
 
+function isAbsoluteUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
 function toResponseItem(item: ArtworkJson) {
   const mediaType = VIDEO_EXT.test(item.filename) ? ("video" as const) : ("image" as const);
+  const imageUrl = isAbsoluteUrl(item.filename)
+    ? item.filename
+    : `${ARTWORKS_BASE}/${item.filename}`;
   return {
     id: item.id,
     category: item.category,
     filename: item.filename,
-    imageUrl: `${ARTWORKS_BASE}/${item.filename}`,
+    imageUrl,
     mediaType,
     titleTR: item.titleTR,
     titleEN: item.titleEN,

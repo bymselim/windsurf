@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
+import { randomUUID } from "crypto";
+import { readArtworksFromFile, writeArtworksToFile } from "@/lib/artworks-io";
+import { readCategoriesFromFile, writeCategoriesToFile } from "@/lib/categories-io";
+import { dimensionsCMToIN } from "@/lib/dimensions";
 
 const COOKIE_NAME = "admin_session";
 
@@ -62,5 +66,48 @@ export async function POST(request: NextRequest) {
     })
   );
 
-  return NextResponse.json({ files: uploads });
+  // Ensure category exists (category = folder). If folder empty, we still create artworks under category "Uncategorized".
+  const categoryName = folder || "Uncategorized";
+  const categories = await readCategoriesFromFile();
+  if (!categories.some((c) => c.name === categoryName)) {
+    categories.push({ name: categoryName, color: "#3b82f6", icon: "🎨" });
+    await writeCategoriesToFile(categories);
+  }
+
+  const existing = await readArtworksFromFile();
+  const existingByFilename = new Set(existing.map((e) => e.filename));
+
+  const created: Array<{ id: string; filename: string; category: string }> = [];
+  for (const u of uploads) {
+    // Avoid duplicating by exact filename/url.
+    if (existingByFilename.has(u.url)) continue;
+    existingByFilename.add(u.url);
+
+    const baseTitle = String(u.name || "Artwork").replace(/\.[^.]+$/, "").trim();
+    const dimensionsCM = "";
+    const dimensionsIN = dimensionsCMToIN(dimensionsCM);
+    const id = randomUUID();
+    existing.push({
+      id,
+      category: categoryName,
+      filename: u.url,
+      titleTR: baseTitle || "Yeni Eser",
+      titleEN: baseTitle || "New Artwork",
+      descriptionTR: null,
+      descriptionEN: null,
+      priceTRY: 0,
+      priceUSD: 0,
+      dimensionsCM,
+      dimensionsIN,
+      tags: undefined,
+      isFeatured: false,
+    });
+    created.push({ id, filename: u.url, category: categoryName });
+  }
+
+  if (created.length > 0) {
+    await writeArtworksToFile(existing);
+  }
+
+  return NextResponse.json({ files: uploads, createdArtworks: created });
 }
