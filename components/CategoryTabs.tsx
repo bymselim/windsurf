@@ -22,6 +22,7 @@ type CategoryTabsProps = {
   allPreviewImageUrl?: string;
   rotateMs?: number;
   fadeMs?: number;
+  mode?: "auto" | "allGrid";
 };
 
 const DEFAULT_ROTATE_MS = 2000;
@@ -130,6 +131,7 @@ export function CategoryTabs({
   allPreviewImageUrl,
   rotateMs,
   fadeMs,
+  mode = "auto",
 }: CategoryTabsProps) {
   const rotate = typeof rotateMs === "number" && Number.isFinite(rotateMs) ? rotateMs : DEFAULT_ROTATE_MS;
   const fade = typeof fadeMs === "number" && Number.isFinite(fadeMs) ? fadeMs : DEFAULT_FADE_MS;
@@ -147,6 +149,7 @@ export function CategoryTabs({
     [allLabel, allPreviewImageUrl, categories]
   );
   const isAllActive = active === "All";
+  const renderAllAsGrid = mode === "allGrid";
 
   return (
     <nav
@@ -155,7 +158,13 @@ export function CategoryTabs({
       aria-label="Category filter"
     >
       {isAllActive ? (
-        <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          className={
+            renderAllAsGrid
+              ? "mx-auto grid max-w-6xl grid-cols-2 gap-3 px-4 py-6 sm:grid-cols-3 lg:grid-cols-5"
+              : "mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          }
+        >
           {tabs.map((tab) => {
             const isActive = active === tab.value;
             const images =
@@ -176,7 +185,11 @@ export function CategoryTabs({
                 role="tab"
                 aria-selected={isActive}
                 onClick={() => onSelect(tab.value)}
-                className="group relative aspect-[4/5] w-[148px] shrink-0 overflow-hidden rounded-2xl border transition"
+                className={
+                  renderAllAsGrid
+                    ? "group relative aspect-[4/5] w-full overflow-hidden rounded-2xl border transition"
+                    : "group relative aspect-[4/5] w-[148px] shrink-0 overflow-hidden rounded-2xl border transition"
+                }
                 style={{
                   borderColor: isActive ? "rgb(245 158 11)" : "rgb(39 39 42)",
                   backgroundColor: "rgb(9 9 11)",

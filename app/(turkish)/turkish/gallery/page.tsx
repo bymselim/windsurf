@@ -223,13 +223,10 @@ export default function TurkishGalleryPage() {
         allPreviewImageUrl={process.env.NEXT_PUBLIC_ALL_PREVIEW_IMAGE_URL}
         rotateMs={ui?.categoryPreviewRotateMs}
         fadeMs={ui?.categoryPreviewFadeMs}
+        mode="allGrid"
       />
 
-      {category === "All" ? (
-        <div className="mx-auto max-w-6xl px-4 py-10 text-center text-sm text-zinc-500">
-          {UI.all}
-        </div>
-      ) : loading ? (
+      {category === "All" ? null : loading ? (
         <div className="flex min-h-[60vh] items-center justify-center">
           <motion.div
             animate={{ opacity: [0.5, 1, 0.5] }}
