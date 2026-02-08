@@ -59,6 +59,8 @@ export async function POST(request: NextRequest) {
   const name = String(body?.name ?? "").trim();
   const color = String(body?.color ?? "#3b82f6").trim();
   const icon = String(body?.icon ?? "📁").trim();
+  const previewImageUrl =
+    typeof body?.previewImageUrl === "string" ? body.previewImageUrl.trim() : "";
   if (!name) {
     return NextResponse.json({ error: "Category name is required" }, { status: 400 });
   }
@@ -66,10 +68,10 @@ export async function POST(request: NextRequest) {
   if (categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
     return NextResponse.json({ error: "Category already exists" }, { status: 400 });
   }
-  categories.push({ name, color, icon });
+  categories.push({ name, color, icon, previewImageUrl: previewImageUrl || undefined });
   await writeCategoriesToFile(categories);
   await ensureCategoryFolder(name);
-  return NextResponse.json({ name, color, icon });
+  return NextResponse.json({ name, color, icon, previewImageUrl: previewImageUrl || undefined });
 }
 
 export async function PUT(request: NextRequest) {
@@ -81,6 +83,8 @@ export async function PUT(request: NextRequest) {
   const name = String(body?.name ?? body?.newName ?? "").trim();
   const color = String(body?.color ?? "#3b82f6").trim();
   const icon = String(body?.icon ?? "📁").trim();
+  const previewImageUrl =
+    typeof body?.previewImageUrl === "string" ? body.previewImageUrl.trim() : undefined;
   if (!oldName || !name) {
     return NextResponse.json({ error: "oldName and name are required" }, { status: 400 });
   }
@@ -93,7 +97,12 @@ export async function PUT(request: NextRequest) {
   if (nameChanged && categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
     return NextResponse.json({ error: "Target category name already exists" }, { status: 400 });
   }
-  categories[index] = { name, color, icon };
+  categories[index] = {
+    name,
+    color,
+    icon,
+    previewImageUrl: previewImageUrl === "" ? undefined : previewImageUrl,
+  };
   await writeCategoriesToFile(categories);
   if (nameChanged) {
     const artworks = await readArtworksFromFile();

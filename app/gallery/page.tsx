@@ -26,10 +26,11 @@ export default function GalleryPage() {
         setArtworks(raw.map((item: ArtworkFull) => mapFullToArtwork(item, "tr")));
         setCategories(
           Array.isArray(categoriesData)
-            ? categoriesData.map((c: { name: string; icon?: string }) => ({
+            ? categoriesData.map((c: { name: string; icon?: string; previewImageUrl?: string }) => ({
                 value: c.name,
                 label: c.name,
                 icon: c.icon,
+                previewImageUrl: c.previewImageUrl,
               }))
             : []
         );

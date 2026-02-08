@@ -3,11 +3,13 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 interface Category {
   name: string;
   color: string;
   icon: string;
+  previewImageUrl?: string;
   artworkCount?: number;
 }
 
@@ -21,6 +23,7 @@ export default function AdminCategoriesPage() {
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState("#3b82f6");
   const [newIcon, setNewIcon] = useState("🎨");
+  const [newPreviewImageUrl, setNewPreviewImageUrl] = useState("");
   const [addError, setAddError] = useState("");
   const [adding, setAdding] = useState(false);
 
@@ -29,6 +32,7 @@ export default function AdminCategoriesPage() {
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState("");
   const [editIcon, setEditIcon] = useState("");
+  const [editPreviewImageUrl, setEditPreviewImageUrl] = useState("");
   const [editError, setEditError] = useState("");
 
   // Delete
@@ -77,7 +81,12 @@ export default function AdminCategoriesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ name, color: newColor, icon: newIcon }),
+        body: JSON.stringify({
+          name,
+          color: newColor,
+          icon: newIcon,
+          previewImageUrl: newPreviewImageUrl.trim() || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Failed to add");
@@ -85,6 +94,7 @@ export default function AdminCategoriesPage() {
       setNewName("");
       setNewColor("#3b82f6");
       setNewIcon("🎨");
+      setNewPreviewImageUrl("");
     } catch (err) {
       setAddError(err instanceof Error ? err.message : "Failed to add category");
     } finally {
@@ -97,6 +107,7 @@ export default function AdminCategoriesPage() {
     setEditName(cat.name);
     setEditColor(cat.color);
     setEditIcon(cat.icon);
+    setEditPreviewImageUrl(cat.previewImageUrl ?? "");
     setEditError("");
   };
 
@@ -122,6 +133,7 @@ export default function AdminCategoriesPage() {
           name,
           color: editColor,
           icon: editIcon,
+          previewImageUrl: editPreviewImageUrl.trim() || "",
         }),
       });
       const data = await res.json();
@@ -229,6 +241,16 @@ export default function AdminCategoriesPage() {
                 className="w-20 p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-center text-xl focus:border-amber-500/50 focus:outline-none"
               />
             </div>
+            <div className="min-w-[220px] flex-1">
+              <label className="block text-zinc-400 text-sm mb-1">Preview image URL</label>
+              <input
+                type="text"
+                value={newPreviewImageUrl}
+                onChange={(e) => setNewPreviewImageUrl(e.target.value)}
+                placeholder="e.g. /artworks/stone/example.jpg or https://..."
+                className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
+              />
+            </div>
             <button
               type="submit"
               disabled={adding}
@@ -254,6 +276,9 @@ export default function AdminCategoriesPage() {
                     Name
                   </th>
                   <th className="p-4 text-left text-sm font-semibold text-zinc-300">
+                    Preview
+                  </th>
+                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">
                     Color
                   </th>
                   <th className="p-4 text-left text-sm font-semibold text-zinc-300">
@@ -274,6 +299,20 @@ export default function AdminCategoriesPage() {
                     className="border-t border-zinc-800 hover:bg-zinc-900/30"
                   >
                     <td className="p-4 font-medium">{cat.name}</td>
+                    <td className="p-4">
+                      {cat.previewImageUrl ? (
+                        <Image
+                          src={cat.previewImageUrl}
+                          alt=""
+                          width={64}
+                          height={48}
+                          unoptimized
+                          className="h-12 w-16 rounded-lg object-cover border border-zinc-700"
+                        />
+                      ) : (
+                        <span className="text-zinc-600 text-sm">—</span>
+                      )}
+                    </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <span
@@ -309,6 +348,13 @@ export default function AdminCategoriesPage() {
                             onChange={(e) => setEditIcon(e.target.value)}
                             placeholder="🎨"
                             className="w-14 p-1.5 bg-zinc-800 border border-zinc-700 rounded text-center text-lg"
+                          />
+                          <input
+                            type="text"
+                            value={editPreviewImageUrl}
+                            onChange={(e) => setEditPreviewImageUrl(e.target.value)}
+                            placeholder="Preview URL"
+                            className="w-48 p-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm"
                           />
                           <button
                             type="button"
