@@ -21,6 +21,10 @@ type UiSettings = {
   categoryPreviewFadeMs: number;
   galleryIntroTR: string;
   galleryIntroEN: string;
+  welcomeTR: string;
+  welcomeEN: string;
+  quotesTR: Array<{ text: string; author?: string; linkUrl?: string; linkLabel?: string }>;
+  quotesEN: Array<{ text: string; author?: string; linkUrl?: string; linkLabel?: string }>;
 };
 
 export default function SettingsPage() {
@@ -80,6 +84,18 @@ export default function SettingsPage() {
               categoryPreviewFadeMs: fade,
               galleryIntroTR: typeof uiObj.galleryIntroTR === "string" ? uiObj.galleryIntroTR : "",
               galleryIntroEN: typeof uiObj.galleryIntroEN === "string" ? uiObj.galleryIntroEN : "",
+              welcomeTR: typeof uiObj.welcomeTR === "string" ? uiObj.welcomeTR : "",
+              welcomeEN: typeof uiObj.welcomeEN === "string" ? uiObj.welcomeEN : "",
+              quotesTR: Array.isArray(uiObj.quotesTR)
+                ? (uiObj.quotesTR as Array<{ text: string; author?: string; linkUrl?: string; linkLabel?: string }>).filter(
+                    (q) => q && typeof q.text === "string" && q.text.trim().length > 0
+                  )
+                : [],
+              quotesEN: Array.isArray(uiObj.quotesEN)
+                ? (uiObj.quotesEN as Array<{ text: string; author?: string; linkUrl?: string; linkLabel?: string }>).filter(
+                    (q) => q && typeof q.text === "string" && q.text.trim().length > 0
+                  )
+                : [],
             });
           }
         }
@@ -113,6 +129,18 @@ export default function SettingsPage() {
             categoryPreviewFadeMs: fade,
             galleryIntroTR: typeof uiObj.galleryIntroTR === "string" ? uiObj.galleryIntroTR : "",
             galleryIntroEN: typeof uiObj.galleryIntroEN === "string" ? uiObj.galleryIntroEN : "",
+            welcomeTR: typeof uiObj.welcomeTR === "string" ? uiObj.welcomeTR : "",
+            welcomeEN: typeof uiObj.welcomeEN === "string" ? uiObj.welcomeEN : "",
+            quotesTR: Array.isArray(uiObj.quotesTR)
+              ? (uiObj.quotesTR as Array<{ text: string; author?: string; linkUrl?: string; linkLabel?: string }>).filter(
+                  (q) => q && typeof q.text === "string" && q.text.trim().length > 0
+                )
+              : [],
+            quotesEN: Array.isArray(uiObj.quotesEN)
+              ? (uiObj.quotesEN as Array<{ text: string; author?: string; linkUrl?: string; linkLabel?: string }>).filter(
+                  (q) => q && typeof q.text === "string" && q.text.trim().length > 0
+                )
+              : [],
           });
         }
       }
@@ -437,6 +465,10 @@ export default function SettingsPage() {
                     categoryPreviewFadeMs: prev?.categoryPreviewFadeMs ?? 600,
                     galleryIntroTR: prev?.galleryIntroTR ?? "",
                     galleryIntroEN: prev?.galleryIntroEN ?? "",
+                    welcomeTR: prev?.welcomeTR ?? "",
+                    welcomeEN: prev?.welcomeEN ?? "",
+                    quotesTR: prev?.quotesTR ?? [],
+                    quotesEN: prev?.quotesEN ?? [],
                   }))
                 }
                 className="w-full p-3 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none text-sm"
@@ -458,6 +490,10 @@ export default function SettingsPage() {
                     categoryPreviewFadeMs: Number(e.target.value || 0),
                     galleryIntroTR: prev?.galleryIntroTR ?? "",
                     galleryIntroEN: prev?.galleryIntroEN ?? "",
+                    welcomeTR: prev?.welcomeTR ?? "",
+                    welcomeEN: prev?.welcomeEN ?? "",
+                    quotesTR: prev?.quotesTR ?? [],
+                    quotesEN: prev?.quotesEN ?? [],
                   }))
                 }
                 className="w-full p-3 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none text-sm"
@@ -474,6 +510,10 @@ export default function SettingsPage() {
                     categoryPreviewFadeMs: prev?.categoryPreviewFadeMs ?? 600,
                     galleryIntroTR: e.target.value,
                     galleryIntroEN: prev?.galleryIntroEN ?? "",
+                    welcomeTR: prev?.welcomeTR ?? "",
+                    welcomeEN: prev?.welcomeEN ?? "",
+                    quotesTR: prev?.quotesTR ?? [],
+                    quotesEN: prev?.quotesEN ?? [],
                   }))
                 }
                 rows={5}
@@ -491,6 +531,10 @@ export default function SettingsPage() {
                     categoryPreviewFadeMs: prev?.categoryPreviewFadeMs ?? 600,
                     galleryIntroTR: prev?.galleryIntroTR ?? "",
                     galleryIntroEN: e.target.value,
+                    welcomeTR: prev?.welcomeTR ?? "",
+                    welcomeEN: prev?.welcomeEN ?? "",
+                    quotesTR: prev?.quotesTR ?? [],
+                    quotesEN: prev?.quotesEN ?? [],
                   }))
                 }
                 rows={5}

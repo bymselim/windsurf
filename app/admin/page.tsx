@@ -8,6 +8,7 @@ const NAV = [
   { href: "/admin/artworks", label: "Artworks", desc: "Edit all artworks", icon: "🖼️" },
   { href: "/admin/uploads", label: "Uploads", desc: "Upload photos/videos", icon: "⬆️" },
   { href: "/admin/categories", label: "Categories", desc: "Manage categories", icon: "📁" },
+  { href: "/admin/quotes", label: "Quotes", desc: "Welcome text + quotes/links", icon: "💬" },
   { href: "/admin/access-logs", label: "Access Logs", desc: "View who logged in", icon: "📋" },
   { href: "/admin/analytics", label: "Analytics", desc: "Visits, devices, top artworks", icon: "📊" },
   { href: "/admin/settings", label: "Settings", desc: "Change passwords", icon: "🔐" },

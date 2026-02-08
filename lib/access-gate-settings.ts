@@ -19,6 +19,13 @@ export interface AccessGateSettings {
   updatedAt: string;
 }
 
+export interface QuoteItem {
+  text: string;
+  author?: string;
+  linkUrl?: string;
+  linkLabel?: string;
+}
+
 export async function getUiSettings(): Promise<UiSettings> {
   const data = await readSettingsFile();
   const ui = (data?.ui ?? {}) as Partial<UiSettings>;
@@ -26,13 +33,44 @@ export async function getUiSettings(): Promise<UiSettings> {
   const fadeRaw = ui.categoryPreviewFadeMs;
   const introTRRaw = ui.galleryIntroTR;
   const introENRaw = ui.galleryIntroEN;
+  const welcomeTRRaw = ui.welcomeTR;
+  const welcomeENRaw = ui.welcomeEN;
+  const quotesTRRaw = ui.quotesTR;
+  const quotesENRaw = ui.quotesEN;
   const rotate = typeof rotateRaw === "number" && Number.isFinite(rotateRaw) ? rotateRaw : DEFAULT_UI.categoryPreviewRotateMs;
   const fade = typeof fadeRaw === "number" && Number.isFinite(fadeRaw) ? fadeRaw : DEFAULT_UI.categoryPreviewFadeMs;
+
+  const normalizeQuoteArray = (raw: unknown): QuoteItem[] => {
+    if (!Array.isArray(raw)) return [];
+    const out: QuoteItem[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== "object") continue;
+      const obj = item as Record<string, unknown>;
+      const text = typeof obj.text === "string" ? obj.text.trim() : "";
+      if (!text) continue;
+      const author = typeof obj.author === "string" ? obj.author.trim() : "";
+      const linkUrl = typeof obj.linkUrl === "string" ? obj.linkUrl.trim() : "";
+      const linkLabel = typeof obj.linkLabel === "string" ? obj.linkLabel.trim() : "";
+      out.push({
+        text,
+        author: author || undefined,
+        linkUrl: linkUrl || undefined,
+        linkLabel: linkLabel || undefined,
+      });
+      if (out.length >= 50) break;
+    }
+    return out;
+  };
+
   return {
     categoryPreviewRotateMs: Math.max(500, Math.min(30000, Math.round(rotate))),
     categoryPreviewFadeMs: Math.max(100, Math.min(5000, Math.round(fade))),
     galleryIntroTR: typeof introTRRaw === "string" ? introTRRaw : DEFAULT_UI.galleryIntroTR,
     galleryIntroEN: typeof introENRaw === "string" ? introENRaw : DEFAULT_UI.galleryIntroEN,
+    welcomeTR: typeof welcomeTRRaw === "string" ? welcomeTRRaw : DEFAULT_UI.welcomeTR,
+    welcomeEN: typeof welcomeENRaw === "string" ? welcomeENRaw : DEFAULT_UI.welcomeEN,
+    quotesTR: normalizeQuoteArray(quotesTRRaw),
+    quotesEN: normalizeQuoteArray(quotesENRaw),
   };
 }
 
@@ -49,6 +87,10 @@ export async function updateUiSettings(updates: Partial<UiSettings>): Promise<Ui
         : current.categoryPreviewFadeMs,
     galleryIntroTR: typeof updates.galleryIntroTR === "string" ? updates.galleryIntroTR : current.galleryIntroTR,
     galleryIntroEN: typeof updates.galleryIntroEN === "string" ? updates.galleryIntroEN : current.galleryIntroEN,
+    welcomeTR: typeof updates.welcomeTR === "string" ? updates.welcomeTR : current.welcomeTR,
+    welcomeEN: typeof updates.welcomeEN === "string" ? updates.welcomeEN : current.welcomeEN,
+    quotesTR: Array.isArray(updates.quotesTR) ? (updates.quotesTR as QuoteItem[]) : current.quotesTR,
+    quotesEN: Array.isArray(updates.quotesEN) ? (updates.quotesEN as QuoteItem[]) : current.quotesEN,
   };
 
   const data = await readSettingsFile();
@@ -67,6 +109,10 @@ export interface UiSettings {
   categoryPreviewFadeMs: number;
   galleryIntroTR: string;
   galleryIntroEN: string;
+  welcomeTR: string;
+  welcomeEN: string;
+  quotesTR: QuoteItem[];
+  quotesEN: QuoteItem[];
 }
 
 export interface SettingsJson {
@@ -93,6 +139,10 @@ const DEFAULT_UI: UiSettings = {
   categoryPreviewFadeMs: 600,
   galleryIntroTR: "",
   galleryIntroEN: "",
+  welcomeTR: "",
+  welcomeEN: "",
+  quotesTR: [],
+  quotesEN: [],
 };
 
 /**

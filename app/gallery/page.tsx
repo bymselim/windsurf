@@ -18,7 +18,17 @@ export default function GalleryPage() {
     categoryPreviewFadeMs: number;
     galleryIntroTR: string;
     galleryIntroEN: string;
+    welcomeTR: string;
+    welcomeEN: string;
+    quotesTR: Array<{ text: string; author?: string; linkUrl?: string; linkLabel?: string }>;
+    quotesEN: Array<{ text: string; author?: string; linkUrl?: string; linkLabel?: string }>;
   } | null>(null);
+  const [headerItem, setHeaderItem] = useState<
+    | null
+    | { kind: "welcome"; text: string }
+    | { kind: "quote"; text: string; author?: string; linkUrl?: string; linkLabel?: string }
+    | { kind: "intro"; text: string }
+  >(null);
   const [selected, setSelected] = useState<{ artwork: Artwork; index: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -183,10 +193,64 @@ export default function GalleryPage() {
           categoryPreviewFadeMs: fade,
           galleryIntroTR: typeof obj.galleryIntroTR === "string" ? obj.galleryIntroTR : "",
           galleryIntroEN: typeof obj.galleryIntroEN === "string" ? obj.galleryIntroEN : "",
+          welcomeTR: typeof obj.welcomeTR === "string" ? obj.welcomeTR : "",
+          welcomeEN: typeof obj.welcomeEN === "string" ? obj.welcomeEN : "",
+          quotesTR: Array.isArray(obj.quotesTR)
+            ? (obj.quotesTR as Array<{ text: string; author?: string; linkUrl?: string; linkLabel?: string }>).filter(
+                (q) => q && typeof q.text === "string" && q.text.trim().length > 0
+              )
+            : [],
+          quotesEN: Array.isArray(obj.quotesEN)
+            ? (obj.quotesEN as Array<{ text: string; author?: string; linkUrl?: string; linkLabel?: string }>).filter(
+                (q) => q && typeof q.text === "string" && q.text.trim().length > 0
+              )
+            : [],
         });
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (category !== "All" || !ui) {
+      setHeaderItem(null);
+      return;
+    }
+
+    const welcome = (ui.welcomeEN || "").trim();
+    const intro = (ui.galleryIntroEN || "").trim();
+    const quotes = Array.isArray(ui.quotesEN) ? ui.quotesEN : [];
+
+    const key = "gallery_header_seen_en";
+    const isFirst =
+      typeof window !== "undefined" &&
+      (localStorage.getItem(key) == null || localStorage.getItem(key) === "0");
+
+    if (isFirst && welcome) {
+      if (typeof window !== "undefined") localStorage.setItem(key, "1");
+      setHeaderItem({ kind: "welcome", text: welcome });
+      return;
+    }
+
+    if (quotes.length > 0) {
+      const idx = Math.floor(Math.random() * quotes.length);
+      const q = quotes[idx];
+      setHeaderItem({
+        kind: "quote",
+        text: (q.text || "").trim(),
+        author: q.author,
+        linkUrl: q.linkUrl,
+        linkLabel: q.linkLabel,
+      });
+      return;
+    }
+
+    if (intro) {
+      setHeaderItem({ kind: "intro", text: intro });
+      return;
+    }
+
+    setHeaderItem(null);
+  }, [category, ui]);
 
   const filteredList = artworks;
 
@@ -210,11 +274,24 @@ export default function GalleryPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950">
-      {category === "All" && ui?.galleryIntroEN ? (
+      {category === "All" && headerItem?.text ? (
         <div className="mx-auto max-w-3xl px-4 pt-8 pb-2 text-center">
           <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-300/90">
-            {ui.galleryIntroEN}
+            {headerItem.text}
           </p>
+          {headerItem.kind === "quote" && headerItem.author ? (
+            <p className="mt-2 text-xs text-zinc-500">— {headerItem.author}</p>
+          ) : null}
+          {headerItem.kind === "quote" && headerItem.linkUrl ? (
+            <a
+              href={headerItem.linkUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-block text-sm text-amber-400 hover:text-amber-300 transition"
+            >
+              {headerItem.linkLabel || headerItem.linkUrl}
+            </a>
+          ) : null}
         </div>
       ) : null}
       <CategoryTabs
