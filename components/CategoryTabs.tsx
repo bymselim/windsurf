@@ -22,6 +22,7 @@ type CategoryTabsProps = {
   allPreviewImageUrl?: string;
   /** Hide the All/Tümü tab/card and show only categories. */
   hideAllTab?: boolean;
+  otherCategoriesLabel?: string;
   rotateMs?: number;
   fadeMs?: number;
   mode?: "auto" | "allGrid";
@@ -137,10 +138,12 @@ export function CategoryTabs({
   allLabel = "All",
   allPreviewImageUrl,
   hideAllTab = false,
+  otherCategoriesLabel = "Other Categories",
   rotateMs,
   fadeMs,
   mode = "auto",
 }: CategoryTabsProps) {
+  const [quickOpen, setQuickOpen] = useState(false);
   const rotate = typeof rotateMs === "number" && Number.isFinite(rotateMs) ? rotateMs : DEFAULT_ROTATE_MS;
   const fade = typeof fadeMs === "number" && Number.isFinite(fadeMs) ? fadeMs : DEFAULT_FADE_MS;
   const tabs = useMemo(
@@ -166,6 +169,8 @@ export function CategoryTabs({
       className="sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/80"
       role="tablist"
       aria-label="Category filter"
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchEnd={(e) => e.stopPropagation()}
     >
       {isAllActive ? (
         <div
@@ -248,59 +253,73 @@ export function CategoryTabs({
           })}
         </div>
       ) : (
-        <div className="mx-auto grid max-w-6xl auto-cols-max grid-flow-col [grid-template-rows:repeat(2,max-content)] items-center gap-x-2 gap-y-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-x-3 sm:gap-y-3 sm:py-3">
-          {tabs.map((tab, idx) => {
-            const isActive = active === tab.value;
-            const images =
-              tab.value === "All"
-                ? tab.previewImageUrl
-                  ? [tab.previewImageUrl]
-                  : []
-                : Array.isArray(tab.previewImages) && tab.previewImages.length > 0
-                  ? tab.previewImages
-                  : tab.previewImageUrl
-                    ? [tab.previewImageUrl]
-                    : [];
-            const offsetMs = tab.value === "All" ? 0 : hash(tab.value) % rotate;
-            const isPriority = idx < 4;
-            return (
-              <button
-                key={tab.value}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => onSelect(tab.value)}
-                className="flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition whitespace-nowrap sm:px-5 sm:py-2.5 sm:text-sm"
-                style={{
-                  borderColor: isActive ? "rgb(245 158 11)" : "rgb(39 39 42)",
-                  backgroundColor: isActive ? "rgba(245, 158, 11, 0.15)" : "transparent",
-                  color: isActive ? "rgb(245 158 11)" : "rgb(161 161 170)",
-                }}
-              >
-                {images.length > 0 ? (
-                  <span className="relative h-6 w-6 overflow-hidden rounded-full border border-zinc-700">
-                    <RotatingImage
-                      images={images}
-                      offsetMs={offsetMs}
-                      rotateMs={rotate}
-                      fadeMs={fade}
-                      className="object-cover"
-                      sizes="24px"
-                      priority={isPriority}
-                    />
-                  </span>
+        <div className="mx-auto w-full max-w-6xl px-4 py-2 sm:py-3">
+          <div className="flex items-center justify-center">
+            <button
+              type="button"
+              onClick={() => setQuickOpen((v) => !v)}
+              className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-xs font-semibold text-zinc-100 hover:bg-zinc-800 transition sm:text-sm"
+              aria-expanded={quickOpen}
+            >
+              {otherCategoriesLabel}
+            </button>
+          </div>
+
+          {quickOpen ? (
+            <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-950/95 p-2">
+              <div className="grid grid-cols-1 gap-2">
+                {!hideAllTab ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickOpen(false);
+                      onSelect("All");
+                    }}
+                    className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition"
+                    style={{
+                      borderColor: active === "All" ? "rgb(245 158 11)" : "rgb(39 39 42)",
+                      backgroundColor: active === "All" ? "rgba(245, 158, 11, 0.15)" : "transparent",
+                      color: active === "All" ? "rgb(245 158 11)" : "rgb(244 244 245)",
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <FiLayers className="h-4 w-4" aria-hidden />
+                      <span>{allLabel}</span>
+                    </span>
+                  </button>
                 ) : null}
-                {tab.value === "All" ? (
-                  <FiLayers className="h-4 w-4" aria-hidden />
-                ) : tab.icon ? (
-                  <span className="text-base leading-none" aria-hidden>
-                    {tab.icon}
-                  </span>
-                ) : null}
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+
+                {categories.map((c) => {
+                  const isActive = active === c.value;
+                  return (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => {
+                        setQuickOpen(false);
+                        onSelect(c.value);
+                      }}
+                      className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition"
+                      style={{
+                        borderColor: isActive ? "rgb(245 158 11)" : "rgb(39 39 42)",
+                        backgroundColor: isActive ? "rgba(245, 158, 11, 0.15)" : "transparent",
+                        color: isActive ? "rgb(245 158 11)" : "rgb(244 244 245)",
+                      }}
+                    >
+                      <span className="flex items-center gap-2">
+                        {c.icon ? (
+                          <span className="text-base leading-none" aria-hidden>
+                            {c.icon}
+                          </span>
+                        ) : null}
+                        <span>{c.label}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </nav>
