@@ -260,15 +260,16 @@ export default function ArtworksAdminPage() {
                       <td className="p-2">
                         <button
                           type="button"
-                          onClick={() => setImageModal(`/artworks/${artwork.filename}`)}
+                          onClick={() => setImageModal(artwork.imageUrl ?? `/artworks/${artwork.filename}`)}
                           className="block"
                         >
                           <Image
-                            src={`/artworks/${artwork.filename}`}
+                            src={artwork.imageUrl ?? `/artworks/${artwork.filename}`}
                             alt={artwork.titleTR}
                             width={64}
                             height={64}
                             className="w-16 h-16 object-cover rounded"
+                            unoptimized={(artwork.imageUrl ?? "").startsWith("http")}
                           />
                         </button>
                       </td>
