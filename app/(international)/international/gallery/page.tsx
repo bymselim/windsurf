@@ -42,8 +42,11 @@ export default function InternationalGalleryPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
+  const [showNavHint, setShowNavHint] = useState(false);
+  const [highlightTabs, setHighlightTabs] = useState(false);
   const seedRef = useRef<string>("");
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const PAGE_LIMIT = 24;
 
@@ -132,6 +135,71 @@ export default function InternationalGalleryPage() {
       recordPage("/international/gallery" + (category !== "All" ? `?cat=${category}` : ""));
     }
   }, [category]);
+
+  useEffect(() => {
+    if (category === "All" || selected) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        setCategory("All");
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [category, selected]);
+
+  useEffect(() => {
+    if (category === "All" || selected) return;
+    const el = containerRef.current;
+    if (!el) return;
+
+    let startX = 0;
+    let startY = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!t) return;
+      startX = t.clientX;
+      startY = t.clientY;
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      const t = e.changedTouches[0];
+      if (!t) return;
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return;
+      setCategory("All");
+    };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [category, selected]);
+
+  useEffect(() => {
+    if (category === "All") {
+      setShowNavHint(false);
+      setHighlightTabs(false);
+      return;
+    }
+    if (selected) return;
+    if (typeof window === "undefined") return;
+
+    const key = "gallery_tabs_hint_seen_en";
+    if (localStorage.getItem(key) === "1") return;
+    localStorage.setItem(key, "1");
+    setShowNavHint(true);
+    setHighlightTabs(true);
+
+    const t1 = window.setTimeout(() => setHighlightTabs(false), 2500);
+    const t2 = window.setTimeout(() => setShowNavHint(false), 6000);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [category, selected]);
 
   const onArtworkViewed = useCallback((id: string) => recordArtworkViewed(id), []);
   const onOrderClicked = useCallback(() => recordOrderClicked(), []);
@@ -302,7 +370,7 @@ export default function InternationalGalleryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div ref={containerRef} className="min-h-screen bg-zinc-950">
       {category === "All" && headerItem?.text ? (
         <div className="mx-auto max-w-3xl px-4 pt-8 pb-2 text-center">
           <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-300/90">
@@ -323,16 +391,32 @@ export default function InternationalGalleryPage() {
           ) : null}
         </div>
       ) : null}
-      <CategoryTabs
-        categories={categories}
-        active={category}
-        onSelect={setCategory}
-        allLabel={UI.all}
-        allPreviewImageUrl={process.env.NEXT_PUBLIC_ALL_PREVIEW_IMAGE_URL}
-        rotateMs={ui?.categoryPreviewRotateMs}
-        fadeMs={ui?.categoryPreviewFadeMs}
-        mode="allGrid"
-      />
+      <div
+        className={
+          highlightTabs
+            ? "ring-1 ring-amber-500/50 bg-amber-500/5 animate-pulse transition"
+            : "transition"
+        }
+      >
+        <CategoryTabs
+          categories={categories}
+          active={category}
+          onSelect={setCategory}
+          allLabel={UI.all}
+          allPreviewImageUrl={process.env.NEXT_PUBLIC_ALL_PREVIEW_IMAGE_URL}
+          rotateMs={ui?.categoryPreviewRotateMs}
+          fadeMs={ui?.categoryPreviewFadeMs}
+          mode="allGrid"
+        />
+      </div>
+
+      {showNavHint ? (
+        <div className="mx-auto max-w-3xl px-4 pt-3">
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            You can switch categories from the menu above.
+          </div>
+        </div>
+      ) : null}
       {category === "All" ? null : loading ? (
         <div className="flex min-h-[60vh] items-center justify-center">
           <motion.div
