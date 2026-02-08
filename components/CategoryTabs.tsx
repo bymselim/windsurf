@@ -50,6 +50,7 @@ function RotatingImage({
 }) {
   const [index, setIndex] = useState(0);
   const [prevIndex, setPrevIndex] = useState<number | null>(null);
+  const [phase, setPhase] = useState<0 | 1>(1);
 
   useEffect(() => {
     if (!images || images.length <= 1) return;
@@ -57,12 +58,16 @@ function RotatingImage({
     let intervalId: number | null = null;
     let fadeTimeoutId: number | null = null;
     let startTimeoutId: number | null = null;
+    let rafId: number | null = null;
 
     const tick = () => {
+      setPhase(0);
       setIndex((i) => {
         setPrevIndex(i);
         return (i + 1) % images.length;
       });
+      if (rafId) window.cancelAnimationFrame(rafId);
+      rafId = window.requestAnimationFrame(() => setPhase(1));
       if (fadeTimeoutId) window.clearTimeout(fadeTimeoutId);
       fadeTimeoutId = window.setTimeout(() => setPrevIndex(null), fadeMs + 50);
     };
@@ -76,6 +81,7 @@ function RotatingImage({
       if (startTimeoutId) window.clearTimeout(startTimeoutId);
       if (intervalId) window.clearInterval(intervalId);
       if (fadeTimeoutId) window.clearTimeout(fadeTimeoutId);
+      if (rafId) window.cancelAnimationFrame(rafId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [images.join("|"), offsetMs, rotateMs, fadeMs]);
@@ -92,8 +98,8 @@ function RotatingImage({
           alt=""
           fill
           unoptimized
-          className={`${className} opacity-0 transition-opacity`}
-          style={{ transitionDuration: `${fadeMs}ms` }}
+          className={`${className} transition-opacity`}
+          style={{ opacity: phase === 0 ? 1 : 0, transitionDuration: `${fadeMs}ms` }}
           sizes={sizes}
           priority={false}
         />
@@ -104,7 +110,11 @@ function RotatingImage({
         alt=""
         fill
         unoptimized
-        className={`${className} opacity-100`}
+        className={`${className} transition-opacity`}
+        style={{
+          opacity: prevSrc ? (phase === 0 ? 0 : 1) : 1,
+          transitionDuration: `${fadeMs}ms`,
+        }}
         sizes={sizes}
         priority={false}
       />
