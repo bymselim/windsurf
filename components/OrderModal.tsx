@@ -12,6 +12,10 @@ const WHATSAPP_NUMBER =
   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "905551234567";
 const CONTACT_EMAIL =
   process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "info@gallery.com";
+const INSTAGRAM_HANDLE =
+  process.env.NEXT_PUBLIC_INSTAGRAM ??
+  process.env.NEXT_PUBLIC_INSTAGRAM_USERNAME ??
+  "bymelikesevinc";
 
 function whatsAppMessage(artwork: Artwork, locale: GalleryLocale): string {
   const text =
@@ -29,14 +33,6 @@ function emailBody(artwork: Artwork): string {
   return encodeURIComponent(
     `Hello,\n\nI would like to inquire about ordering the artwork "${artwork.title}" (${artwork.dimensions}).\n\nPlease contact me with availability and next steps.\n\nThank you.`
   );
-}
-
-function instagramDirectMessage(artwork: Artwork, locale: GalleryLocale): string {
-  const text =
-    locale === "tr"
-      ? `Merhaba! '${artwork.title}' adlı eseri sipariş vermek istiyorum.`
-      : `Hello! I'm interested in ordering the artwork '${artwork.title}'. Please contact me.`;
-  return encodeURIComponent(text);
 }
 
 type OrderModalProps = {
@@ -76,8 +72,7 @@ function buildOptions(locale: GalleryLocale) {
     icon: FaInstagram,
     iconBg: "bg-gradient-to-br from-[#F58529] via-[#DD2A7B] to-[#8134AF]/90",
     iconColor: "text-white",
-    getHref: (artwork: Artwork) =>
-      `https://instagram.com/direct/inbox?text=${instagramDirectMessage(artwork, locale)}`,
+    getHref: () => `https://instagram.com/${INSTAGRAM_HANDLE.replace(/^@/, "")}`,
     external: true,
   };
   return locale === "tr" ? [whatsapp, email, instagram] : [email, instagram, whatsapp];

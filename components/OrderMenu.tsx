@@ -12,7 +12,7 @@ const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "info@gallery.com
 const INSTAGRAM_HANDLE =
   process.env.NEXT_PUBLIC_INSTAGRAM ??
   process.env.NEXT_PUBLIC_INSTAGRAM_USERNAME ??
-  "gallery";
+  "bymelikesevinc";
 
 type OrderMenuProps = {
   artwork: Artwork;
