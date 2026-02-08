@@ -73,6 +73,9 @@ export default function ArtworksAdminPage() {
     dead: number;
     deadList: Array<{ id: string; titleTR: string; imageUrl: string; reason?: string }>;
   } | null>(null);
+  const [clearAllConfirm, setClearAllConfirm] = useState("");
+  const [clearAllLoading, setClearAllLoading] = useState(false);
+  const [clearAllMessage, setClearAllMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -106,6 +109,35 @@ export default function ArtworksAdminPage() {
       setValidateLoading(false);
     }
   }, []);
+
+  const clearAllArtworks = useCallback(async () => {
+    if (clearAllConfirm !== "DELETE_ALL_ARTWORKS") {
+      setClearAllMessage({ ok: false, text: "Onay için kutuya DELETE_ALL_ARTWORKS yazın." });
+      return;
+    }
+    setClearAllLoading(true);
+    setClearAllMessage(null);
+    try {
+      const res = await fetch("/api/admin/artworks/clear-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ confirm: "DELETE_ALL_ARTWORKS" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setClearAllMessage({ ok: true, text: "Tüm eserler silindi. Artık Yüklemeler sayfasından yeniden yükleyebilirsiniz." });
+        setClearAllConfirm("");
+        loadArtworks();
+      } else {
+        setClearAllMessage({ ok: false, text: (data?.error as string) || "Silme başarısız." });
+      }
+    } catch {
+      setClearAllMessage({ ok: false, text: "İstek hatası." });
+    } finally {
+      setClearAllLoading(false);
+    }
+  }, [clearAllConfirm, loadArtworks]);
 
   const loadArtworks = useCallback(async () => {
     setLoading(true);
@@ -632,6 +664,38 @@ export default function ArtworksAdminPage() {
               )}
             </div>
           )}
+
+          <div className="mt-4 rounded-xl border border-red-900/50 bg-zinc-900/30 p-4">
+            <div className="text-sm font-semibold text-red-400/90 mb-2">Tüm eserleri sil (sıfırdan yükleme)</div>
+            <p className="text-xs text-zinc-500 mb-3">
+              Tüm eser kayıtları silinir (fotoğraflar Blob’da kalır). Sonra Admin → Yüklemeler’den kategorilere göre yeniden yükleyebilirsiniz.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                value={clearAllConfirm}
+                onChange={(e) => {
+                setClearAllMessage(null);
+                setClearAllConfirm(e.target.value);
+              }}
+                placeholder="DELETE_ALL_ARTWORKS yazın"
+                className="w-64 p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-100 text-sm placeholder-zinc-500 focus:border-red-500/50 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={clearAllArtworks}
+                disabled={clearAllLoading || clearAllConfirm !== "DELETE_ALL_ARTWORKS"}
+                className="rounded-lg bg-red-900/70 hover:bg-red-800/80 text-white px-4 py-2 text-sm font-medium transition disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {clearAllLoading ? "Siliniyor..." : "Tüm eserleri sil"}
+              </button>
+            </div>
+            {clearAllMessage && (
+              <p className={`mt-2 text-sm ${clearAllMessage.ok ? "text-green-400" : "text-red-400"}`}>
+                {clearAllMessage.text}
+              </p>
+            )}
+          </div>
 
           <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30">
             <button

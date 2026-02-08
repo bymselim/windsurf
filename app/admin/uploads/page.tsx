@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 type UploadedFile = {
@@ -10,6 +11,7 @@ type UploadedFile = {
   type: string;
   pathname: string;
   url: string;
+  thumbUrl?: string;
 };
 
 type UploadErrorItem = {
@@ -350,14 +352,47 @@ export default function AdminUploadsPage() {
               <span className="text-xs text-zinc-500">{uploaded.length} files</span>
             </div>
             <div className="divide-y divide-zinc-800">
-              {uploaded.map((u) => (
-                <div key={u.url} className="px-4 py-3">
-                  <div className="flex flex-col gap-1">
-                    <div className="text-sm text-zinc-200 font-medium">{u.name}</div>
-                    <div className="text-xs text-zinc-500 font-mono break-all">{u.url}</div>
+              {uploaded.map((u) => {
+                const previewUrl = (u as UploadedFile & { thumbUrl?: string }).thumbUrl || u.url;
+                const isImage = (u.type || "").startsWith("image/") || /\.(jpe?g|png|gif|webp)$/i.test(u.name);
+                return (
+                  <div key={u.url} className="px-4 py-3 flex items-start gap-3">
+                    {isImage ? (
+                      <div className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-zinc-800">
+                        <Image
+                          src={previewUrl}
+                          alt={u.name}
+                          fill
+                          className="object-cover"
+                          sizes="64px"
+                          unoptimized={previewUrl.startsWith("http")}
+                          onError={(e) => {
+                            const container = e.currentTarget.closest(".relative");
+                            const fallback = container?.querySelector("[data-upload-fallback]") as HTMLElement | null;
+                            if (fallback) fallback.style.display = "flex";
+                          }}
+                        />
+                        <div
+                          data-upload-fallback
+                          className="absolute inset-0 hidden items-center justify-center text-zinc-500 text-xs bg-zinc-800"
+                          style={{ display: "none" }}
+                          aria-hidden
+                        >
+                          Hata
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-16 h-16 shrink-0 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-500 text-xs">
+                        📄
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-zinc-200 font-medium">{u.name}</div>
+                      <div className="text-xs text-zinc-500 font-mono break-all">{u.url}</div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ) : null}

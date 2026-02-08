@@ -12,20 +12,26 @@ function toPublicUrl(filename: string): string {
   return isAbsoluteUrl(filename) ? filename : `${ARTWORKS_BASE}/${filename}`;
 }
 
-/** HEAD request with timeout. Returns true if response ok. */
-async function checkUrlReachable(url: string, timeoutMs = 8000): Promise<boolean> {
+/** HEAD first; if 405/403 try GET. Many CDNs/Blob storages don't support HEAD. */
+async function checkUrlReachable(url: string, timeoutMs = 10000): Promise<boolean> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  const opts = {
+    signal: controller.signal,
+    cache: "no-store" as RequestCache,
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; GalleryValidate/1.0)" },
+  };
   try {
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), timeoutMs);
-    const res = await fetch(url, {
-      method: "HEAD",
-      signal: controller.signal,
-      cache: "no-store",
-      headers: { "User-Agent": "Gallery-Validate/1.0" },
-    });
+    const headRes = await fetch(url, { ...opts, method: "HEAD" });
     clearTimeout(t);
-    return res.ok;
+    if (headRes.ok) return true;
+    if (headRes.status === 405 || headRes.status === 403) {
+      const getRes = await fetch(url, { ...opts, method: "GET" });
+      return getRes.ok;
+    }
+    return false;
   } catch {
+    clearTimeout(t);
     return false;
   }
 }
