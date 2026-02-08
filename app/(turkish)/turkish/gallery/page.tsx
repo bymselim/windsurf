@@ -384,10 +384,11 @@ export default function TurkishGalleryPage() {
           <button
             type="button"
             onClick={() => setCategory("All")}
-            className="absolute left-3 top-3 z-10 rounded-full border border-zinc-700 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900 transition"
+            className="fixed left-3 top-1/2 -translate-y-1/2 z-40 rounded-xl border border-zinc-700 bg-zinc-950/70 px-3 py-2 text-xs text-zinc-200/70 hover:text-zinc-200 hover:bg-zinc-900/80 transition"
             aria-label="Tümü"
           >
-            ←
+            <span className="mr-2">←</span>
+            <span>geri dön</span>
           </button>
         ) : null}
 
