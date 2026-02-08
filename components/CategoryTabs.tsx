@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FiLayers } from "react-icons/fi";
 import Image from "next/image";
 
@@ -144,6 +144,8 @@ export function CategoryTabs({
   mode = "auto",
 }: CategoryTabsProps) {
   const [navEl, setNavEl] = useState<HTMLElement | null>(null);
+  const leadingPointerDownRef = useRef<{ x: number; y: number } | null>(null);
+  const leadingDraggedRef = useRef(false);
   const rotate = typeof rotateMs === "number" && Number.isFinite(rotateMs) ? rotateMs : DEFAULT_ROTATE_MS;
   const fade = typeof fadeMs === "number" && Number.isFinite(fadeMs) ? fadeMs : DEFAULT_FADE_MS;
   const tabs = useMemo(
@@ -256,7 +258,22 @@ export function CategoryTabs({
           {leadingLabel ? (
             <button
               type="button"
+              onPointerDown={(e) => {
+                leadingPointerDownRef.current = { x: e.clientX, y: e.clientY };
+                leadingDraggedRef.current = false;
+              }}
+              onPointerMove={(e) => {
+                const start = leadingPointerDownRef.current;
+                if (!start) return;
+                const dx = Math.abs(e.clientX - start.x);
+                const dy = Math.abs(e.clientY - start.y);
+                if (dx > 8 || dy > 8) leadingDraggedRef.current = true;
+              }}
+              onPointerUp={() => {
+                leadingPointerDownRef.current = null;
+              }}
               onClick={() => {
+                if (leadingDraggedRef.current) return;
                 onSelect("All");
                 window.setTimeout(() => navEl?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
               }}
