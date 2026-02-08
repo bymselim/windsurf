@@ -120,6 +120,7 @@ export default function InternationalGalleryPage() {
         active={category}
         onSelect={setCategory}
         allLabel={UI.all}
+        allPreviewImageUrl={process.env.NEXT_PUBLIC_ALL_PREVIEW_IMAGE_URL}
       />
 
       {loading ? (

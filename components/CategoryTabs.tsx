@@ -18,6 +18,8 @@ type CategoryTabsProps = {
   onSelect: (value: string) => void;
   /** Label for "All" tab (e.g. "Tümü" for Turkish). Default "All". */
   allLabel?: string;
+  /** Optional preview image for the All/Tümü card. */
+  allPreviewImageUrl?: string;
 };
 
 const ROTATE_MS = 2000;
@@ -102,10 +104,25 @@ function RotatingImage({
   );
 }
 
-export function CategoryTabs({ categories, active, onSelect, allLabel = "All" }: CategoryTabsProps) {
+export function CategoryTabs({
+  categories,
+  active,
+  onSelect,
+  allLabel = "All",
+  allPreviewImageUrl,
+}: CategoryTabsProps) {
   const tabs = useMemo(
-    () => [{ value: "All", label: allLabel, icon: undefined }, ...categories],
-    [allLabel, categories]
+    () =>
+      [
+        {
+          value: "All",
+          label: allLabel,
+          icon: undefined,
+          previewImageUrl: allPreviewImageUrl,
+        },
+        ...categories,
+      ],
+    [allLabel, allPreviewImageUrl, categories]
   );
   const isAllActive = active === "All";
 
@@ -121,7 +138,9 @@ export function CategoryTabs({ categories, active, onSelect, allLabel = "All" }:
             const isActive = active === tab.value;
             const images =
               tab.value === "All"
-                ? []
+                ? tab.previewImageUrl
+                  ? [tab.previewImageUrl]
+                  : []
                 : Array.isArray(tab.previewImages) && tab.previewImages.length > 0
                   ? tab.previewImages
                   : tab.previewImageUrl
@@ -185,7 +204,9 @@ export function CategoryTabs({ categories, active, onSelect, allLabel = "All" }:
             const isActive = active === tab.value;
             const images =
               tab.value === "All"
-                ? []
+                ? tab.previewImageUrl
+                  ? [tab.previewImageUrl]
+                  : []
                 : Array.isArray(tab.previewImages) && tab.previewImages.length > 0
                   ? tab.previewImages
                   : tab.previewImageUrl

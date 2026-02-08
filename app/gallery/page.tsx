@@ -91,7 +91,12 @@ export default function GalleryPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950">
-      <CategoryTabs categories={categories} active={category} onSelect={setCategory} />
+      <CategoryTabs
+        categories={categories}
+        active={category}
+        onSelect={setCategory}
+        allPreviewImageUrl={process.env.NEXT_PUBLIC_ALL_PREVIEW_IMAGE_URL}
+      />
 
       {loading ? (
         <div className="flex min-h-[60vh] items-center justify-center">
