@@ -64,6 +64,13 @@ export default function TurkishGalleryPage() {
           return list[Math.floor(Math.random() * list.length)];
         };
 
+        const pickSample = (cat: string): string[] | undefined => {
+          const list = imageByCategory[cat] ?? [];
+          if (list.length === 0) return undefined;
+          const shuffled = [...list].sort(() => Math.random() - 0.5);
+          return shuffled.slice(0, 10);
+        };
+
         setCategories(
           Array.isArray(categoriesData)
             ? categoriesData.map((c: { name: string; icon?: string; previewImageUrl?: string }) => ({
@@ -71,6 +78,7 @@ export default function TurkishGalleryPage() {
                 label: c.name,
                 icon: c.icon,
                 previewImageUrl: pickRandom(c.name) ?? c.previewImageUrl,
+                previewImages: pickSample(c.name),
               }))
             : []
         );

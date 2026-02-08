@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { FiLayers } from "react-icons/fi";
 import Image from "next/image";
 
@@ -8,6 +9,7 @@ export interface CategoryItem {
   label: string;
   icon?: string;
   previewImageUrl?: string;
+  previewImages?: string[];
 }
 
 type CategoryTabsProps = {
@@ -19,8 +21,44 @@ type CategoryTabsProps = {
 };
 
 export function CategoryTabs({ categories, active, onSelect, allLabel = "All" }: CategoryTabsProps) {
-  const tabs = [{ value: "All", label: allLabel, icon: undefined }, ...categories];
+  const tabs = useMemo(
+    () => [{ value: "All", label: allLabel, icon: undefined }, ...categories],
+    [allLabel, categories]
+  );
   const isAllActive = active === "All";
+
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 4500);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const hash = (s: string): number => {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return Math.abs(h);
+  };
+
+  const imageForTab = useMemo(() => {
+    const out: Record<string, string | undefined> = {};
+    for (const tab of tabs) {
+      if (tab.value === "All") continue;
+      const list =
+        Array.isArray(tab.previewImages) && tab.previewImages.length > 0
+          ? tab.previewImages
+          : tab.previewImageUrl
+            ? [tab.previewImageUrl]
+            : [];
+      if (list.length === 0) {
+        out[tab.value] = undefined;
+        continue;
+      }
+      const start = hash(tab.value) % list.length;
+      out[tab.value] = list[(start + tick) % list.length];
+    }
+    return out;
+  }, [tabs, tick]);
 
   return (
     <nav
@@ -32,7 +70,7 @@ export function CategoryTabs({ categories, active, onSelect, allLabel = "All" }:
         <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {tabs.map((tab) => {
             const isActive = active === tab.value;
-            const img = tab.value === "All" ? undefined : tab.previewImageUrl;
+            const img = tab.value === "All" ? undefined : imageForTab[tab.value];
             return (
               <button
                 key={tab.value}
@@ -40,7 +78,7 @@ export function CategoryTabs({ categories, active, onSelect, allLabel = "All" }:
                 role="tab"
                 aria-selected={isActive}
                 onClick={() => onSelect(tab.value)}
-                className="group relative h-[74px] w-[160px] shrink-0 overflow-hidden rounded-2xl border transition"
+                className="group relative aspect-[4/5] w-[148px] shrink-0 overflow-hidden rounded-2xl border transition"
                 style={{
                   borderColor: isActive ? "rgb(245 158 11)" : "rgb(39 39 42)",
                   backgroundColor: "rgb(9 9 11)",
@@ -53,7 +91,7 @@ export function CategoryTabs({ categories, active, onSelect, allLabel = "All" }:
                     fill
                     unoptimized
                     className="object-cover opacity-90 transition group-hover:opacity-100"
-                    sizes="160px"
+                    sizes="148px"
                     priority={false}
                   />
                 ) : (
@@ -91,6 +129,7 @@ export function CategoryTabs({ categories, active, onSelect, allLabel = "All" }:
         <div className="mx-auto flex max-w-6xl flex-wrap justify-center gap-1 px-4 py-3 sm:gap-2">
           {tabs.map((tab) => {
             const isActive = active === tab.value;
+            const img = tab.value === "All" ? undefined : imageForTab[tab.value];
             return (
               <button
                 key={tab.value}
@@ -105,6 +144,19 @@ export function CategoryTabs({ categories, active, onSelect, allLabel = "All" }:
                   color: isActive ? "rgb(245 158 11)" : "rgb(161 161 170)",
                 }}
               >
+                {img ? (
+                  <span className="relative h-6 w-6 overflow-hidden rounded-full border border-zinc-700">
+                    <Image
+                      src={img}
+                      alt=""
+                      fill
+                      unoptimized
+                      className="object-cover"
+                      sizes="24px"
+                      priority={false}
+                    />
+                  </span>
+                ) : null}
                 {tab.value === "All" ? (
                   <FiLayers className="h-4 w-4" aria-hidden />
                 ) : tab.icon ? (
