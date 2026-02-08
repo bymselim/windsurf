@@ -21,6 +21,7 @@ export default function TurkishGalleryPage() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [category, setCategory] = useState<string>("All");
+  const [ui, setUi] = useState<{ categoryPreviewRotateMs: number; categoryPreviewFadeMs: number } | null>(null);
   const [selected, setSelected] = useState<{ artwork: Artwork; index: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -29,6 +30,20 @@ export default function TurkishGalleryPage() {
     const onUnload = () => flushSessionLog();
     window.addEventListener("beforeunload", onUnload);
     return () => window.removeEventListener("beforeunload", onUnload);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/settings/ui")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data || typeof data !== "object") return;
+        const obj = data as Record<string, unknown>;
+        const rotate = Number(obj.categoryPreviewRotateMs);
+        const fade = Number(obj.categoryPreviewFadeMs);
+        if (!Number.isFinite(rotate) || !Number.isFinite(fade)) return;
+        setUi({ categoryPreviewRotateMs: rotate, categoryPreviewFadeMs: fade });
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -121,6 +136,8 @@ export default function TurkishGalleryPage() {
         onSelect={setCategory}
         allLabel={UI.all}
         allPreviewImageUrl={process.env.NEXT_PUBLIC_ALL_PREVIEW_IMAGE_URL}
+        rotateMs={ui?.categoryPreviewRotateMs}
+        fadeMs={ui?.categoryPreviewFadeMs}
       />
 
       {loading ? (

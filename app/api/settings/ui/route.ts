@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { getAccessGateConfig } from "@/lib/access-gate-settings";
+import { getUiSettings } from "@/lib/access-gate-settings";
 
 export const dynamic = "force-dynamic";
 
 /** Public endpoint: UI settings (non-sensitive). */
 export async function GET() {
-  const config = await getAccessGateConfig();
-  return NextResponse.json(config);
+  const ui = await getUiSettings();
+  return NextResponse.json(ui);
 }

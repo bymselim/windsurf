@@ -13,6 +13,7 @@ export default function GalleryPage() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [category, setCategory] = useState<string>("All");
+  const [ui, setUi] = useState<{ categoryPreviewRotateMs: number; categoryPreviewFadeMs: number } | null>(null);
   const [selected, setSelected] = useState<{ artwork: Artwork; index: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -66,6 +67,20 @@ export default function GalleryPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    fetch("/api/settings/ui")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data || typeof data !== "object") return;
+        const obj = data as Record<string, unknown>;
+        const rotate = Number(obj.categoryPreviewRotateMs);
+        const fade = Number(obj.categoryPreviewFadeMs);
+        if (!Number.isFinite(rotate) || !Number.isFinite(fade)) return;
+        setUi({ categoryPreviewRotateMs: rotate, categoryPreviewFadeMs: fade });
+      })
+      .catch(() => {});
+  }, []);
+
   const filteredList = useMemo(() => {
     if (category === "All") return artworks;
     return artworks.filter((a) => a.category === category);
@@ -98,6 +113,8 @@ export default function GalleryPage() {
         allPreviewImageUrl={process.env.NEXT_PUBLIC_ALL_PREVIEW_IMAGE_URL}
       />
 
+        rotateMs={ui?.categoryPreviewRotateMs}
+        fadeMs={ui?.categoryPreviewFadeMs}
       {loading ? (
         <div className="flex min-h-[60vh] items-center justify-center">
           <motion.div

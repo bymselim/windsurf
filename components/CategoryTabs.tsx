@@ -20,10 +20,12 @@ type CategoryTabsProps = {
   allLabel?: string;
   /** Optional preview image for the All/Tümü card. */
   allPreviewImageUrl?: string;
+  rotateMs?: number;
+  fadeMs?: number;
 };
 
-const ROTATE_MS = 2000;
-const FADE_MS = 600;
+const DEFAULT_ROTATE_MS = 2000;
+const DEFAULT_FADE_MS = 600;
 
 function hash(value: string): number {
   let h = 0;
@@ -34,11 +36,15 @@ function hash(value: string): number {
 function RotatingImage({
   images,
   offsetMs,
+  rotateMs,
+  fadeMs,
   className,
   sizes,
 }: {
   images: string[];
   offsetMs: number;
+  rotateMs: number;
+  fadeMs: number;
   className: string;
   sizes: string;
 }) {
@@ -53,14 +59,16 @@ function RotatingImage({
     let startTimeoutId: number | null = null;
 
     const tick = () => {
-      setPrevIndex(index);
-      setIndex((i) => (i + 1) % images.length);
+      setIndex((i) => {
+        setPrevIndex(i);
+        return (i + 1) % images.length;
+      });
       if (fadeTimeoutId) window.clearTimeout(fadeTimeoutId);
-      fadeTimeoutId = window.setTimeout(() => setPrevIndex(null), FADE_MS + 50);
+      fadeTimeoutId = window.setTimeout(() => setPrevIndex(null), fadeMs + 50);
     };
 
     startTimeoutId = window.setTimeout(() => {
-      intervalId = window.setInterval(tick, ROTATE_MS);
+      intervalId = window.setInterval(tick, rotateMs);
       tick();
     }, offsetMs);
 
@@ -70,7 +78,7 @@ function RotatingImage({
       if (fadeTimeoutId) window.clearTimeout(fadeTimeoutId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [images.join("|"), offsetMs]);
+  }, [images.join("|"), offsetMs, rotateMs, fadeMs]);
 
   const currentSrc = images[index];
   const prevSrc = prevIndex != null ? images[prevIndex] : null;
@@ -85,7 +93,7 @@ function RotatingImage({
           fill
           unoptimized
           className={`${className} opacity-0 transition-opacity`}
-          style={{ transitionDuration: `${FADE_MS}ms` }}
+          style={{ transitionDuration: `${fadeMs}ms` }}
           sizes={sizes}
           priority={false}
         />
@@ -110,7 +118,11 @@ export function CategoryTabs({
   onSelect,
   allLabel = "All",
   allPreviewImageUrl,
+  rotateMs,
+  fadeMs,
 }: CategoryTabsProps) {
+  const rotate = typeof rotateMs === "number" && Number.isFinite(rotateMs) ? rotateMs : DEFAULT_ROTATE_MS;
+  const fade = typeof fadeMs === "number" && Number.isFinite(fadeMs) ? fadeMs : DEFAULT_FADE_MS;
   const tabs = useMemo(
     () =>
       [
@@ -146,7 +158,7 @@ export function CategoryTabs({
                   : tab.previewImageUrl
                     ? [tab.previewImageUrl]
                     : [];
-            const offsetMs = tab.value === "All" ? 0 : hash(tab.value) % ROTATE_MS;
+            const offsetMs = tab.value === "All" ? 0 : hash(tab.value) % rotate;
             return (
               <button
                 key={tab.value}
@@ -164,6 +176,8 @@ export function CategoryTabs({
                   <RotatingImage
                     images={images}
                     offsetMs={offsetMs}
+                    rotateMs={rotate}
+                    fadeMs={fade}
                     className="object-cover opacity-90 group-hover:opacity-100"
                     sizes="148px"
                   />
@@ -212,7 +226,7 @@ export function CategoryTabs({
                   : tab.previewImageUrl
                     ? [tab.previewImageUrl]
                     : [];
-            const offsetMs = tab.value === "All" ? 0 : hash(tab.value) % ROTATE_MS;
+            const offsetMs = tab.value === "All" ? 0 : hash(tab.value) % rotate;
             return (
               <button
                 key={tab.value}
@@ -232,6 +246,8 @@ export function CategoryTabs({
                     <RotatingImage
                       images={images}
                       offsetMs={offsetMs}
+                      rotateMs={rotate}
+                      fadeMs={fade}
                       className="object-cover"
                       sizes="24px"
                     />

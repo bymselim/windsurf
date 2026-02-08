@@ -19,14 +19,52 @@ export interface AccessGateSettings {
   updatedAt: string;
 }
 
+export async function getUiSettings(): Promise<UiSettings> {
+  const data = await readSettingsFile();
+  const ui = (data?.ui ?? {}) as Partial<UiSettings>;
+  const rotateRaw = ui.categoryPreviewRotateMs;
+  const fadeRaw = ui.categoryPreviewFadeMs;
+  const rotate = typeof rotateRaw === "number" && Number.isFinite(rotateRaw) ? rotateRaw : DEFAULT_UI.categoryPreviewRotateMs;
+  const fade = typeof fadeRaw === "number" && Number.isFinite(fadeRaw) ? fadeRaw : DEFAULT_UI.categoryPreviewFadeMs;
+  return {
+    categoryPreviewRotateMs: Math.max(500, Math.min(30000, Math.round(rotate))),
+    categoryPreviewFadeMs: Math.max(100, Math.min(5000, Math.round(fade))),
+  };
+}
+
+export async function updateUiSettings(updates: Partial<UiSettings>): Promise<UiSettings> {
+  const current = await getUiSettings();
+  const next: UiSettings = {
+    categoryPreviewRotateMs:
+      typeof updates.categoryPreviewRotateMs === "number" && Number.isFinite(updates.categoryPreviewRotateMs)
+        ? updates.categoryPreviewRotateMs
+        : current.categoryPreviewRotateMs,
+    categoryPreviewFadeMs:
+      typeof updates.categoryPreviewFadeMs === "number" && Number.isFinite(updates.categoryPreviewFadeMs)
+        ? updates.categoryPreviewFadeMs
+        : current.categoryPreviewFadeMs,
+  };
+
+  const data = await readSettingsFile();
+  const merged: SettingsJson = { ...data, ui: { ...data.ui, ...next } };
+  await writeSettingsFile(merged);
+  return await getUiSettings();
+}
+
 export interface PasswordsConfig {
   turkish: string;
   international: string;
 }
 
+export interface UiSettings {
+  categoryPreviewRotateMs: number;
+  categoryPreviewFadeMs: number;
+}
+
 export interface SettingsJson {
   accessGate: AccessGateSettings;
   passwords?: Partial<PasswordsConfig>;
+  ui?: Partial<UiSettings>;
 }
 
 const DEFAULT_PW = process.env.NEXT_PUBLIC_ACCESS_PASSWORD ?? "gallery2024";
@@ -40,6 +78,11 @@ const DEFAULT_ACCESS_GATE: AccessGateSettings = {
   showKVKK: true,
   kvkkText: "",
   updatedAt: new Date().toISOString(),
+};
+
+const DEFAULT_UI: UiSettings = {
+  categoryPreviewRotateMs: 2000,
+  categoryPreviewFadeMs: 600,
 };
 
 /**

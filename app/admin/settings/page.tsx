@@ -16,6 +16,11 @@ type AccessGateSettings = {
   updatedAt: string;
 };
 
+type UiSettings = {
+  categoryPreviewRotateMs: number;
+  categoryPreviewFadeMs: number;
+};
+
 export default function SettingsPage() {
   const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState("");
@@ -32,6 +37,9 @@ export default function SettingsPage() {
   const [requirePhoneNumber, setRequirePhoneNumber] = useState(true);
   const [showKVKK, setShowKVKK] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const [ui, setUi] = useState<UiSettings | null>(null);
+  const [uiMessage, setUiMessage] = useState("");
 
   useEffect(() => {
     const saved =
@@ -60,9 +68,49 @@ export default function SettingsPage() {
           setRequirePhoneNumber(Boolean(ag.requirePhoneNumber));
           setShowKVKK(Boolean(ag.showKVKK));
         }
+        if (data?.ui && typeof data.ui === "object") {
+          const uiObj = data.ui as Record<string, unknown>;
+          const rotate = Number(uiObj.categoryPreviewRotateMs);
+          const fade = Number(uiObj.categoryPreviewFadeMs);
+          if (Number.isFinite(rotate) && Number.isFinite(fade)) {
+            setUi({ categoryPreviewRotateMs: rotate, categoryPreviewFadeMs: fade });
+          }
+        }
       })
       .catch(() => {});
   }, [isAuthenticated]);
+
+  const saveUiSettings = async () => {
+    if (!ui) return;
+    setUiMessage("");
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ui }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUiMessage(data?.error ? `❌ ${data.error}` : "❌ Failed to save");
+        return;
+      }
+      if (data?.ui && typeof data.ui === "object") {
+        const uiObj = data.ui as Record<string, unknown>;
+        const rotate = Number(uiObj.categoryPreviewRotateMs);
+        const fade = Number(uiObj.categoryPreviewFadeMs);
+        if (Number.isFinite(rotate) && Number.isFinite(fade)) {
+          setUi({ categoryPreviewRotateMs: rotate, categoryPreviewFadeMs: fade });
+        }
+      }
+      setUiMessage("✅ UI settings saved.");
+    } catch {
+      setUiMessage("❌ Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -355,6 +403,71 @@ export default function SettingsPage() {
                 Enter Gallery
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="mb-10">
+          <h2 className="text-lg font-semibold text-zinc-100 mb-1">Gallery UI</h2>
+          <p className="text-sm text-zinc-500 mb-4">Category preview rotation speed</p>
+
+          <div className="space-y-4">
+            <div className="p-4 bg-zinc-900/50 rounded-lg border border-zinc-800">
+              <label className="block text-sm text-zinc-300 mb-2">Category preview rotate (ms)</label>
+              <input
+                type="number"
+                value={ui?.categoryPreviewRotateMs ?? 2000}
+                min={500}
+                max={30000}
+                step={100}
+                onChange={(e) =>
+                  setUi((prev) => ({
+                    categoryPreviewRotateMs: Number(e.target.value || 0),
+                    categoryPreviewFadeMs: prev?.categoryPreviewFadeMs ?? 600,
+                  }))
+                }
+                className="w-full p-3 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none text-sm"
+              />
+              <p className="mt-2 text-xs text-zinc-500">2000 = 2 seconds</p>
+            </div>
+
+            <div className="p-4 bg-zinc-900/50 rounded-lg border border-zinc-800">
+              <label className="block text-sm text-zinc-300 mb-2">Category preview fade (ms)</label>
+              <input
+                type="number"
+                value={ui?.categoryPreviewFadeMs ?? 600}
+                min={100}
+                max={5000}
+                step={50}
+                onChange={(e) =>
+                  setUi((prev) => ({
+                    categoryPreviewRotateMs: prev?.categoryPreviewRotateMs ?? 2000,
+                    categoryPreviewFadeMs: Number(e.target.value || 0),
+                  }))
+                }
+                className="w-full p-3 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none text-sm"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={saveUiSettings}
+              disabled={saving || !ui}
+              className="rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 px-4 py-2 text-sm font-medium transition disabled:opacity-50"
+            >
+              Save UI settings
+            </button>
+
+            {uiMessage && (
+              <div
+                className={`p-3 rounded-lg text-sm ${
+                  uiMessage.includes("✅")
+                    ? "bg-green-500/20 border border-green-500/30 text-green-400"
+                    : "bg-red-500/20 border border-red-500/30 text-red-400"
+                }`}
+              >
+                {uiMessage}
+              </div>
+            )}
           </div>
         </section>
 
