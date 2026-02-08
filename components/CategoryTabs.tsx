@@ -141,7 +141,6 @@ export function CategoryTabs({
   fadeMs,
   mode = "auto",
 }: CategoryTabsProps) {
-  const [navEl, setNavEl] = useState<HTMLElement | null>(null);
   const rotate = typeof rotateMs === "number" && Number.isFinite(rotateMs) ? rotateMs : DEFAULT_ROTATE_MS;
   const fade = typeof fadeMs === "number" && Number.isFinite(fadeMs) ? fadeMs : DEFAULT_FADE_MS;
   const tabs = useMemo(
@@ -164,7 +163,6 @@ export function CategoryTabs({
 
   return (
     <nav
-      ref={setNavEl}
       className="sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/80"
       role="tablist"
       aria-label="Category filter"
