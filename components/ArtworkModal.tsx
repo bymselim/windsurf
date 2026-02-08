@@ -160,7 +160,7 @@ export function ArtworkModal({
             >
               {isVideoArtwork(artwork) ? (
                 <video
-                  src={`/artworks/${artwork.filename}`}
+                  src={artwork.imageUrl}
                   controls
                   autoPlay
                   playsInline
@@ -169,7 +169,7 @@ export function ArtworkModal({
                 />
               ) : (
                 <Image
-                  src={`/artworks/${artwork.filename}`}
+                  src={artwork.imageUrl}
                   alt={artwork.title}
                   width={800}
                   height={1000}
@@ -190,11 +190,13 @@ export function ArtworkModal({
               <p className="text-sm text-zinc-400">
                 {artwork.category} · {artwork.dimensions}
               </p>
-              <p className="mt-0.5 text-base font-semibold text-amber-500">
-                {artwork.currency === "TL"
-                  ? `${artwork.price.toLocaleString()} TL`
-                  : `$${artwork.price.toLocaleString()}`}
-              </p>
+              {typeof artwork.price === "number" && artwork.price > 0 ? (
+                <p className="mt-0.5 text-base font-semibold text-amber-500">
+                  {artwork.currency === "TL"
+                    ? `${artwork.price.toLocaleString()} TL`
+                    : `$${artwork.price.toLocaleString()}`}
+                </p>
+              ) : null}
               {artwork.description && (
                 <div className="mt-4 p-4 bg-zinc-900/50 rounded-lg">
                   <p className="text-zinc-300 text-sm leading-relaxed">

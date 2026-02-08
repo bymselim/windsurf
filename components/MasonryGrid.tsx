@@ -48,7 +48,7 @@ export function MasonryGrid({ artworks, category, onSelect }: MasonryGridProps) 
               <div className="aspect-[4/5] relative overflow-hidden">
                 {isVideoArtwork(artwork) ? (
                   <video
-                    src={`/artworks/${artwork.filename}`}
+                    src={artwork.imageUrl}
                     muted
                     loop
                     playsInline
@@ -58,11 +58,12 @@ export function MasonryGrid({ artworks, category, onSelect }: MasonryGridProps) 
                   />
                 ) : (
                   <Image
-                    src={`/artworks/${artwork.filename}`}
+                    src={artwork.imageUrl}
                     alt={artwork.title}
                     fill
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                     className="object-cover transition duration-300 group-hover:scale-105"
+                    unoptimized={artwork.imageUrl.startsWith("http")}
                   />
                 )}
               </div>
