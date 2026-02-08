@@ -1,8 +1,16 @@
 import Link from "next/link";
+import { getUiSettings } from "@/lib/access-gate-settings";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const ui = await getUiSettings();
+  const intro = (ui.galleryIntroTR || ui.galleryIntroEN || "").trim();
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 px-4 py-8">
+      {intro ? (
+        <div className="w-full max-w-2xl pb-6 text-center">
+          <p className="text-sm leading-relaxed text-zinc-300/90">{intro}</p>
+        </div>
+      ) : null}
       <div className="w-full max-w-md rounded-2xl border border-zinc-700/50 bg-zinc-900/80 p-8 shadow-2xl backdrop-blur">
         <h1 className="mb-2 text-center text-xl font-semibold tracking-tight text-zinc-100 sm:text-2xl">
           Welcome to the Gallery
