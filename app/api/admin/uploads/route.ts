@@ -40,8 +40,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No files" }, { status: 400 });
   }
 
-  const rawFolder = typeof form.get("folder") === "string" ? String(form.get("folder")) : "";
-  const folder = safePathSegment(rawFolder);
+  const categoryRaw = typeof form.get("category") === "string" ? String(form.get("category")) : "";
+  const categoryName = categoryRaw.trim();
+  if (!categoryName) {
+    return NextResponse.json({ error: "Category is required" }, { status: 400 });
+  }
+
+  const folder = safePathSegment(categoryName);
+  if (!folder) {
+    return NextResponse.json({ error: "Invalid category" }, { status: 400 });
+  }
   const prefix = "artworks";
 
   const uploads = await Promise.all(
@@ -66,47 +74,56 @@ export async function POST(request: NextRequest) {
     })
   );
 
-  // Ensure category exists (category = folder). If folder empty, we still create artworks under category "Uncategorized".
-  const categoryName = folder || "Uncategorized";
-  const categories = await readCategoriesFromFile();
-  if (!categories.some((c) => c.name === categoryName)) {
-    categories.push({ name: categoryName, color: "#3b82f6", icon: "🎨" });
-    await writeCategoriesToFile(categories);
-  }
-
-  const existing = await readArtworksFromFile();
-  const existingByFilename = new Set(existing.map((e) => e.filename));
-
   const created: Array<{ id: string; filename: string; category: string }> = [];
-  for (const u of uploads) {
-    // Avoid duplicating by exact filename/url.
-    if (existingByFilename.has(u.url)) continue;
-    existingByFilename.add(u.url);
+  try {
+    const categories = await readCategoriesFromFile();
+    if (!categories.some((c) => c.name === categoryName)) {
+      categories.push({ name: categoryName, color: "#3b82f6", icon: "🎨" });
+      await writeCategoriesToFile(categories);
+    }
 
-    const baseTitle = String(u.name || "Artwork").replace(/\.[^.]+$/, "").trim();
-    const dimensionsCM = "";
-    const dimensionsIN = dimensionsCMToIN(dimensionsCM);
-    const id = randomUUID();
-    existing.push({
-      id,
-      category: categoryName,
-      filename: u.url,
-      titleTR: baseTitle || "Yeni Eser",
-      titleEN: baseTitle || "New Artwork",
-      descriptionTR: null,
-      descriptionEN: null,
-      priceTRY: 0,
-      priceUSD: 0,
-      dimensionsCM,
-      dimensionsIN,
-      tags: undefined,
-      isFeatured: false,
-    });
-    created.push({ id, filename: u.url, category: categoryName });
-  }
+    const existing = await readArtworksFromFile();
+    const existingByFilename = new Set(existing.map((e) => e.filename));
 
-  if (created.length > 0) {
-    await writeArtworksToFile(existing);
+    for (const u of uploads) {
+      // Avoid duplicating by exact filename/url.
+      if (existingByFilename.has(u.url)) continue;
+      existingByFilename.add(u.url);
+
+      const baseTitle = String(u.name || "Artwork").replace(/\.[^.]+$/, "").trim();
+      const dimensionsCM = "";
+      const dimensionsIN = dimensionsCMToIN(dimensionsCM);
+      const id = randomUUID();
+      existing.push({
+        id,
+        category: categoryName,
+        filename: u.url,
+        titleTR: baseTitle || "Yeni Eser",
+        titleEN: baseTitle || "New Artwork",
+        descriptionTR: null,
+        descriptionEN: null,
+        priceTRY: 0,
+        priceUSD: 0,
+        dimensionsCM,
+        dimensionsIN,
+        tags: undefined,
+        isFeatured: false,
+      });
+      created.push({ id, filename: u.url, category: categoryName });
+    }
+
+    if (created.length > 0) {
+      await writeArtworksToFile(existing);
+    }
+  } catch (e) {
+    return NextResponse.json(
+      {
+        error: "Uploaded to Blob but failed to create artworks",
+        details: e instanceof Error ? e.message : String(e),
+        files: uploads,
+      },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ files: uploads, createdArtworks: created });

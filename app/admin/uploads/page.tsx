@@ -18,11 +18,19 @@ type CreatedArtwork = {
   category: string;
 };
 
+type Category = {
+  name: string;
+  icon?: string;
+};
+
 export default function AdminUploadsPage() {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
-  const [folder, setFolder] = useState("balloon");
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [category, setCategory] = useState<string>("");
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +48,23 @@ export default function AdminUploadsPage() {
     }
   }, [isAuthenticated, router]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetch("/api/admin/categories", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? (data as Category[]) : [];
+        setCategories(list);
+        if (!category && list.length > 0) {
+          setCategory(String(list[0]?.name ?? ""));
+        }
+      })
+      .catch(() => {
+        setCategories([]);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
+
   const totalSize = useMemo(() => files.reduce((sum, f) => sum + (f.size || 0), 0), [files]);
 
   const onPickFiles = (list: FileList | null) => {
@@ -48,8 +73,44 @@ export default function AdminUploadsPage() {
     setFiles(arr);
   };
 
+  const createCategory = async () => {
+    setError(null);
+    const name = newCategoryName.trim();
+    if (!name) {
+      setError("Enter a category name.");
+      return;
+    }
+    setCreatingCategory(true);
+    try {
+      const res = await fetch("/api/admin/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json?.error ?? "Failed to create category");
+        return;
+      }
+      const created = { name: String(json?.name ?? name), icon: typeof json?.icon === "string" ? json.icon : undefined };
+      const next = [...categories, created];
+      setCategories(next);
+      setCategory(created.name);
+      setNewCategoryName("");
+    } catch {
+      setError("Failed to create category");
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
+
   const startUpload = async () => {
     setError(null);
+    if (!category.trim()) {
+      setError("Select a category first.");
+      return;
+    }
     if (files.length === 0) {
       setError("Select at least one file.");
       return;
@@ -57,7 +118,7 @@ export default function AdminUploadsPage() {
     setUploading(true);
     try {
       const form = new FormData();
-      form.set("folder", folder);
+      form.set("category", category.trim());
       for (const f of files) form.append("files", f);
 
       const res = await fetch("/api/admin/uploads", {
@@ -119,15 +180,40 @@ export default function AdminUploadsPage() {
         <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/50">
           <div className="flex flex-col gap-4">
             <div>
-              <label className="block text-zinc-400 text-sm mb-1">Folder (optional)</label>
-              <input
-                value={folder}
-                onChange={(e) => setFolder(e.target.value)}
-                placeholder="e.g. balloon / stone / cosmo"
-                className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
-              />
+              <label className="block text-zinc-400 text-sm mb-1">Category (required)</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 focus:border-amber-500/50 focus:outline-none"
+              >
+                <option value="" disabled>
+                  Select category
+                </option>
+                {categories.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.icon ? `${c.icon} ` : ""}
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="New category name"
+                  className="flex-1 p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  disabled={creatingCategory}
+                  onClick={createCategory}
+                  className="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-medium text-zinc-100 disabled:opacity-50 transition"
+                >
+                  {creatingCategory ? "Creating..." : "Create category"}
+                </button>
+              </div>
               <p className="mt-2 text-xs text-zinc-500">
-                Files will be stored under <span className="font-mono">artworks/&lt;folder&gt;/...</span>
+                Upload will create artwork records under the selected category.
               </p>
             </div>
 
@@ -147,7 +233,7 @@ export default function AdminUploadsPage() {
             <div className="flex gap-3">
               <button
                 type="button"
-                disabled={uploading}
+                disabled={uploading || !category.trim()}
                 onClick={startUpload}
                 className="px-4 py-3 bg-amber-500 hover:bg-amber-600 rounded-lg font-medium text-zinc-950 disabled:opacity-50 transition"
               >
