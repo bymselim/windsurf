@@ -207,10 +207,6 @@ export default function GalleryPage() {
     }
     if (selected) return;
     if (typeof window === "undefined") return;
-
-    const key = "gallery_tabs_hint_seen_default";
-    if (localStorage.getItem(key) === "1") return;
-    localStorage.setItem(key, "1");
     setShowNavHint(true);
     setHighlightTabs(true);
 
@@ -362,13 +358,25 @@ export default function GalleryPage() {
           ) : null}
         </div>
       ) : null}
-      <div
-        className={
-          highlightTabs
-            ? "ring-1 ring-amber-500/50 bg-amber-500/5 animate-pulse transition"
-            : "transition"
-        }
-      >
+      <div className="relative">
+        {category !== "All" ? (
+          <button
+            type="button"
+            onClick={() => setCategory("All")}
+            className="absolute left-3 top-3 z-10 rounded-full border border-zinc-700 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900 transition"
+            aria-label="All"
+          >
+            ←
+          </button>
+        ) : null}
+
+        <div
+          className={
+            highlightTabs
+              ? "ring-1 ring-amber-500/50 bg-amber-500/5 animate-pulse transition"
+              : "transition"
+          }
+        >
         <CategoryTabs
           categories={categories}
           active={category}
@@ -378,6 +386,7 @@ export default function GalleryPage() {
           fadeMs={ui?.categoryPreviewFadeMs}
           mode="allGrid"
         />
+        </div>
       </div>
 
       {showNavHint ? (
