@@ -4,12 +4,16 @@ A mobile-first, production-ready luxury art gallery built with Next.js 14 (App R
 
 ## Features
 
-- **Protected access gate**: Full name, phone, password, and KVKK consent before entering the gallery.
-- **Session**: JWT in HTTP-only cookie + localStorage; middleware protects `/gallery`.
-- **Gallery**: Category tabs (All, Stone, Balloon, Cosmo), masonry grid, lightbox with prev/next and order menu (WhatsApp, Email, Instagram).
-- **Data**: Artworks are stored in a local array in `data/artworks.ts` (12 sample items). No database required.
+- **Dual Gallery System**: Separate Turkish and International galleries with localized content
+- **Protected Access Gate**: Full name, phone, password, and KVKK consent before entering
+- **Session Management**: JWT in HTTP-only cookie; middleware protects gallery routes
+- **Gallery Views**: Category tabs, masonry grid, lightbox with prev/next navigation
+- **Order System**: WhatsApp, Email, Instagram order options
+- **Admin Panel**: Manage artworks, categories, access logs, and settings
+- **Analytics**: Track visits, devices, and popular artworks
+- **Data Storage**: JSON-based storage (no database required)
 
-## Setup
+## Quick Start
 
 ### 1. Install dependencies
 
@@ -17,17 +21,15 @@ A mobile-first, production-ready luxury art gallery built with Next.js 14 (App R
 npm install
 ```
 
-### 2. Environment variables (optional)
+### 2. Environment variables
 
-Copy the example env file and fill in your values:
+Copy the example env file:
 
 ```bash
 cp .env.local.example .env.local
 ```
 
-- **NEXT_PUBLIC_ACCESS_PASSWORD**: Password required to enter the gallery. If omitted, any password works (demo only).
-- **JWT_SECRET**: Secret for signing session tokens (defaults to a dev value if unset).
-- **NEXT_PUBLIC_WHATSAPP_NUMBER**, **NEXT_PUBLIC_CONTACT_EMAIL**, **NEXT_PUBLIC_INSTAGRAM**: Used in the “Order This Artwork” menu.
+Edit `.env.local` with your values (see Environment Variables section below).
 
 ### 3. Run locally
 
@@ -35,33 +37,64 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Enter the access password (or any value if `NEXT_PUBLIC_ACCESS_PASSWORD` is not set) and proceed to the gallery.
+Open [http://localhost:3000](http://localhost:3000)
 
-## Project structure
+## Project Structure
 
-- **`/app`**: App Router pages (`page.tsx` = access gate, `gallery/page.tsx` = gallery), layout, API routes.
-- **`/components`**: AuthGate, KVKKModal, CategoryTabs, MasonryGrid, ArtworkModal, OrderMenu.
-- **`/data`**: `artworks.ts` — local array of 12 sample artworks. Edit this file to add or change artworks.
-- **`/lib`**: Auth (JWT + cookie), types.
+```
+├── app/
+│   ├── (turkish)/turkish/       # Turkish gallery routes
+│   ├── (international)/international/  # International gallery routes
+│   ├── admin/                   # Admin panel pages
+│   ├── api/                     # API routes
+│   └── styles/                  # Global styles
+├── components/                  # React components
+├── lib/                         # Utilities, types, data access
+│   └── data/                    # JSON data files
+└── public/                      # Static assets
+```
 
-## Customization
-
-- **Artworks**: Edit `data/artworks.ts`. Use Cloudinary or `/public` URLs for `imageUrl`; add the host to `next.config.js` if using a custom domain.
-- **Categories**: Edit `CATEGORIES` and `ArtworkCategory` in `lib/types.ts`, and add matching entries in `data/artworks.ts`.
-- **KVKK text**: Edit the constant in `components/KVKKModal.tsx`.
-
-## Environment variables summary
+## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `NEXT_PUBLIC_ACCESS_PASSWORD` | No* | Gate password (*if unset, any password works for demo) |
-| `JWT_SECRET` | No | Session signing secret (defaults to dev value) |
-| `NEXT_PUBLIC_WHATSAPP_NUMBER` | No | For "Order This Artwork" WhatsApp link |
-| `NEXT_PUBLIC_CONTACT_EMAIL` | No | For "Order This Artwork" mailto link |
-| `NEXT_PUBLIC_INSTAGRAM` | No | Instagram handle for order menu link |
+| `JWT_SECRET` | **Yes** (production) | Secret for signing session tokens |
+| `NEXT_PUBLIC_ACCESS_PASSWORD` | No | Default gallery password |
+| `ADMIN_PASSWORD` | No | Admin panel password (default: admin123) |
+| `NEXT_PUBLIC_WHATSAPP_NUMBER` | No | WhatsApp number for orders |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | No | Email for order inquiries |
+| `NEXT_PUBLIC_INSTAGRAM_USERNAME` | No | Instagram handle for DMs |
+| `NEXT_PUBLIC_IMAGES_BASE` | No | Base URL for artwork images (default: /artworks) |
 
-## Deployment (Vercel)
+## Deployment
 
-1. Push to GitHub and import the repo in Vercel.
-2. Add env vars in Vercel (e.g. `NEXT_PUBLIC_ACCESS_PASSWORD`).
-3. Deploy. No database or build step required.
+### Vercel (Recommended)
+
+1. Push your code to GitHub
+2. Import the repository in [Vercel](https://vercel.com)
+3. Add environment variables in Vercel dashboard:
+   - `JWT_SECRET` (required for production)
+   - Other variables as needed
+4. Deploy
+
+### Manual Deployment
+
+```bash
+npm run build
+npm start
+```
+
+## Admin Panel
+
+Access the admin panel at `/admin`. Default password: `admin123`
+
+Features:
+- **Artworks**: Edit titles, descriptions, prices (TR/EN)
+- **Categories**: Manage gallery categories
+- **Access Logs**: View visitor information
+- **Analytics**: Track gallery performance
+- **Settings**: Change passwords and access gate settings
+
+## License
+
+Private - All rights reserved.
