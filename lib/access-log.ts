@@ -69,9 +69,14 @@ async function readLogs(): Promise<AccessLogEntry[]> {
 }
 
 async function writeLogs(entries: AccessLogEntry[]): Promise<void> {
-  const dir = path.dirname(LOG_FILE);
-  await fs.mkdir(dir, { recursive: true });
-  await fs.writeFile(LOG_FILE, JSON.stringify(entries, null, 2), "utf-8");
+  try {
+    const dir = path.dirname(LOG_FILE);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(LOG_FILE, JSON.stringify(entries, null, 2), "utf-8");
+  } catch {
+    // Best-effort only: on serverless platforms (e.g. Vercel) the filesystem may be read-only.
+    // Logging should never block authentication or gallery access.
+  }
 }
 
 /**
@@ -98,9 +103,13 @@ export async function createAccessLogEntry(params: {
     artworksViewed: [],
     orderClicked: false,
   };
-  const entries = await readLogs();
-  entries.push(entry);
-  await writeLogs(entries);
+  try {
+    const entries = await readLogs();
+    entries.push(entry);
+    await writeLogs(entries);
+  } catch {
+    // Best-effort only.
+  }
   return id;
 }
 
@@ -116,18 +125,22 @@ export async function updateAccessLogEntry(
     orderClicked: boolean;
   }>
 ): Promise<boolean> {
-  const entries = await readLogs();
-  const index = entries.findIndex((e) => e.id === logId);
-  if (index === -1) return false;
-  if (updates.sessionEnd != null) entries[index].sessionEnd = updates.sessionEnd;
-  if (updates.pagesVisited != null)
-    entries[index].pagesVisited = updates.pagesVisited;
-  if (updates.artworksViewed != null)
-    entries[index].artworksViewed = updates.artworksViewed;
-  if (updates.orderClicked != null)
-    entries[index].orderClicked = updates.orderClicked;
-  await writeLogs(entries);
-  return true;
+  try {
+    const entries = await readLogs();
+    const index = entries.findIndex((e) => e.id === logId);
+    if (index === -1) return false;
+    if (updates.sessionEnd != null) entries[index].sessionEnd = updates.sessionEnd;
+    if (updates.pagesVisited != null)
+      entries[index].pagesVisited = updates.pagesVisited;
+    if (updates.artworksViewed != null)
+      entries[index].artworksViewed = updates.artworksViewed;
+    if (updates.orderClicked != null)
+      entries[index].orderClicked = updates.orderClicked;
+    await writeLogs(entries);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Get all log entries (for analytics). */
