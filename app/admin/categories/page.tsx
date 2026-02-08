@@ -78,13 +78,21 @@ export default function AdminCategoriesPage() {
       params.set("seed", "admin-preview");
       const res = await fetch(`/api/artworks?${params.toString()}`, { credentials: "include" });
       const json = await res.json().catch(() => ({}));
-      const items = Array.isArray(json?.items) ? (json.items as any[]) : Array.isArray(json) ? (json as any[]) : [];
-      const opts = items
-        .filter((a) => a && typeof a.id === "string" && typeof a.imageUrl === "string")
+      const rawItems: unknown =
+        json && typeof json === "object" && Array.isArray((json as { items?: unknown }).items)
+          ? (json as { items: unknown[] }).items
+          : Array.isArray(json)
+            ? (json as unknown[])
+            : [];
+
+      const opts = (rawItems as unknown[])
+        .map((a) => (a && typeof a === "object" ? (a as Record<string, unknown>) : null))
+        .filter((a): a is Record<string, unknown> => Boolean(a))
+        .filter((a) => typeof a.id === "string" && typeof a.imageUrl === "string")
         .map((a) => ({
-          id: String(a.id),
+          id: a.id as string,
           thumbnailUrl: typeof a.thumbnailUrl === "string" ? a.thumbnailUrl : undefined,
-          imageUrl: String(a.imageUrl),
+          imageUrl: a.imageUrl as string,
         }));
       setPreviewOptionsByCategory((prev) => ({ ...prev, [cat]: opts }));
     } catch {
