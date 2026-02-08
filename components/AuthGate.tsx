@@ -4,9 +4,27 @@ import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { FiLock, FiPhone, FiUser, FiCheck } from "react-icons/fi";
 import { KVKKModal } from "./KVKKModal";
+
+const WELCOME_MESSAGES: { lang: string; text: string }[] = [
+  { lang: "TR", text: "Melike Sevinç Artworks VIP Girişine Hoş Geldiniz." },
+  { lang: "EN", text: "Welcome to Melike Sevinç Artworks VIP Access." },
+  { lang: "FR", text: "Bienvenue à l'accès VIP Melike Sevinç Artworks." },
+  { lang: "DE", text: "Willkommen beim VIP-Zugang zu Melike Sevinç Artworks." },
+  { lang: "ES", text: "Bienvenido al acceso VIP de Melike Sevinç Artworks." },
+  { lang: "PT", text: "Bem-vindo ao acesso VIP da Melike Sevinç Artworks." },
+  { lang: "AR", text: "مرحباً بكم في الدخول الحصري لأعمال ميلكه سيفينتش الفنية." },
+  { lang: "IT", text: "Benvenuti all'accesso VIP di Melike Sevinç Artworks." },
+  { lang: "JA", text: "メリケ・セヴィンチ アートワークス VIPへようこそ。" },
+  { lang: "ZH", text: "欢迎来到 Melike Sevinç Artworks 贵宾通道。" },
+  { lang: "HI", text: "मेलिके सेविन्क आर्टवर्क्स VIP एक्सेस में आपका स्वागत है।" },
+  { lang: "DA", text: "Velkommen til Melike Sevinç Artworks VIP-adgang." },
+  { lang: "RU", text: "Добро пожаловать в VIP-доступ Melike Sevinç Artworks." },
+];
+
+const ROTATE_MS = 3500;
 
 type AccessGateConfig = {
   requireFullName: boolean;
@@ -50,6 +68,14 @@ export function AuthGate({ gallery }: AuthGateProps = {}) {
   const [config, setConfig] = useState<AccessGateConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [kvkkOpen, setKvkkOpen] = useState(false);
+  const [welcomeIndex, setWelcomeIndex] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setWelcomeIndex((i) => (i + 1) % WELCOME_MESSAGES.length);
+    }, ROTATE_MS);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -153,18 +179,31 @@ export function AuthGate({ gallery }: AuthGateProps = {}) {
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 px-4 py-8">
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full max-w-md rounded-2xl border border-zinc-700/50 bg-zinc-900/80 p-6 shadow-2xl backdrop-blur sm:p-8"
-      >
-        <h1 className="mb-2 text-center text-xl font-semibold tracking-tight text-zinc-100 sm:text-2xl">
-          Welcome to the Gallery
-        </h1>
-        <p className="mb-6 text-center text-sm text-zinc-400">
-          Enter your details to access the collection
-        </p>
+      <div className="flex flex-1 flex-col items-center justify-center w-full">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="w-full max-w-md rounded-2xl border border-zinc-700/50 bg-zinc-900/80 p-6 shadow-2xl backdrop-blur sm:p-8"
+        >
+          <div className="mb-4 min-h-[3.5rem] flex items-center justify-center">
+            <AnimatePresence mode="wait">
+              <motion.h1
+                key={welcomeIndex}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.35 }}
+                className="text-center text-xl font-semibold tracking-tight text-zinc-100 sm:text-2xl"
+              >
+                {WELCOME_MESSAGES[welcomeIndex].text}
+              </motion.h1>
+            </AnimatePresence>
+          </div>
+          <p className="mb-6 text-center text-sm text-zinc-400 leading-relaxed">
+            <span className="block">Lütfen size verilen özel şifreyi ya da formu doldurarak giriş yapınız.</span>
+            <span className="block mt-1 text-zinc-500">Please enter the password provided to you or fill in the form to enter.</span>
+          </p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {config.requireFullName && (
@@ -275,7 +314,15 @@ export function AuthGate({ gallery }: AuthGateProps = {}) {
             Enter Gallery
           </button>
         </form>
-      </motion.div>
+        </motion.div>
+      </div>
+
+      <footer className="mt-auto w-full max-w-md px-2 py-6 text-center">
+        <p className="text-[11px] sm:text-xs text-zinc-500 leading-relaxed">
+          Bu sayfa melikesevinc.com&apos;un VIP misafirlerine özeldir.
+          <span className="block mt-0.5 text-zinc-600">This page is exclusive to VIP guests of melikesevinc.com.</span>
+        </p>
+      </footer>
 
       <KVKKModal
         isOpen={kvkkOpen}
