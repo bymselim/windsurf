@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FiLayers } from "react-icons/fi";
 import Image from "next/image";
 
@@ -22,7 +22,6 @@ type CategoryTabsProps = {
   allPreviewImageUrl?: string;
   /** Hide the All/Tümü tab/card and show only categories. */
   hideAllTab?: boolean;
-  leadingLabel?: string;
   rotateMs?: number;
   fadeMs?: number;
   mode?: "auto" | "allGrid";
@@ -138,14 +137,11 @@ export function CategoryTabs({
   allLabel = "All",
   allPreviewImageUrl,
   hideAllTab = false,
-  leadingLabel,
   rotateMs,
   fadeMs,
   mode = "auto",
 }: CategoryTabsProps) {
   const [navEl, setNavEl] = useState<HTMLElement | null>(null);
-  const leadingPointerDownRef = useRef<{ x: number; y: number } | null>(null);
-  const leadingDraggedRef = useRef(false);
   const rotate = typeof rotateMs === "number" && Number.isFinite(rotateMs) ? rotateMs : DEFAULT_ROTATE_MS;
   const fade = typeof fadeMs === "number" && Number.isFinite(fadeMs) ? fadeMs : DEFAULT_FADE_MS;
   const tabs = useMemo(
@@ -255,33 +251,6 @@ export function CategoryTabs({
         </div>
       ) : (
         <div className="mx-auto grid max-w-6xl auto-cols-max grid-flow-col [grid-template-rows:repeat(2,max-content)] items-center gap-x-2 gap-y-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-x-3 sm:gap-y-3 sm:py-3">
-          {leadingLabel ? (
-            <button
-              type="button"
-              onPointerDown={(e) => {
-                leadingPointerDownRef.current = { x: e.clientX, y: e.clientY };
-                leadingDraggedRef.current = false;
-              }}
-              onPointerMove={(e) => {
-                const start = leadingPointerDownRef.current;
-                if (!start) return;
-                const dx = Math.abs(e.clientX - start.x);
-                const dy = Math.abs(e.clientY - start.y);
-                if (dx > 8 || dy > 8) leadingDraggedRef.current = true;
-              }}
-              onPointerUp={() => {
-                leadingPointerDownRef.current = null;
-              }}
-              onClick={() => {
-                if (leadingDraggedRef.current) return;
-                onSelect("All");
-                window.setTimeout(() => navEl?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
-              }}
-              className="row-span-2 flex shrink-0 items-center justify-center rounded-full border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-xs font-semibold tracking-[0.22em] text-zinc-400 transition hover:bg-zinc-900/40 hover:text-zinc-200 whitespace-nowrap sm:px-5 sm:py-2.5 sm:text-sm"
-            >
-              {leadingLabel}
-            </button>
-          ) : null}
           {tabs.map((tab, idx) => {
             const isActive = active === tab.value;
             const images =

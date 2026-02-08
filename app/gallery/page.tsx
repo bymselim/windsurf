@@ -395,7 +395,6 @@ export default function GalleryPage() {
           }}
           allPreviewImageUrl={process.env.NEXT_PUBLIC_ALL_PREVIEW_IMAGE_URL}
           hideAllTab
-          leadingLabel={category !== "All" ? "KATALOG" : undefined}
           rotateMs={ui?.categoryPreviewRotateMs}
           fadeMs={ui?.categoryPreviewFadeMs}
           mode="allGrid"
