@@ -212,7 +212,7 @@ export default function GalleryPage() {
     <div className="min-h-screen bg-zinc-950">
       {ui?.galleryIntroEN ? (
         <div className="mx-auto max-w-3xl px-4 pt-8 pb-2 text-center">
-          <p className="text-sm leading-relaxed text-zinc-300/90">
+          <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-300/90">
             {ui.galleryIntroEN}
           </p>
         </div>
