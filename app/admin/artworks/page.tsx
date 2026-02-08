@@ -25,9 +25,12 @@ interface ArtworkRow {
 
 export default function ArtworksAdminPage() {
   const [artworks, setArtworks] = useState<ArtworkRow[]>([]);
+  const [originalById, setOriginalById] = useState<Record<string, ArtworkRow>>({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<Record<string, { ok: boolean; message: string }>>({});
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState<string>("");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [featuredFilter, setFeaturedFilter] = useState<string>("");
@@ -60,9 +63,14 @@ export default function ArtworksAdminPage() {
     try {
       const res = await fetch("/api/artworks", { credentials: "include" });
       const data = await res.json();
-      setArtworks(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? (data as ArtworkRow[]) : [];
+      setArtworks(list);
+      const map: Record<string, ArtworkRow> = {};
+      for (const a of list) map[a.id] = a;
+      setOriginalById(map);
     } catch {
       setArtworks([]);
+      setOriginalById({});
     } finally {
       setLoading(false);
     }
@@ -80,6 +88,44 @@ export default function ArtworksAdminPage() {
     setArtworks((prev) =>
       prev.map((art) => (art.id === id ? { ...art, [field]: value } : art))
     );
+  };
+
+  const isDirty = (a: ArtworkRow): boolean => {
+    const o = originalById[a.id];
+    if (!o) return true;
+    return (
+      a.category !== o.category ||
+      a.titleTR !== o.titleTR ||
+      a.titleEN !== o.titleEN ||
+      (a.descriptionTR ?? "") !== (o.descriptionTR ?? "") ||
+      (a.descriptionEN ?? "") !== (o.descriptionEN ?? "") ||
+      a.priceTRY !== o.priceTRY ||
+      a.priceUSD !== o.priceUSD ||
+      a.dimensionsCM !== o.dimensionsCM ||
+      a.isFeatured !== o.isFeatured
+    );
+  };
+
+  const dirtyIds = artworks.filter(isDirty).map((a) => a.id);
+
+  const saveAllChanges = async () => {
+    if (bulkSaving) return;
+    const dirty = artworks.filter(isDirty);
+    if (dirty.length === 0) return;
+    setBulkSaving(true);
+    setBulkStatus("");
+    try {
+      for (let i = 0; i < dirty.length; i++) {
+        const a = dirty[i];
+        setBulkStatus(`Saving ${i + 1}/${dirty.length}...`);
+        // eslint-disable-next-line no-await-in-loop
+        await saveArtwork(a);
+      }
+      setBulkStatus("Saved.");
+      window.setTimeout(() => setBulkStatus(""), 2500);
+    } finally {
+      setBulkSaving(false);
+    }
   };
 
   const deleteArtwork = async (artwork: ArtworkRow) => {
@@ -251,6 +297,16 @@ export default function ArtworksAdminPage() {
               <option value="price">Sort by price (TRY)</option>
               <option value="category">Sort by category</option>
             </select>
+
+            <button
+              type="button"
+              onClick={saveAllChanges}
+              disabled={bulkSaving || savingId != null || dirtyIds.length === 0}
+              className="rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 px-4 py-3 text-sm font-semibold transition disabled:opacity-50"
+            >
+              {bulkSaving ? "Saving..." : `Toplu Kaydet (${dirtyIds.length})`}
+            </button>
+            {bulkStatus ? <span className="text-sm text-zinc-400 self-center">{bulkStatus}</span> : null}
           </div>
         </div>
 
