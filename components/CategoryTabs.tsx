@@ -252,7 +252,7 @@ export function CategoryTabs({
           })}
         </div>
       ) : (
-        <div className="mx-auto grid max-w-6xl grid-flow-col grid-rows-2 items-center gap-1 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-2 sm:py-3">
+        <div className="mx-auto grid max-w-6xl auto-cols-max grid-flow-col [grid-template-rows:repeat(2,max-content)] items-center gap-x-2 gap-y-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-x-3 sm:gap-y-3 sm:py-3">
           {leadingLabel ? (
             <button
               type="button"
@@ -260,7 +260,7 @@ export function CategoryTabs({
                 onSelect("All");
                 window.setTimeout(() => navEl?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
               }}
-              className="flex shrink-0 items-center rounded-full border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-xs font-semibold tracking-[0.22em] text-zinc-400 transition hover:bg-zinc-900/40 hover:text-zinc-200 sm:px-5 sm:py-2.5 sm:text-sm"
+              className="row-span-2 flex shrink-0 items-center justify-center rounded-full border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-xs font-semibold tracking-[0.22em] text-zinc-400 transition hover:bg-zinc-900/40 hover:text-zinc-200 whitespace-nowrap sm:px-5 sm:py-2.5 sm:text-sm"
             >
               {leadingLabel}
             </button>
@@ -286,7 +286,7 @@ export function CategoryTabs({
                 role="tab"
                 aria-selected={isActive}
                 onClick={() => onSelect(tab.value)}
-                className="flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition sm:px-5 sm:py-2.5 sm:text-sm"
+                className="flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition whitespace-nowrap sm:px-5 sm:py-2.5 sm:text-sm"
                 style={{
                   borderColor: isActive ? "rgb(245 158 11)" : "rgb(39 39 42)",
                   backgroundColor: isActive ? "rgba(245, 158, 11, 0.15)" : "transparent",
