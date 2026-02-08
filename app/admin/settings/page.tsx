@@ -19,6 +19,8 @@ type AccessGateSettings = {
 type UiSettings = {
   categoryPreviewRotateMs: number;
   categoryPreviewFadeMs: number;
+  galleryIntroTR: string;
+  galleryIntroEN: string;
 };
 
 export default function SettingsPage() {
@@ -73,7 +75,12 @@ export default function SettingsPage() {
           const rotate = Number(uiObj.categoryPreviewRotateMs);
           const fade = Number(uiObj.categoryPreviewFadeMs);
           if (Number.isFinite(rotate) && Number.isFinite(fade)) {
-            setUi({ categoryPreviewRotateMs: rotate, categoryPreviewFadeMs: fade });
+            setUi({
+              categoryPreviewRotateMs: rotate,
+              categoryPreviewFadeMs: fade,
+              galleryIntroTR: typeof uiObj.galleryIntroTR === "string" ? uiObj.galleryIntroTR : "",
+              galleryIntroEN: typeof uiObj.galleryIntroEN === "string" ? uiObj.galleryIntroEN : "",
+            });
           }
         }
       })
@@ -101,7 +108,12 @@ export default function SettingsPage() {
         const rotate = Number(uiObj.categoryPreviewRotateMs);
         const fade = Number(uiObj.categoryPreviewFadeMs);
         if (Number.isFinite(rotate) && Number.isFinite(fade)) {
-          setUi({ categoryPreviewRotateMs: rotate, categoryPreviewFadeMs: fade });
+          setUi({
+            categoryPreviewRotateMs: rotate,
+            categoryPreviewFadeMs: fade,
+            galleryIntroTR: typeof uiObj.galleryIntroTR === "string" ? uiObj.galleryIntroTR : "",
+            galleryIntroEN: typeof uiObj.galleryIntroEN === "string" ? uiObj.galleryIntroEN : "",
+          });
         }
       }
       setUiMessage("✅ UI settings saved.");
@@ -423,6 +435,8 @@ export default function SettingsPage() {
                   setUi((prev) => ({
                     categoryPreviewRotateMs: Number(e.target.value || 0),
                     categoryPreviewFadeMs: prev?.categoryPreviewFadeMs ?? 600,
+                    galleryIntroTR: prev?.galleryIntroTR ?? "",
+                    galleryIntroEN: prev?.galleryIntroEN ?? "",
                   }))
                 }
                 className="w-full p-3 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none text-sm"
@@ -442,8 +456,44 @@ export default function SettingsPage() {
                   setUi((prev) => ({
                     categoryPreviewRotateMs: prev?.categoryPreviewRotateMs ?? 2000,
                     categoryPreviewFadeMs: Number(e.target.value || 0),
+                    galleryIntroTR: prev?.galleryIntroTR ?? "",
+                    galleryIntroEN: prev?.galleryIntroEN ?? "",
                   }))
                 }
+                className="w-full p-3 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none text-sm"
+              />
+            </div>
+
+            <div className="p-4 bg-zinc-900/50 rounded-lg border border-zinc-800">
+              <label className="block text-sm text-zinc-300 mb-2">Gallery intro text (TR)</label>
+              <textarea
+                value={ui?.galleryIntroTR ?? ""}
+                onChange={(e) =>
+                  setUi((prev) => ({
+                    categoryPreviewRotateMs: prev?.categoryPreviewRotateMs ?? 2000,
+                    categoryPreviewFadeMs: prev?.categoryPreviewFadeMs ?? 600,
+                    galleryIntroTR: e.target.value,
+                    galleryIntroEN: prev?.galleryIntroEN ?? "",
+                  }))
+                }
+                rows={5}
+                className="w-full p-3 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none text-sm"
+              />
+            </div>
+
+            <div className="p-4 bg-zinc-900/50 rounded-lg border border-zinc-800">
+              <label className="block text-sm text-zinc-300 mb-2">Gallery intro text (EN)</label>
+              <textarea
+                value={ui?.galleryIntroEN ?? ""}
+                onChange={(e) =>
+                  setUi((prev) => ({
+                    categoryPreviewRotateMs: prev?.categoryPreviewRotateMs ?? 2000,
+                    categoryPreviewFadeMs: prev?.categoryPreviewFadeMs ?? 600,
+                    galleryIntroTR: prev?.galleryIntroTR ?? "",
+                    galleryIntroEN: e.target.value,
+                  }))
+                }
+                rows={5}
                 className="w-full p-3 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none text-sm"
               />
             </div>

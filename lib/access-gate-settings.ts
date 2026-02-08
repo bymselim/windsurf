@@ -24,11 +24,15 @@ export async function getUiSettings(): Promise<UiSettings> {
   const ui = (data?.ui ?? {}) as Partial<UiSettings>;
   const rotateRaw = ui.categoryPreviewRotateMs;
   const fadeRaw = ui.categoryPreviewFadeMs;
+  const introTRRaw = ui.galleryIntroTR;
+  const introENRaw = ui.galleryIntroEN;
   const rotate = typeof rotateRaw === "number" && Number.isFinite(rotateRaw) ? rotateRaw : DEFAULT_UI.categoryPreviewRotateMs;
   const fade = typeof fadeRaw === "number" && Number.isFinite(fadeRaw) ? fadeRaw : DEFAULT_UI.categoryPreviewFadeMs;
   return {
     categoryPreviewRotateMs: Math.max(500, Math.min(30000, Math.round(rotate))),
     categoryPreviewFadeMs: Math.max(100, Math.min(5000, Math.round(fade))),
+    galleryIntroTR: typeof introTRRaw === "string" ? introTRRaw : DEFAULT_UI.galleryIntroTR,
+    galleryIntroEN: typeof introENRaw === "string" ? introENRaw : DEFAULT_UI.galleryIntroEN,
   };
 }
 
@@ -43,6 +47,8 @@ export async function updateUiSettings(updates: Partial<UiSettings>): Promise<Ui
       typeof updates.categoryPreviewFadeMs === "number" && Number.isFinite(updates.categoryPreviewFadeMs)
         ? updates.categoryPreviewFadeMs
         : current.categoryPreviewFadeMs,
+    galleryIntroTR: typeof updates.galleryIntroTR === "string" ? updates.galleryIntroTR : current.galleryIntroTR,
+    galleryIntroEN: typeof updates.galleryIntroEN === "string" ? updates.galleryIntroEN : current.galleryIntroEN,
   };
 
   const data = await readSettingsFile();
@@ -59,6 +65,8 @@ export interface PasswordsConfig {
 export interface UiSettings {
   categoryPreviewRotateMs: number;
   categoryPreviewFadeMs: number;
+  galleryIntroTR: string;
+  galleryIntroEN: string;
 }
 
 export interface SettingsJson {
@@ -83,6 +91,8 @@ const DEFAULT_ACCESS_GATE: AccessGateSettings = {
 const DEFAULT_UI: UiSettings = {
   categoryPreviewRotateMs: 2000,
   categoryPreviewFadeMs: 600,
+  galleryIntroTR: "",
+  galleryIntroEN: "",
 };
 
 /**

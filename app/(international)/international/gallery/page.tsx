@@ -21,7 +21,12 @@ export default function InternationalGalleryPage() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [category, setCategory] = useState<string>("All");
-  const [ui, setUi] = useState<{ categoryPreviewRotateMs: number; categoryPreviewFadeMs: number } | null>(null);
+  const [ui, setUi] = useState<{
+    categoryPreviewRotateMs: number;
+    categoryPreviewFadeMs: number;
+    galleryIntroTR: string;
+    galleryIntroEN: string;
+  } | null>(null);
   const [selected, setSelected] = useState<{ artwork: Artwork; index: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -48,7 +53,12 @@ export default function InternationalGalleryPage() {
         const rotate = Number(obj.categoryPreviewRotateMs);
         const fade = Number(obj.categoryPreviewFadeMs);
         if (!Number.isFinite(rotate) || !Number.isFinite(fade)) return;
-        setUi({ categoryPreviewRotateMs: rotate, categoryPreviewFadeMs: fade });
+        setUi({
+          categoryPreviewRotateMs: rotate,
+          categoryPreviewFadeMs: fade,
+          galleryIntroTR: typeof obj.galleryIntroTR === "string" ? obj.galleryIntroTR : "",
+          galleryIntroEN: typeof obj.galleryIntroEN === "string" ? obj.galleryIntroEN : "",
+        });
       })
       .catch(() => {});
   }, []);
@@ -223,6 +233,13 @@ export default function InternationalGalleryPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950">
+      {ui?.galleryIntroEN ? (
+        <div className="mx-auto max-w-3xl px-4 pt-8 pb-2 text-center">
+          <p className="text-sm leading-relaxed text-zinc-300/90">
+            {ui.galleryIntroEN}
+          </p>
+        </div>
+      ) : null}
       <CategoryTabs
         categories={categories}
         active={category}
