@@ -13,6 +13,7 @@ export default function GalleryPage() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [category, setCategory] = useState<string>("All");
+  const [categoryShuffleToken, setCategoryShuffleToken] = useState(0);
   const [ui, setUi] = useState<{
     categoryPreviewRotateMs: number;
     categoryPreviewFadeMs: number;
@@ -107,7 +108,7 @@ export default function GalleryPage() {
         setHasMore(false);
       })
       .finally(() => setLoading(false));
-  }, [category, fetchPage]);
+  }, [category, categoryShuffleToken, fetchPage]);
 
   useEffect(() => {
     fetch("/api/artworks?limit=200&page=1&seed=preview")
@@ -388,7 +389,10 @@ export default function GalleryPage() {
         <CategoryTabs
           categories={categories}
           active={category}
-          onSelect={setCategory}
+          onSelect={(value) => {
+            setCategory(value);
+            if (value !== "All") setCategoryShuffleToken((t) => t + 1);
+          }}
           allPreviewImageUrl={process.env.NEXT_PUBLIC_ALL_PREVIEW_IMAGE_URL}
           hideAllTab
           rotateMs={ui?.categoryPreviewRotateMs}

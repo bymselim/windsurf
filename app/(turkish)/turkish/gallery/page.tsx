@@ -21,6 +21,7 @@ export default function TurkishGalleryPage() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [category, setCategory] = useState<string>("All");
+  const [categoryShuffleToken, setCategoryShuffleToken] = useState(0);
   const [ui, setUi] = useState<{
     categoryPreviewRotateMs: number;
     categoryPreviewFadeMs: number;
@@ -265,7 +266,7 @@ export default function TurkishGalleryPage() {
       })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category]);
+  }, [category, categoryShuffleToken]);
 
   useEffect(() => {
     // Load a larger sample once for rotating category previews.
@@ -407,7 +408,10 @@ export default function TurkishGalleryPage() {
         <CategoryTabs
           categories={categories}
           active={category}
-          onSelect={setCategory}
+          onSelect={(value) => {
+            setCategory(value);
+            if (value !== "All") setCategoryShuffleToken((t) => t + 1);
+          }}
           allLabel={UI.all}
           allPreviewImageUrl={process.env.NEXT_PUBLIC_ALL_PREVIEW_IMAGE_URL}
           hideAllTab
