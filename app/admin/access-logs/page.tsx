@@ -10,7 +10,9 @@ interface AccessLog {
   phone?: string;
   timestamp?: string;
   sessionStart?: string;
+  sessionEnd?: string | null;
   device?: string;
+  ip?: string;
   country?: string;
   orderClicked?: boolean;
 }
@@ -166,7 +168,13 @@ export default function AccessLogsPage() {
                     Device
                   </th>
                   <th className="p-4 text-left font-semibold text-zinc-300 border-b border-zinc-800">
+                    IP
+                  </th>
+                  <th className="p-4 text-left font-semibold text-zinc-300 border-b border-zinc-800">
                     Country
+                  </th>
+                  <th className="p-4 text-left font-semibold text-zinc-300 border-b border-zinc-800">
+                    Session End
                   </th>
                   <th className="p-4 text-left font-semibold text-zinc-300 border-b border-zinc-800">
                     Order clicked
@@ -177,6 +185,7 @@ export default function AccessLogsPage() {
                 {logs.map((log, index) => {
                   const ts = log.sessionStart ?? log.timestamp ?? "";
                   const phone = log.phone ?? log.phoneNumber ?? "—";
+                  const end = log.sessionEnd ?? null;
                   return (
                     <tr
                       key={log.id ?? `${ts}-${log.fullName}-${index}`}
@@ -193,7 +202,22 @@ export default function AccessLogsPage() {
                       <td className="p-4 font-medium">{log.fullName}</td>
                       <td className="p-4 font-mono text-amber-400">{phone}</td>
                       <td className="p-4 text-zinc-400 capitalize">{log.device ?? "—"}</td>
+                      <td className="p-4 font-mono text-zinc-400">{log.ip ?? "—"}</td>
                       <td className="p-4 text-zinc-400">{log.country ?? "—"}</td>
+                      <td className="p-4">
+                        {end ? (
+                          <div>
+                            <div className="font-medium">
+                              {new Date(end).toLocaleDateString("tr-TR")}
+                            </div>
+                            <div className="text-sm text-zinc-400">
+                              {new Date(end).toLocaleTimeString("tr-TR")}
+                            </div>
+                          </div>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td className="p-4">{log.orderClicked ? "Yes" : "No"}</td>
                     </tr>
                   );

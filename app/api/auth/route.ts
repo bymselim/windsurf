@@ -11,6 +11,12 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const userAgent = request.headers.get("user-agent") ?? "";
   const country = request.headers.get("x-vercel-ip-country") ?? request.headers.get("cf-ipcountry") ?? "";
+  const forwardedFor = request.headers.get("x-forwarded-for") ?? "";
+  const ip =
+    forwardedFor.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    request.headers.get("x-vercel-forwarded-for") ||
+    "";
   const { fullName, phoneNumber, password, gallery: galleryParam } = body;
 
   const gallery: GalleryType =
@@ -59,6 +65,7 @@ export async function POST(request: NextRequest) {
     fullName: name || "—",
     phoneNumber: phone,
     userAgent,
+    ip,
     country,
   });
 

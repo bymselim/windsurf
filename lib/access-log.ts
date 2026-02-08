@@ -11,6 +11,7 @@ export interface AccessLogEntry {
   fullName: string;
   phone: string;
   device: "mobile" | "desktop" | "unknown";
+  ip: string;
   country: string;
   sessionStart: string;
   sessionEnd: string | null;
@@ -48,6 +49,7 @@ function normalizeEntry(raw: Record<string, unknown>, index: number): AccessLogE
     fullName: typeof raw.fullName === "string" ? raw.fullName : "—",
     phone: phone !== "—" ? maskPhone(phone) : "—",
     device: "unknown",
+    ip: "—",
     country: "—",
     sessionStart: ts,
     sessionEnd: null,
@@ -97,6 +99,7 @@ export async function createAccessLogEntry(params: {
   fullName: string;
   phoneNumber: string;
   userAgent: string;
+  ip: string;
   country: string;
 }): Promise<string> {
   const id = randomUUID();
@@ -106,6 +109,7 @@ export async function createAccessLogEntry(params: {
     fullName: params.fullName.trim() || "—",
     phone: params.phoneNumber ? maskPhone(params.phoneNumber) : "—",
     device: parseDevice(params.userAgent),
+    ip: params.ip || "—",
     country: params.country || "—",
     sessionStart: now,
     sessionEnd: null,
