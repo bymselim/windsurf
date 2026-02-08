@@ -82,6 +82,31 @@ export default function ArtworksAdminPage() {
     );
   };
 
+  const deleteArtwork = async (artwork: ArtworkRow) => {
+    if (!confirm(`Delete artwork '${artwork.titleTR}'?`)) return;
+    setSavingId(artwork.id);
+    setSaveStatus((prev) => ({ ...prev, [artwork.id]: { ok: true, message: "" } }));
+    try {
+      const res = await fetch("/api/artworks", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ id: artwork.id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = typeof json?.error === "string" ? json.error : "Delete failed";
+        setSaveStatus((prev) => ({ ...prev, [artwork.id]: { ok: false, message: msg } }));
+        return;
+      }
+      setArtworks((prev) => prev.filter((a) => a.id !== artwork.id));
+    } catch {
+      setSaveStatus((prev) => ({ ...prev, [artwork.id]: { ok: false, message: "Delete failed" } }));
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   const saveArtwork = async (artwork: ArtworkRow) => {
     setSavingId(artwork.id);
     setSaveStatus((prev) => ({ ...prev, [artwork.id]: { ok: true, message: "" } }));
@@ -410,6 +435,13 @@ export default function ArtworksAdminPage() {
                           className="px-3 py-2 bg-amber-500 hover:bg-amber-600 rounded-lg text-sm font-medium text-zinc-950 disabled:opacity-50 transition"
                         >
                           {savingId === artwork.id ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          onClick={() => deleteArtwork(artwork)}
+                          disabled={savingId === artwork.id}
+                          className="ml-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium text-zinc-100 disabled:opacity-50 transition"
+                        >
+                          Delete
                         </button>
                         {saveStatus[artwork.id]?.message ? (
                           <div

@@ -104,12 +104,17 @@ export default function TurkishGalleryPage() {
   }, []);
 
   useEffect(() => {
-    // Initial load + when category changes: reset feed.
     setLoading(true);
     setLoadingMore(false);
     setHasMore(true);
     setPage(1);
     seedRef.current = "";
+    if (category === "All") {
+      setArtworks([]);
+      setHasMore(false);
+      setLoading(false);
+      return;
+    }
     fetchPage(1, category)
       .then((r) => {
         setArtworks(r.items);
@@ -220,7 +225,11 @@ export default function TurkishGalleryPage() {
         fadeMs={ui?.categoryPreviewFadeMs}
       />
 
-      {loading ? (
+      {category === "All" ? (
+        <div className="mx-auto max-w-6xl px-4 py-10 text-center text-sm text-zinc-500">
+          {UI.all}
+        </div>
+      ) : loading ? (
         <div className="flex min-h-[60vh] items-center justify-center">
           <motion.div
             animate={{ opacity: [0.5, 1, 0.5] }}
@@ -238,9 +247,9 @@ export default function TurkishGalleryPage() {
         />
       )}
 
-      <div ref={sentinelRef} />
+      {category !== "All" ? <div ref={sentinelRef} /> : null}
 
-      {loadingMore ? (
+      {category !== "All" && loadingMore ? (
         <div className="pb-10 text-center text-sm text-zinc-500">{UI.loading}</div>
       ) : null}
 

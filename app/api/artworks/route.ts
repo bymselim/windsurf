@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { del } from "@vercel/blob";
 import {
   readArtworksFromFile,
   writeArtworksToFile,
@@ -160,4 +161,44 @@ export async function PUT(request: NextRequest) {
 
   await writeArtworksToFile(entries);
   return NextResponse.json(toResponseItem(entries[index]));
+}
+
+export async function DELETE(request: NextRequest) {
+  if (request.cookies.get(COOKIE_NAME)?.value !== "1") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+  const obj = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const id = obj.id;
+  if (!id || typeof id !== "string") {
+    return NextResponse.json({ error: "Missing artwork id" }, { status: 400 });
+  }
+
+  const entries = await readArtworksFromFile();
+  const index = entries.findIndex((e) => e.id === id);
+  if (index === -1) {
+    return NextResponse.json({ error: "Artwork not found" }, { status: 404 });
+  }
+
+  const removed = entries[index];
+  const next = entries.filter((e) => e.id !== id);
+  await writeArtworksToFile(next);
+
+  // Best-effort: if this artwork points to a Blob URL, try to delete it.
+  // Ignore failures so we don't block record deletion.
+  if (removed?.filename && typeof removed.filename === "string" && isAbsoluteUrl(removed.filename)) {
+    try {
+      await del(removed.filename);
+    } catch {
+      // ignore
+    }
+  }
+
+  return NextResponse.json({ deleted: id });
 }
