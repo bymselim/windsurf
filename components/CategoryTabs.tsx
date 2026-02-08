@@ -30,7 +30,7 @@ export function CategoryTabs({ categories, active, onSelect, allLabel = "All" }:
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    const id = window.setInterval(() => setTick((t) => t + 1), 4500);
+    const id = window.setInterval(() => setTick((t) => t + 1), 2000);
     return () => window.clearInterval(id);
   }, []);
 
