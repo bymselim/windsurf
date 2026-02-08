@@ -396,7 +396,7 @@ export default function InternationalGalleryPage() {
           <button
             type="button"
             onClick={() => setCategory("All")}
-            className="fixed bottom-4 left-4 z-40 h-24 w-24 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-[11px] text-zinc-100 hover:bg-zinc-800 transition"
+            className="fixed bottom-4 left-4 z-40 h-20 w-32 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-[11px] text-zinc-100 hover:bg-zinc-800 transition"
             aria-label="Katalog'a geri dön"
           >
             <div className="flex h-full flex-col items-center justify-between">
