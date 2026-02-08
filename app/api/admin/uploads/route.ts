@@ -61,22 +61,56 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
   );
 
-  const uploads = await Promise.all(
-    files.map(async (file) => {
-      const filename = safePathSegment(file.name || "file");
+  const uploads: Array<
+    | {
+        name: string;
+        size: number;
+        type: string;
+        pathname: string;
+        url: string;
+        thumbUrl?: string;
+        contentHash: string;
+      }
+    | {
+        name: string;
+        size: number;
+        type: string;
+        pathname: string;
+        url: string;
+        thumbUrl?: string;
+        contentHash: string;
+        skipped: true;
+      }
+    | {
+        name: string;
+        size: number;
+        type: string;
+        pathname: string;
+        url: string;
+        thumbUrl?: string;
+        contentHash?: string;
+        error: string;
+      }
+  > = [];
+
+  for (const file of files) {
+    const filename = safePathSegment(file.name || "file");
+    try {
       const buf = Buffer.from(await file.arrayBuffer());
       const contentHash = createHash("sha256").update(buf).digest("hex");
+
       if (existingHashesInCategory.has(contentHash)) {
-        return {
+        uploads.push({
           name: file.name,
           size: file.size,
           type: file.type,
           pathname: "",
           url: "",
-          thumbUrl: undefined as string | undefined,
+          thumbUrl: undefined,
           contentHash,
-          skipped: true as const,
-        };
+          skipped: true,
+        });
+        continue;
       }
       existingHashesInCategory.add(contentHash);
 
@@ -110,7 +144,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return {
+      uploads.push({
         name: file.name,
         size: file.size,
         type: file.type,
@@ -118,9 +152,18 @@ export async function POST(request: NextRequest) {
         url: res.url,
         thumbUrl,
         contentHash,
-      };
-    })
-  );
+      });
+    } catch (e) {
+      uploads.push({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        pathname: "",
+        url: "",
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
 
   const created: Array<{ id: string; filename: string; category: string }> = [];
   try {
@@ -134,6 +177,7 @@ export async function POST(request: NextRequest) {
 
     for (const u of uploads) {
       if ((u as { skipped?: boolean }).skipped) continue;
+      if ((u as { error?: string }).error) continue;
       // Avoid duplicating by exact filename/url.
       if (existingByFilename.has(u.url)) continue;
       existingByFilename.add(u.url);
@@ -146,7 +190,10 @@ export async function POST(request: NextRequest) {
         category: categoryName,
         filename: u.url,
         thumbnailFilename: typeof u.thumbUrl === "string" ? u.thumbUrl : undefined,
-        contentHash: typeof (u as { contentHash?: string }).contentHash === "string" ? (u as { contentHash?: string }).contentHash : undefined,
+        contentHash:
+          typeof (u as { contentHash?: string }).contentHash === "string"
+            ? (u as { contentHash?: string }).contentHash
+            : undefined,
         titleTR: "",
         titleEN: "",
         descriptionTR: "Detaylı bilgi ve sipariş için sipariş butonunu kullanabilirsiniz.",
@@ -175,5 +222,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ files: uploads, createdArtworks: created });
+  const errors = uploads
+    .filter((u) => typeof (u as { error?: string }).error === "string")
+    .map((u) => ({ name: u.name, error: (u as { error: string }).error }));
+  const skipped = uploads.filter((u) => (u as { skipped?: boolean }).skipped).length;
+
+  return NextResponse.json({ files: uploads, createdArtworks: created, errors, skipped });
 }

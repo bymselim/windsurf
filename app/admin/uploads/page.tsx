@@ -12,6 +12,11 @@ type UploadedFile = {
   url: string;
 };
 
+type UploadErrorItem = {
+  name: string;
+  error: string;
+};
+
 type CreatedArtwork = {
   id: string;
   filename: string;
@@ -34,8 +39,11 @@ export default function AdminUploadsPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadErrors, setUploadErrors] = useState<UploadErrorItem[]>([]);
+  const [skippedCount, setSkippedCount] = useState(0);
   const [uploaded, setUploaded] = useState<UploadedFile[]>([]);
   const [createdArtworks, setCreatedArtworks] = useState<CreatedArtwork[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     const saved = typeof window !== "undefined" && localStorage.getItem("admin-authenticated");
@@ -73,6 +81,21 @@ export default function AdminUploadsPage() {
     setFiles(arr);
   };
 
+  const addDroppedFiles = (list: FileList) => {
+    const incoming = Array.from(list);
+    setFiles((prev) => {
+      const seen = new Set(prev.map((f) => `${f.name}-${f.size}-${f.lastModified}`));
+      const merged = [...prev];
+      for (const f of incoming) {
+        const k = `${f.name}-${f.size}-${f.lastModified}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        merged.push(f);
+      }
+      return merged;
+    });
+  };
+
   const createCategory = async () => {
     setError(null);
     const name = newCategoryName.trim();
@@ -107,6 +130,8 @@ export default function AdminUploadsPage() {
 
   const startUpload = async () => {
     setError(null);
+    setUploadErrors([]);
+    setSkippedCount(0);
     if (!category.trim()) {
       setError("Select a category first.");
       return;
@@ -128,15 +153,23 @@ export default function AdminUploadsPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        setError(json?.error ?? "Upload failed");
+        setError(
+          typeof json?.details === "string"
+            ? `${json?.error ?? "Upload failed"}: ${json.details}`
+            : (json?.error ?? "Upload failed")
+        );
         return;
       }
       const uploadedFiles = Array.isArray(json?.files) ? (json.files as UploadedFile[]) : [];
       const created = Array.isArray(json?.createdArtworks)
         ? (json.createdArtworks as CreatedArtwork[])
         : [];
+      const errs = Array.isArray(json?.errors) ? (json.errors as UploadErrorItem[]) : [];
+      const skipped = typeof json?.skipped === "number" && Number.isFinite(json.skipped) ? json.skipped : 0;
       setUploaded(uploadedFiles);
       setCreatedArtworks(created);
+      setUploadErrors(errs);
+      setSkippedCount(skipped);
       setFiles([]);
     } catch {
       setError("Upload failed");
@@ -219,12 +252,49 @@ export default function AdminUploadsPage() {
 
             <div>
               <label className="block text-zinc-400 text-sm mb-1">Files</label>
-              <input
-                type="file"
-                multiple
-                onChange={(e) => onPickFiles(e.target.files)}
-                className="block w-full text-sm text-zinc-300 file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-zinc-100 hover:file:bg-zinc-700"
-              />
+              <div
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(true);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(false);
+                  if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+                    addDroppedFiles(e.dataTransfer.files);
+                    e.dataTransfer.clearData();
+                  }
+                }}
+                className={`rounded-xl border border-dashed p-4 transition ${
+                  isDragging
+                    ? "border-amber-500/70 bg-amber-500/10"
+                    : "border-zinc-700 bg-zinc-900/30"
+                }`}
+              >
+                <div className="flex flex-col gap-3">
+                  <p className="text-sm text-zinc-300">
+                    Drag & drop files here, or choose from your computer.
+                  </p>
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(e) => onPickFiles(e.target.files)}
+                    className="block w-full text-sm text-zinc-300 file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-zinc-100 hover:file:bg-zinc-700"
+                  />
+                </div>
+              </div>
               <p className="mt-2 text-xs text-zinc-500">
                 Selected: <span className="font-mono">{files.length}</span> files • Total: {Math.round(totalSize / 1024 / 1024)} MB
               </p>
@@ -250,6 +320,26 @@ export default function AdminUploadsPage() {
             </div>
 
             {error && <p className="text-sm text-red-400">{error}</p>}
+            {skippedCount > 0 ? (
+              <p className="text-xs text-zinc-500">
+                Skipped (duplicate in same category): <span className="font-mono">{skippedCount}</span>
+              </p>
+            ) : null}
+            {uploadErrors.length > 0 ? (
+              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3">
+                <div className="text-sm text-red-300 font-semibold">Some files failed</div>
+                <div className="mt-2 space-y-1">
+                  {uploadErrors.slice(0, 8).map((it) => (
+                    <div key={`${it.name}-${it.error}`} className="text-xs text-red-200/90">
+                      <span className="font-mono">{it.name}</span>: {it.error}
+                    </div>
+                  ))}
+                  {uploadErrors.length > 8 ? (
+                    <div className="text-xs text-red-200/80">(+{uploadErrors.length - 8} more)</div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
