@@ -374,7 +374,7 @@ export default function InternationalGalleryPage() {
       {category !== "All" ? (
         <div className="fixed left-1/2 top-2 z-50 -translate-x-1/2 pointer-events-none select-none">
           <div className="rounded-full border border-zinc-800 bg-zinc-950/70 px-3 py-1 text-[11px] font-semibold tracking-[0.22em] text-zinc-300 backdrop-blur">
-            CATEGORY
+            CATALOG
           </div>
         </div>
       ) : null}
