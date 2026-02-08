@@ -48,13 +48,29 @@ export default function InternationalGalleryPage() {
       .then(([artworksData, categoriesData]) => {
         const raw = Array.isArray(artworksData) ? artworksData : [];
         setArtworks(raw.map((item: ArtworkFull) => mapFullToArtwork(item, "en")));
+
+        const imageByCategory: Record<string, string[]> = {};
+        for (const a of raw as ArtworkFull[]) {
+          const cat = typeof a.category === "string" ? a.category : "";
+          if (!cat) continue;
+          if (a.mediaType && a.mediaType !== "image") continue;
+          const url = typeof a.imageUrl === "string" ? a.imageUrl : "";
+          if (!url) continue;
+          (imageByCategory[cat] ??= []).push(url);
+        }
+        const pickRandom = (cat: string): string | undefined => {
+          const list = imageByCategory[cat] ?? [];
+          if (list.length === 0) return undefined;
+          return list[Math.floor(Math.random() * list.length)];
+        };
+
         setCategories(
           Array.isArray(categoriesData)
             ? categoriesData.map((c: { name: string; icon?: string; previewImageUrl?: string }) => ({
                 value: c.name,
                 label: c.name,
                 icon: c.icon,
-                previewImageUrl: c.previewImageUrl,
+                previewImageUrl: pickRandom(c.name) ?? c.previewImageUrl,
               }))
             : []
         );
