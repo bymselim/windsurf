@@ -41,6 +41,7 @@ function RotatingImage({
   fadeMs,
   className,
   sizes,
+  priority,
 }: {
   images: string[];
   offsetMs: number;
@@ -48,6 +49,7 @@ function RotatingImage({
   fadeMs: number;
   className: string;
   sizes: string;
+  priority: boolean;
 }) {
   const [index, setIndex] = useState(0);
   const [prevIndex, setPrevIndex] = useState<number | null>(null);
@@ -92,6 +94,7 @@ function RotatingImage({
 
   return (
     <>
+      <div className="absolute inset-0 bg-zinc-900" />
       {prevSrc ? (
         <Image
           key={`prev-${prevSrc}`}
@@ -103,6 +106,7 @@ function RotatingImage({
           style={{ opacity: phase === 0 ? 1 : 0, transitionDuration: `${fadeMs}ms` }}
           sizes={sizes}
           priority={false}
+          loading="lazy"
         />
       ) : null}
       <Image
@@ -117,7 +121,8 @@ function RotatingImage({
           transitionDuration: `${fadeMs}ms`,
         }}
         sizes={sizes}
-        priority={false}
+        priority={priority}
+        loading={priority ? "eager" : "lazy"}
       />
     </>
   );
@@ -165,7 +170,7 @@ export function CategoryTabs({
               : "mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           }
         >
-          {tabs.map((tab) => {
+          {tabs.map((tab, idx) => {
             const isActive = active === tab.value;
             const images =
               tab.value === "All"
@@ -178,6 +183,7 @@ export function CategoryTabs({
                     ? [tab.previewImageUrl]
                     : [];
             const offsetMs = tab.value === "All" ? 0 : hash(tab.value) % rotate;
+            const isPriority = idx < 6;
             return (
               <button
                 key={tab.value}
@@ -202,7 +208,8 @@ export function CategoryTabs({
                     rotateMs={rotate}
                     fadeMs={fade}
                     className="object-cover opacity-90 group-hover:opacity-100"
-                    sizes="148px"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                    priority={isPriority}
                   />
                 ) : (
                   <div className="absolute inset-0 bg-zinc-900" />
@@ -237,7 +244,7 @@ export function CategoryTabs({
         </div>
       ) : (
         <div className="mx-auto flex max-w-6xl flex-wrap justify-center gap-1 px-4 py-3 sm:gap-2">
-          {tabs.map((tab) => {
+          {tabs.map((tab, idx) => {
             const isActive = active === tab.value;
             const images =
               tab.value === "All"
@@ -250,6 +257,7 @@ export function CategoryTabs({
                     ? [tab.previewImageUrl]
                     : [];
             const offsetMs = tab.value === "All" ? 0 : hash(tab.value) % rotate;
+            const isPriority = idx < 4;
             return (
               <button
                 key={tab.value}
@@ -273,6 +281,7 @@ export function CategoryTabs({
                       fadeMs={fade}
                       className="object-cover"
                       sizes="24px"
+                      priority={isPriority}
                     />
                   </span>
                 ) : null}
