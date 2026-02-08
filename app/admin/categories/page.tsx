@@ -10,6 +10,7 @@ interface Category {
   color: string;
   icon: string;
   previewImageUrl?: string;
+  order?: number;
   artworkCount?: number;
 }
 
@@ -24,6 +25,7 @@ export default function AdminCategoriesPage() {
   const [newColor, setNewColor] = useState("#3b82f6");
   const [newIcon, setNewIcon] = useState("🎨");
   const [newPreviewImageUrl, setNewPreviewImageUrl] = useState("");
+  const [newOrder, setNewOrder] = useState("0");
   const [addError, setAddError] = useState("");
   const [adding, setAdding] = useState(false);
 
@@ -33,6 +35,7 @@ export default function AdminCategoriesPage() {
   const [editColor, setEditColor] = useState("");
   const [editIcon, setEditIcon] = useState("");
   const [editPreviewImageUrl, setEditPreviewImageUrl] = useState("");
+  const [editOrder, setEditOrder] = useState("0");
   const [editError, setEditError] = useState("");
 
   // Delete
@@ -86,6 +89,7 @@ export default function AdminCategoriesPage() {
           color: newColor,
           icon: newIcon,
           previewImageUrl: newPreviewImageUrl.trim() || undefined,
+          order: Number(newOrder),
         }),
       });
       const data = await res.json();
@@ -95,6 +99,7 @@ export default function AdminCategoriesPage() {
       setNewColor("#3b82f6");
       setNewIcon("🎨");
       setNewPreviewImageUrl("");
+      setNewOrder("0");
     } catch (err) {
       setAddError(err instanceof Error ? err.message : "Failed to add category");
     } finally {
@@ -108,6 +113,7 @@ export default function AdminCategoriesPage() {
     setEditColor(cat.color);
     setEditIcon(cat.icon);
     setEditPreviewImageUrl(cat.previewImageUrl ?? "");
+    setEditOrder(String(typeof cat.order === "number" && Number.isFinite(cat.order) ? cat.order : 0));
     setEditError("");
   };
 
@@ -134,6 +140,7 @@ export default function AdminCategoriesPage() {
           color: editColor,
           icon: editIcon,
           previewImageUrl: editPreviewImageUrl.trim() || "",
+          order: Number(editOrder),
         }),
       });
       const data = await res.json();
@@ -215,6 +222,26 @@ export default function AdminCategoriesPage() {
               />
             </div>
             <div>
+              <label className="block text-zinc-400 text-sm mb-1">Preview image URL (optional)</label>
+              <input
+                type="text"
+                value={newPreviewImageUrl}
+                onChange={(e) => setNewPreviewImageUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full min-w-[220px] p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-zinc-400 text-sm mb-1">Order</label>
+              <input
+                type="number"
+                value={newOrder}
+                onChange={(e) => setNewOrder(e.target.value)}
+                className="w-28 p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
+              />
+            </div>
+            <div>
               <label className="block text-zinc-400 text-sm mb-1">Color</label>
               <div className="flex items-center gap-2">
                 <input
@@ -241,27 +268,15 @@ export default function AdminCategoriesPage() {
                 className="w-20 p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-center text-xl focus:border-amber-500/50 focus:outline-none"
               />
             </div>
-            <div className="min-w-[220px] flex-1">
-              <label className="block text-zinc-400 text-sm mb-1">Preview image URL</label>
-              <input
-                type="text"
-                value={newPreviewImageUrl}
-                onChange={(e) => setNewPreviewImageUrl(e.target.value)}
-                placeholder="e.g. /artworks/stone/example.jpg or https://..."
-                className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
-              />
-            </div>
             <button
               type="submit"
               disabled={adding}
-              className="px-4 py-3 bg-amber-500 hover:bg-amber-600 rounded-lg font-medium text-zinc-950 disabled:opacity-50 transition"
+              className="px-5 py-3 bg-amber-500 hover:bg-amber-600 rounded-lg font-semibold text-zinc-950 disabled:opacity-50 transition"
             >
-              {adding ? "Adding..." : "Add Category"}
+              {adding ? "Adding..." : "Add"}
             </button>
           </div>
-          {addError && (
-            <p className="mt-3 text-sm text-red-400">{addError}</p>
-          )}
+          {addError ? <p className="mt-3 text-sm text-red-400">{addError}</p> : null}
         </form>
 
         {/* List */}
@@ -272,6 +287,9 @@ export default function AdminCategoriesPage() {
             <table className="w-full">
               <thead className="bg-zinc-900">
                 <tr>
+                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">
+                    Order
+                  </th>
                   <th className="p-4 text-left text-sm font-semibold text-zinc-300">
                     Name
                   </th>
@@ -298,6 +316,9 @@ export default function AdminCategoriesPage() {
                     key={cat.name}
                     className="border-t border-zinc-800 hover:bg-zinc-900/30"
                   >
+                    <td className="p-4 text-zinc-400 font-mono text-sm">
+                      {typeof cat.order === "number" && Number.isFinite(cat.order) ? cat.order : 0}
+                    </td>
                     <td className="p-4 font-medium">{cat.name}</td>
                     <td className="p-4">
                       {cat.previewImageUrl ? (
@@ -329,6 +350,13 @@ export default function AdminCategoriesPage() {
                     <td className="p-4">
                       {editingName === cat.name ? (
                         <div className="flex flex-wrap gap-2 items-center">
+                          <input
+                            type="number"
+                            value={editOrder}
+                            onChange={(e) => setEditOrder(e.target.value)}
+                            placeholder="0"
+                            className="w-20 p-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm"
+                          />
                           <input
                             type="text"
                             value={editName}

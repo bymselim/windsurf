@@ -75,6 +75,8 @@ export async function POST(request: NextRequest) {
   const name = String(body?.name ?? "").trim();
   const color = String(body?.color ?? "#3b82f6").trim();
   const icon = String(body?.icon ?? "📁").trim();
+  const orderRaw = body?.order;
+  const order = typeof orderRaw === "number" && Number.isFinite(orderRaw) ? orderRaw : Number(orderRaw);
   const previewImageUrl =
     typeof body?.previewImageUrl === "string" ? normalizePreviewImageUrl(body.previewImageUrl) : "";
   if (!name) {
@@ -84,10 +86,22 @@ export async function POST(request: NextRequest) {
   if (categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
     return NextResponse.json({ error: "Category already exists" }, { status: 400 });
   }
-  categories.push({ name, color, icon, previewImageUrl: previewImageUrl || undefined });
+  categories.push({
+    name,
+    color,
+    icon,
+    previewImageUrl: previewImageUrl || undefined,
+    order: Number.isFinite(order) ? Math.round(order) : 0,
+  });
   await writeCategoriesToFile(categories);
   await ensureCategoryFolder(name);
-  return NextResponse.json({ name, color, icon, previewImageUrl: previewImageUrl || undefined });
+  return NextResponse.json({
+    name,
+    color,
+    icon,
+    previewImageUrl: previewImageUrl || undefined,
+    order: Number.isFinite(order) ? Math.round(order) : 0,
+  });
 }
 
 export async function PUT(request: NextRequest) {
@@ -99,6 +113,8 @@ export async function PUT(request: NextRequest) {
   const name = String(body?.name ?? body?.newName ?? "").trim();
   const color = String(body?.color ?? "#3b82f6").trim();
   const icon = String(body?.icon ?? "📁").trim();
+  const orderRaw = body?.order;
+  const order = typeof orderRaw === "number" && Number.isFinite(orderRaw) ? orderRaw : Number(orderRaw);
   const previewImageUrl =
     typeof body?.previewImageUrl === "string" ? normalizePreviewImageUrl(body.previewImageUrl) : undefined;
   if (!oldName || !name) {
@@ -118,6 +134,7 @@ export async function PUT(request: NextRequest) {
     color,
     icon,
     previewImageUrl: previewImageUrl === "" ? undefined : previewImageUrl,
+    order: Number.isFinite(order) ? Math.round(order) : (categories[index] as { order?: number }).order ?? 0,
   };
   await writeCategoriesToFile(categories);
   if (nameChanged) {

@@ -10,6 +10,7 @@ export interface CategoryJson {
   color: string;
   icon: string;
   previewImageUrl?: string;
+  order?: number;
 }
 
 export async function readCategoriesFromFile(): Promise<CategoryJson[]> {

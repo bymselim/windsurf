@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import sharp from "sharp";
 import { readArtworksFromFile, writeArtworksToFile } from "@/lib/artworks-io";
 import { readCategoriesFromFile, writeCategoriesToFile } from "@/lib/categories-io";
@@ -53,12 +53,34 @@ export async function POST(request: NextRequest) {
   }
   const prefix = "artworks";
 
+  const existing = await readArtworksFromFile();
+  const existingHashesInCategory = new Set(
+    existing
+      .filter((e) => e.category === categoryName)
+      .map((e) => (typeof e.contentHash === "string" ? e.contentHash : ""))
+      .filter(Boolean)
+  );
+
   const uploads = await Promise.all(
     files.map(async (file) => {
       const filename = safePathSegment(file.name || "file");
-      const blobPath = folder ? `${prefix}/${folder}/${filename}` : `${prefix}/${filename}`;
       const buf = Buffer.from(await file.arrayBuffer());
+      const contentHash = createHash("sha256").update(buf).digest("hex");
+      if (existingHashesInCategory.has(contentHash)) {
+        return {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          pathname: "",
+          url: "",
+          thumbUrl: undefined as string | undefined,
+          contentHash,
+          skipped: true as const,
+        };
+      }
+      existingHashesInCategory.add(contentHash);
 
+      const blobPath = folder ? `${prefix}/${folder}/${filename}` : `${prefix}/${filename}`;
       const res = await put(blobPath, buf, {
         access: "public",
         addRandomSuffix: true,
@@ -95,6 +117,7 @@ export async function POST(request: NextRequest) {
         pathname: res.pathname,
         url: res.url,
         thumbUrl,
+        contentHash,
       };
     })
   );
@@ -107,10 +130,10 @@ export async function POST(request: NextRequest) {
       await writeCategoriesToFile(categories);
     }
 
-    const existing = await readArtworksFromFile();
     const existingByFilename = new Set(existing.map((e) => e.filename));
 
     for (const u of uploads) {
+      if ((u as { skipped?: boolean }).skipped) continue;
       // Avoid duplicating by exact filename/url.
       if (existingByFilename.has(u.url)) continue;
       existingByFilename.add(u.url);
@@ -123,6 +146,7 @@ export async function POST(request: NextRequest) {
         category: categoryName,
         filename: u.url,
         thumbnailFilename: typeof u.thumbUrl === "string" ? u.thumbUrl : undefined,
+        contentHash: typeof (u as { contentHash?: string }).contentHash === "string" ? (u as { contentHash?: string }).contentHash : undefined,
         titleTR: "",
         titleEN: "",
         descriptionTR: "Detaylı bilgi ve sipariş için sipariş butonunu kullanabilirsiniz.",
