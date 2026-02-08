@@ -445,7 +445,7 @@ export default function InternationalGalleryPage() {
       {showNavHint ? (
         <div className="mx-auto max-w-3xl px-4 pt-3">
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-            Swipe right here to reach other categories.
+            Swipe right at the top to reach categories.
           </div>
         </div>
       ) : null}

@@ -437,7 +437,7 @@ export default function TurkishGalleryPage() {
       {showNavHint ? (
         <div className="mx-auto max-w-3xl px-4 pt-3">
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-            Buradan diğer kategorilere sağa kaydırarak ulaşabilirsiniz.
+            Yukarıdan sağa kaydırarak kategorilere ulaşabilirsiniz.
           </div>
         </div>
       ) : null}
