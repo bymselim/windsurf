@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -326,6 +326,34 @@ export default function ArtworksAdminPage() {
     });
   };
 
+  const deselectAllOnPage = () => {
+    setSelectedIds((prev) => {
+      const next = { ...prev };
+      for (const a of pageArtworks) delete next[a.id];
+      return next;
+    });
+  };
+
+  const allOnPageSelected = useMemo(() => {
+    if (pageArtworks.length === 0) return false;
+    return pageArtworks.every((a) => Boolean(selectedIds[a.id]));
+  }, [pageArtworks, selectedIds]);
+
+  const someOnPageSelected = useMemo(() => {
+    return pageArtworks.some((a) => Boolean(selectedIds[a.id]));
+  }, [pageArtworks, selectedIds]);
+
+  const formatBullets = (text: string): string => {
+    const lines = String(text ?? "")
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length === 0) return "";
+    const alreadyBullets = lines.every((l) => /^(-\s+|•\s+)/.test(l));
+    if (alreadyBullets) return lines.map((l) => l.replace(/^•\s+/, "- ")).join("\n");
+    return lines.map((l) => (l.startsWith("-") ? l : `- ${l.replace(/^[-•]\s+/, "")}`)).join("\n");
+  };
+
   const applyBulkEdit = async () => {
     if (bulkEditSaving) return;
     if (selectedIdList.length === 0) return;
@@ -537,6 +565,15 @@ export default function ArtworksAdminPage() {
               {bulkSaving ? "Saving..." : `Toplu Kaydet (${dirtyIds.length})`}
             </button>
             {bulkStatus ? <span className="text-sm text-zinc-400 self-center">{bulkStatus}</span> : null}
+
+            <button
+              type="button"
+              onClick={selectAllFiltered}
+              disabled={filtered.length === 0}
+              className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-4 py-3 text-sm font-semibold transition disabled:opacity-50"
+            >
+              Toplu Seç (Filtre)
+            </button>
           </div>
 
           <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30">
@@ -721,10 +758,18 @@ export default function ArtworksAdminPage() {
                       value={bulkDescTR}
                       onChange={(e) => setBulkDescTR(e.target.value)}
                       disabled={!applyDescTR}
-                      rows={2}
+                      rows={4}
                       placeholder="Toplu açıklama (TR)"
                       className="flex-1 min-w-0 p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50 resize-y"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setBulkDescTR((prev) => formatBullets(prev))}
+                      disabled={!applyDescTR}
+                      className="shrink-0 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-3 py-2 text-xs font-medium transition disabled:opacity-50"
+                    >
+                      Madde Yap
+                    </button>
                   </div>
 
                   <div className="flex items-start gap-3">
@@ -741,10 +786,18 @@ export default function ArtworksAdminPage() {
                       value={bulkDescEN}
                       onChange={(e) => setBulkDescEN(e.target.value)}
                       disabled={!applyDescEN}
-                      rows={2}
+                      rows={4}
                       placeholder="Toplu description (EN)"
                       className="flex-1 min-w-0 p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50 resize-y"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setBulkDescEN((prev) => formatBullets(prev))}
+                      disabled={!applyDescEN}
+                      className="shrink-0 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-3 py-2 text-xs font-medium transition disabled:opacity-50"
+                    >
+                      Madde Yap
+                    </button>
                   </div>
                 </div>
 
@@ -784,7 +837,22 @@ export default function ArtworksAdminPage() {
               <table className="w-full min-w-[1200px]">
                 <thead className="bg-zinc-900">
                   <tr>
-                    <th className="p-2 text-left text-sm font-semibold text-zinc-300">Seç</th>
+                    <th className="p-2 text-left text-sm font-semibold text-zinc-300">
+                      <input
+                        type="checkbox"
+                        checked={allOnPageSelected}
+                        ref={(el) => {
+                          if (!el) return;
+                          el.indeterminate = !allOnPageSelected && someOnPageSelected;
+                        }}
+                        onChange={(e) => {
+                          if (e.target.checked) selectAllOnPage();
+                          else deselectAllOnPage();
+                        }}
+                        className="h-4 w-4 accent-amber-500"
+                        aria-label="Select page"
+                      />
+                    </th>
                     <th className="p-2 text-left text-sm font-semibold text-zinc-300">Image</th>
                     <th className="p-2 text-left text-sm font-semibold text-zinc-300">
                       Title (TR)
@@ -934,9 +1002,22 @@ export default function ArtworksAdminPage() {
                             updateArtwork(artwork.id, "descriptionTR", e.target.value)
                           }
                           className="w-full min-w-[140px] p-2 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 text-sm focus:border-amber-500/50 focus:outline-none resize-y"
-                          rows={2}
+                          rows={3}
                           placeholder="Açıklama (TR)"
                         />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateArtwork(
+                              artwork.id,
+                              "descriptionTR",
+                              formatBullets(String(artwork.descriptionTR ?? ""))
+                            )
+                          }
+                          className="mt-1 rounded bg-zinc-800 hover:bg-zinc-700 px-2 py-1 text-[11px] text-zinc-100 transition"
+                        >
+                          Madde Yap
+                        </button>
                       </td>
                       <td className="p-2">
                         <textarea
@@ -945,9 +1026,22 @@ export default function ArtworksAdminPage() {
                             updateArtwork(artwork.id, "descriptionEN", e.target.value)
                           }
                           className="w-full min-w-[140px] p-2 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 text-sm focus:border-amber-500/50 focus:outline-none resize-y"
-                          rows={2}
+                          rows={3}
                           placeholder="Description (EN)"
                         />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateArtwork(
+                              artwork.id,
+                              "descriptionEN",
+                              formatBullets(String(artwork.descriptionEN ?? ""))
+                            )
+                          }
+                          className="mt-1 rounded bg-zinc-800 hover:bg-zinc-700 px-2 py-1 text-[11px] text-zinc-100 transition"
+                        >
+                          Madde Yap
+                        </button>
                       </td>
                       <td className="p-2">
                         <input
