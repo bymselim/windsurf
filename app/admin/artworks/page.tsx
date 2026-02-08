@@ -34,6 +34,9 @@ export default function ArtworksAdminPage() {
   const [bulkPriceCategory, setBulkPriceCategory] = useState<string>("");
   const [bulkPriceTRY, setBulkPriceTRY] = useState<string>("");
   const [bulkPriceUSD, setBulkPriceUSD] = useState<string>("");
+  const [missingTitleOnly, setMissingTitleOnly] = useState(false);
+  const [missingDescriptionOnly, setMissingDescriptionOnly] = useState(false);
+  const [missingPriceOnly, setMissingPriceOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [featuredFilter, setFeaturedFilter] = useState<string>("");
@@ -240,7 +243,24 @@ export default function ArtworksAdminPage() {
       !featuredFilter ||
       (featuredFilter === "yes" && art.isFeatured) ||
       (featuredFilter === "no" && !art.isFeatured);
-    return matchSearch && matchCategory && matchFeatured;
+
+    const titleMissing = !(String(art.titleTR ?? "").trim() || String(art.titleEN ?? "").trim());
+    const descriptionMissing =
+      !(String(art.descriptionTR ?? "").trim() || String(art.descriptionEN ?? "").trim());
+    const priceMissing = !(Number(art.priceTRY) > 0 || Number(art.priceUSD) > 0);
+
+    const matchMissingTitle = !missingTitleOnly || titleMissing;
+    const matchMissingDescription = !missingDescriptionOnly || descriptionMissing;
+    const matchMissingPrice = !missingPriceOnly || priceMissing;
+
+    return (
+      matchSearch &&
+      matchCategory &&
+      matchFeatured &&
+      matchMissingTitle &&
+      matchMissingDescription &&
+      matchMissingPrice
+    );
   });
 
   const sorted = [...filtered].sort((a, b) => {
@@ -308,10 +328,39 @@ export default function ArtworksAdminPage() {
               onChange={(e) => setFeaturedFilter(e.target.value)}
               className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 focus:border-amber-500/50"
             >
-              <option value="">All</option>
+              <option value="">Featured: all</option>
               <option value="yes">Featured only</option>
               <option value="no">Not featured</option>
             </select>
+            <div className="flex flex-wrap gap-2 items-center rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
+              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={missingTitleOnly}
+                  onChange={(e) => setMissingTitleOnly(e.target.checked)}
+                  className="h-4 w-4 accent-amber-500"
+                />
+                Başlık yok
+              </label>
+              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={missingDescriptionOnly}
+                  onChange={(e) => setMissingDescriptionOnly(e.target.checked)}
+                  className="h-4 w-4 accent-amber-500"
+                />
+                Açıklama yok
+              </label>
+              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={missingPriceOnly}
+                  onChange={(e) => setMissingPriceOnly(e.target.checked)}
+                  className="h-4 w-4 accent-amber-500"
+                />
+                Fiyat yok
+              </label>
+            </div>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as "title" | "price" | "category")}
