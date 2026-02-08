@@ -10,6 +10,7 @@ export interface ArtworkJson {
   id: string;
   category: string;
   filename: string;
+  thumbnailFilename?: string;
   titleTR: string;
   titleEN: string;
   descriptionTR: string | null;
@@ -33,6 +34,7 @@ function normalizeEntry(raw: unknown): ArtworkJson {
     id: String(r.id ?? ""),
     category: String(r.category ?? ""),
     filename: String(r.filename ?? ""),
+    thumbnailFilename: typeof r.thumbnailFilename === "string" ? r.thumbnailFilename : undefined,
     titleTR: typeof r.titleTR === "string" ? r.titleTR : title,
     titleEN: typeof r.titleEN === "string" ? r.titleEN : title,
     descriptionTR: typeof r.descriptionTR === "string" ? r.descriptionTR : desc,

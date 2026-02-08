@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { randomUUID } from "crypto";
+import sharp from "sharp";
 import { readArtworksFromFile, writeArtworksToFile } from "@/lib/artworks-io";
 import { readCategoriesFromFile, writeCategoriesToFile } from "@/lib/categories-io";
 import { dimensionsCMToIN } from "@/lib/dimensions";
@@ -64,12 +65,36 @@ export async function POST(request: NextRequest) {
         contentType: file.type || undefined,
       });
 
+      let thumbUrl: string | undefined;
+      if ((file.type || "").startsWith("image/")) {
+        try {
+          const thumb = await sharp(buf)
+            .rotate()
+            .resize({ width: 512, withoutEnlargement: true })
+            .jpeg({ quality: 82, mozjpeg: true })
+            .toBuffer();
+          const base = filename.replace(/\.[^.]+$/, "") || "thumb";
+          const thumbPath = folder
+            ? `${prefix}/${folder}/thumb-${safePathSegment(base)}.jpg`
+            : `${prefix}/thumb-${safePathSegment(base)}.jpg`;
+          const thumbRes = await put(thumbPath, thumb, {
+            access: "public",
+            addRandomSuffix: true,
+            contentType: "image/jpeg",
+          });
+          thumbUrl = thumbRes.url;
+        } catch {
+          // ignore thumbnail failures
+        }
+      }
+
       return {
         name: file.name,
         size: file.size,
         type: file.type,
         pathname: res.pathname,
         url: res.url,
+        thumbUrl,
       };
     })
   );
@@ -97,6 +122,7 @@ export async function POST(request: NextRequest) {
         id,
         category: categoryName,
         filename: u.url,
+        thumbnailFilename: typeof u.thumbUrl === "string" ? u.thumbUrl : undefined,
         titleTR: "",
         titleEN: "",
         descriptionTR: "Detaylı bilgi ve sipariş için sipariş butonunu kullanabilirsiniz.",

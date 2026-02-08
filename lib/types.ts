@@ -8,6 +8,7 @@ export interface ArtworkFull {
   category: ArtworkCategory;
   filename: string;
   imageUrl: string;
+  thumbnailUrl?: string;
   mediaType?: MediaType;
   titleTR: string;
   titleEN: string;

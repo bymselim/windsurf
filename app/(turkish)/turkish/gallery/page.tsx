@@ -150,7 +150,13 @@ export default function TurkishGalleryPage() {
           const cat = typeof a.category === "string" ? a.category : "";
           if (!cat) continue;
           if (a.mediaType && a.mediaType !== "image") continue;
-          const url = typeof a.imageUrl === "string" ? a.imageUrl : "";
+          const url =
+            typeof (a as ArtworkFull & { thumbnailUrl?: string }).thumbnailUrl === "string" &&
+            (a as ArtworkFull & { thumbnailUrl?: string }).thumbnailUrl
+              ? (a as ArtworkFull & { thumbnailUrl?: string }).thumbnailUrl!
+              : typeof a.imageUrl === "string"
+                ? a.imageUrl
+                : "";
           if (!url) continue;
           (imageByCategory[cat] ??= []).push(url);
         }

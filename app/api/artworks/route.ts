@@ -49,16 +49,23 @@ function isAbsoluteUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
 }
 
+function toPublicUrl(value: string): string {
+  return isAbsoluteUrl(value) ? value : `${ARTWORKS_BASE}/${value}`;
+}
+
 function toResponseItem(item: ArtworkJson) {
   const mediaType = VIDEO_EXT.test(item.filename) ? ("video" as const) : ("image" as const);
-  const imageUrl = isAbsoluteUrl(item.filename)
-    ? item.filename
-    : `${ARTWORKS_BASE}/${item.filename}`;
+  const imageUrl = toPublicUrl(item.filename);
+  const thumbnailUrl =
+    typeof item.thumbnailFilename === "string" && item.thumbnailFilename.trim() !== ""
+      ? toPublicUrl(item.thumbnailFilename)
+      : undefined;
   return {
     id: item.id,
     category: item.category,
     filename: item.filename,
     imageUrl,
+    thumbnailUrl,
     mediaType,
     titleTR: item.titleTR,
     titleEN: item.titleEN,
