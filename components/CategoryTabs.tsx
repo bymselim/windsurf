@@ -22,6 +22,7 @@ type CategoryTabsProps = {
   allPreviewImageUrl?: string;
   /** Hide the All/Tümü tab/card and show only categories. */
   hideAllTab?: boolean;
+  leadingLabel?: string;
   rotateMs?: number;
   fadeMs?: number;
   mode?: "auto" | "allGrid";
@@ -137,6 +138,7 @@ export function CategoryTabs({
   allLabel = "All",
   allPreviewImageUrl,
   hideAllTab = false,
+  leadingLabel,
   rotateMs,
   fadeMs,
   mode = "auto",
@@ -249,6 +251,11 @@ export function CategoryTabs({
         </div>
       ) : (
         <div className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-center sm:gap-2 sm:overflow-visible sm:py-3">
+          {leadingLabel ? (
+            <span className="flex shrink-0 items-center rounded-full border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-xs font-semibold tracking-[0.22em] text-zinc-400 sm:px-5 sm:py-2.5 sm:text-sm">
+              {leadingLabel}
+            </span>
+          ) : null}
           {tabs.map((tab, idx) => {
             const isActive = active === tab.value;
             const images =

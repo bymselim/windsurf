@@ -363,13 +363,6 @@ export default function TurkishGalleryPage() {
 
   return (
     <div ref={containerRef} className="min-h-screen bg-zinc-950">
-      {category !== "All" ? (
-        <div className="fixed left-1/2 top-2 z-50 -translate-x-1/2 pointer-events-none select-none">
-          <div className="rounded-full border border-zinc-800 bg-zinc-950/70 px-3 py-1 text-[11px] font-semibold tracking-[0.22em] text-zinc-300 backdrop-blur">
-            KATALOG
-          </div>
-        </div>
-      ) : null}
       {category === "All" && headerItem?.text ? (
         <div className="mx-auto max-w-3xl px-4 pt-8 pb-2 text-center">
           <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-300/90">
@@ -422,6 +415,7 @@ export default function TurkishGalleryPage() {
           allLabel={UI.all}
           allPreviewImageUrl={process.env.NEXT_PUBLIC_ALL_PREVIEW_IMAGE_URL}
           hideAllTab
+          leadingLabel={category !== "All" ? "KATALOG" : undefined}
           rotateMs={ui?.categoryPreviewRotateMs}
           fadeMs={ui?.categoryPreviewFadeMs}
           mode="allGrid"
