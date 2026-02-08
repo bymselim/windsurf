@@ -143,6 +143,7 @@ export function CategoryTabs({
   fadeMs,
   mode = "auto",
 }: CategoryTabsProps) {
+  const [navEl, setNavEl] = useState<HTMLElement | null>(null);
   const rotate = typeof rotateMs === "number" && Number.isFinite(rotateMs) ? rotateMs : DEFAULT_ROTATE_MS;
   const fade = typeof fadeMs === "number" && Number.isFinite(fadeMs) ? fadeMs : DEFAULT_FADE_MS;
   const tabs = useMemo(
@@ -165,6 +166,7 @@ export function CategoryTabs({
 
   return (
     <nav
+      ref={setNavEl}
       className="sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/80"
       role="tablist"
       aria-label="Category filter"
@@ -250,11 +252,18 @@ export function CategoryTabs({
           })}
         </div>
       ) : (
-        <div className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-center sm:gap-2 sm:overflow-visible sm:py-3">
+        <div className="mx-auto grid max-w-6xl grid-flow-col grid-rows-2 items-center gap-1 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-2 sm:py-3">
           {leadingLabel ? (
-            <span className="flex shrink-0 items-center rounded-full border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-xs font-semibold tracking-[0.22em] text-zinc-400 sm:px-5 sm:py-2.5 sm:text-sm">
+            <button
+              type="button"
+              onClick={() => {
+                onSelect("All");
+                window.setTimeout(() => navEl?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+              }}
+              className="flex shrink-0 items-center rounded-full border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-xs font-semibold tracking-[0.22em] text-zinc-400 transition hover:bg-zinc-900/40 hover:text-zinc-200 sm:px-5 sm:py-2.5 sm:text-sm"
+            >
               {leadingLabel}
-            </span>
+            </button>
           ) : null}
           {tabs.map((tab, idx) => {
             const isActive = active === tab.value;
