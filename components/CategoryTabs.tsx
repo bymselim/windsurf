@@ -243,7 +243,7 @@ export function CategoryTabs({
           })}
         </div>
       ) : (
-        <div className="mx-auto flex max-w-6xl flex-wrap justify-center gap-1 px-4 py-3 sm:gap-2">
+        <div className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-center sm:gap-2 sm:overflow-visible sm:py-3">
           {tabs.map((tab, idx) => {
             const isActive = active === tab.value;
             const images =
@@ -265,7 +265,7 @@ export function CategoryTabs({
                 role="tab"
                 aria-selected={isActive}
                 onClick={() => onSelect(tab.value)}
-                className="flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition sm:px-5"
+                className="flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition sm:px-5 sm:py-2.5 sm:text-sm"
                 style={{
                   borderColor: isActive ? "rgb(245 158 11)" : "rgb(39 39 42)",
                   backgroundColor: isActive ? "rgba(245, 158, 11, 0.15)" : "transparent",
