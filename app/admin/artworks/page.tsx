@@ -31,6 +31,25 @@ export default function ArtworksAdminPage() {
   const [saveStatus, setSaveStatus] = useState<Record<string, { ok: boolean; message: string }>>({});
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkStatus, setBulkStatus] = useState<string>("");
+  const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({});
+  const [bulkEditSaving, setBulkEditSaving] = useState(false);
+  const [bulkEditStatus, setBulkEditStatus] = useState<string>("");
+  const [applyTitleTR, setApplyTitleTR] = useState(false);
+  const [bulkTitleTR, setBulkTitleTR] = useState<string>("");
+  const [applyTitleEN, setApplyTitleEN] = useState(false);
+  const [bulkTitleEN, setBulkTitleEN] = useState<string>("");
+  const [applyCategory, setApplyCategory] = useState(false);
+  const [bulkCategory, setBulkCategory] = useState<string>("");
+  const [applyPriceTRY, setApplyPriceTRY] = useState(false);
+  const [bulkEditPriceTRY, setBulkEditPriceTRY] = useState<string>("");
+  const [applyPriceUSD, setApplyPriceUSD] = useState(false);
+  const [bulkEditPriceUSD, setBulkEditPriceUSD] = useState<string>("");
+  const [applyDimensions, setApplyDimensions] = useState(false);
+  const [bulkDimensionsCM, setBulkDimensionsCM] = useState<string>("");
+  const [applyDescTR, setApplyDescTR] = useState(false);
+  const [bulkDescTR, setBulkDescTR] = useState<string>("");
+  const [applyDescEN, setApplyDescEN] = useState(false);
+  const [bulkDescEN, setBulkDescEN] = useState<string>("");
   const [bulkPriceCategory, setBulkPriceCategory] = useState<string>("");
   const [bulkPriceTRY, setBulkPriceTRY] = useState<string>("");
   const [bulkPriceUSD, setBulkPriceUSD] = useState<string>("");
@@ -113,6 +132,8 @@ export default function ArtworksAdminPage() {
   };
 
   const dirtyIds = artworks.filter(isDirty).map((a) => a.id);
+
+  const selectedIdList = Object.keys(selectedIds).filter((id) => selectedIds[id]);
 
   const saveAllChanges = async () => {
     if (bulkSaving) return;
@@ -274,6 +295,85 @@ export default function ArtworksAdminPage() {
   const start = (currentPage - 1) * PAGE_SIZE;
   const pageArtworks = sorted.slice(start, start + PAGE_SIZE);
 
+  const toggleSelected = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => ({ ...prev, [id]: checked }));
+  };
+
+  const clearSelection = () => setSelectedIds({});
+
+  const selectAllFiltered = () => {
+    const next: Record<string, boolean> = {};
+    for (const a of filtered) next[a.id] = true;
+    setSelectedIds(next);
+  };
+
+  const selectAllOnPage = () => {
+    setSelectedIds((prev) => {
+      const next = { ...prev };
+      for (const a of pageArtworks) next[a.id] = true;
+      return next;
+    });
+  };
+
+  const applyBulkEdit = async () => {
+    if (bulkEditSaving) return;
+    if (selectedIdList.length === 0) return;
+
+    const patch: Record<string, unknown> = {};
+    if (applyTitleTR) patch.titleTR = bulkTitleTR;
+    if (applyTitleEN) patch.titleEN = bulkTitleEN;
+    if (applyCategory) patch.category = bulkCategory;
+    if (applyPriceTRY) {
+      const n = bulkEditPriceTRY.trim() === "" ? NaN : Number(bulkEditPriceTRY);
+      if (!Number.isFinite(n)) {
+        setBulkEditStatus("Geçersiz TRY fiyatı");
+        return;
+      }
+      patch.priceTRY = n;
+    }
+    if (applyPriceUSD) {
+      const n = bulkEditPriceUSD.trim() === "" ? NaN : Number(bulkEditPriceUSD);
+      if (!Number.isFinite(n)) {
+        setBulkEditStatus("Geçersiz USD fiyatı");
+        return;
+      }
+      patch.priceUSD = n;
+    }
+    if (applyDimensions) patch.dimensionsCM = bulkDimensionsCM;
+    if (applyDescTR) patch.descriptionTR = bulkDescTR;
+    if (applyDescEN) patch.descriptionEN = bulkDescEN;
+
+    if (Object.keys(patch).length === 0) {
+      setBulkEditStatus("Değiştirilecek alan seçilmedi");
+      return;
+    }
+
+    setBulkEditSaving(true);
+    setBulkEditStatus("");
+    try {
+      const res = await fetch("/api/admin/artworks/bulk", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ids: selectedIdList, patch }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = typeof json?.error === "string" ? json.error : "Bulk update failed";
+        setBulkEditStatus(msg);
+        return;
+      }
+      setBulkEditStatus(`Güncellendi: ${selectedIdList.length}`);
+      clearSelection();
+      await loadArtworks();
+      window.setTimeout(() => setBulkEditStatus(""), 2500);
+    } catch {
+      setBulkEditStatus("Bulk update failed");
+    } finally {
+      setBulkEditSaving(false);
+    }
+  };
+
   if (isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
@@ -418,6 +518,198 @@ export default function ArtworksAdminPage() {
             </button>
             {bulkStatus ? <span className="text-sm text-zinc-400 self-center">{bulkStatus}</span> : null}
           </div>
+
+          <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm text-zinc-300">
+                Seçili: <span className="font-semibold text-zinc-100">{selectedIdList.length}</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={selectAllOnPage}
+                  className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-3 py-2 text-sm font-medium transition"
+                >
+                  Sayfadakileri seç
+                </button>
+                <button
+                  type="button"
+                  onClick={selectAllFiltered}
+                  className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-3 py-2 text-sm font-medium transition"
+                >
+                  Filtredekileri seç
+                </button>
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  disabled={selectedIdList.length === 0}
+                  className="rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-100 px-3 py-2 text-sm font-medium transition disabled:opacity-50"
+                >
+                  Seçimi temizle
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={applyTitleTR}
+                  onChange={(e) => setApplyTitleTR(e.target.checked)}
+                  className="h-4 w-4 accent-amber-500"
+                />
+                Title (TR)
+              </label>
+              <input
+                value={bulkTitleTR}
+                onChange={(e) => setBulkTitleTR(e.target.value)}
+                disabled={!applyTitleTR}
+                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
+                placeholder="Toplu Title (TR)"
+              />
+
+              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={applyTitleEN}
+                  onChange={(e) => setApplyTitleEN(e.target.checked)}
+                  className="h-4 w-4 accent-amber-500"
+                />
+                Title (EN)
+              </label>
+              <input
+                value={bulkTitleEN}
+                onChange={(e) => setBulkTitleEN(e.target.value)}
+                disabled={!applyTitleEN}
+                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
+                placeholder="Toplu Title (EN)"
+              />
+
+              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={applyCategory}
+                  onChange={(e) => setApplyCategory(e.target.checked)}
+                  className="h-4 w-4 accent-amber-500"
+                />
+                Category
+              </label>
+              <select
+                value={bulkCategory}
+                onChange={(e) => setBulkCategory(e.target.value)}
+                disabled={!applyCategory}
+                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 focus:border-amber-500/50 disabled:opacity-50"
+              >
+                <option value="">Seç...</option>
+                {categoryList.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+
+              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={applyPriceTRY}
+                  onChange={(e) => setApplyPriceTRY(e.target.checked)}
+                  className="h-4 w-4 accent-amber-500"
+                />
+                Price (TRY)
+              </label>
+              <input
+                value={bulkEditPriceTRY}
+                onChange={(e) => setBulkEditPriceTRY(e.target.value)}
+                disabled={!applyPriceTRY}
+                inputMode="decimal"
+                placeholder="TRY"
+                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
+              />
+
+              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={applyPriceUSD}
+                  onChange={(e) => setApplyPriceUSD(e.target.checked)}
+                  className="h-4 w-4 accent-amber-500"
+                />
+                Price (USD)
+              </label>
+              <input
+                value={bulkEditPriceUSD}
+                onChange={(e) => setBulkEditPriceUSD(e.target.value)}
+                disabled={!applyPriceUSD}
+                inputMode="decimal"
+                placeholder="USD"
+                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
+              />
+
+              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={applyDimensions}
+                  onChange={(e) => setApplyDimensions(e.target.checked)}
+                  className="h-4 w-4 accent-amber-500"
+                />
+                Dimensions (cm)
+              </label>
+              <input
+                value={bulkDimensionsCM}
+                onChange={(e) => setBulkDimensionsCM(e.target.value)}
+                disabled={!applyDimensions}
+                placeholder="60×90 cm"
+                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
+              />
+
+              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={applyDescTR}
+                  onChange={(e) => setApplyDescTR(e.target.checked)}
+                  className="h-4 w-4 accent-amber-500"
+                />
+                Desc (TR)
+              </label>
+              <textarea
+                value={bulkDescTR}
+                onChange={(e) => setBulkDescTR(e.target.value)}
+                disabled={!applyDescTR}
+                rows={2}
+                placeholder="Toplu açıklama (TR)"
+                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50 resize-y"
+              />
+
+              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={applyDescEN}
+                  onChange={(e) => setApplyDescEN(e.target.checked)}
+                  className="h-4 w-4 accent-amber-500"
+                />
+                Desc (EN)
+              </label>
+              <textarea
+                value={bulkDescEN}
+                onChange={(e) => setBulkDescEN(e.target.value)}
+                disabled={!applyDescEN}
+                rows={2}
+                placeholder="Toplu description (EN)"
+                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50 resize-y"
+              />
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={applyBulkEdit}
+                disabled={bulkEditSaving || selectedIdList.length === 0}
+                className="rounded-lg bg-emerald-500 hover:bg-emerald-600 text-zinc-950 px-4 py-2 text-sm font-semibold transition disabled:opacity-50"
+              >
+                {bulkEditSaving ? "Uygulanıyor..." : "Toplu Güncelle"}
+              </button>
+              {bulkEditStatus ? <span className="text-sm text-zinc-400">{bulkEditStatus}</span> : null}
+            </div>
+          </div>
         </div>
 
         {loading ? (
@@ -428,6 +720,7 @@ export default function ArtworksAdminPage() {
               <table className="w-full min-w-[1200px]">
                 <thead className="bg-zinc-900">
                   <tr>
+                    <th className="p-2 text-left text-sm font-semibold text-zinc-300">Seç</th>
                     <th className="p-2 text-left text-sm font-semibold text-zinc-300">Image</th>
                     <th className="p-2 text-left text-sm font-semibold text-zinc-300">
                       Title (TR)
@@ -463,6 +756,14 @@ export default function ArtworksAdminPage() {
                       key={artwork.id}
                       className="border-b border-zinc-800 hover:bg-zinc-900/50"
                     >
+                      <td className="p-2">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(selectedIds[artwork.id])}
+                          onChange={(e) => toggleSelected(artwork.id, e.target.checked)}
+                          className="h-4 w-4 accent-amber-500"
+                        />
+                      </td>
                       <td className="p-2">
                         <button
                           type="button"
