@@ -369,12 +369,12 @@ export default function GalleryPage() {
           <button
             type="button"
             onClick={() => setCategory("All")}
-            className="fixed left-3 top-[70%] -translate-y-1/2 z-40 w-20 rounded-2xl border border-zinc-700/70 bg-zinc-950/50 px-2 py-2 text-[11px] text-zinc-200/50 hover:text-zinc-200/80 hover:bg-zinc-900/60 transition"
-            aria-label="All"
+            className="fixed bottom-4 left-4 z-40 h-24 w-24 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-[11px] text-zinc-100 hover:bg-zinc-800 transition"
+            aria-label="Katalog'a geri dön"
           >
-            <div className="flex flex-col items-center justify-center gap-1">
-              <div className="text-base leading-none">←</div>
-              <div className="leading-none">Geri Dön</div>
+            <div className="flex h-full flex-col items-center justify-between">
+              <div className="text-[11px] font-semibold leading-none">Katalog&apos;a</div>
+              <div className="text-[11px] font-semibold leading-none">Geri Dön</div>
             </div>
           </button>
         ) : null}
