@@ -34,6 +34,8 @@ export default function ArtworksAdminPage() {
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({});
   const [bulkEditSaving, setBulkEditSaving] = useState(false);
   const [bulkEditStatus, setBulkEditStatus] = useState<string>("");
+  const [bulkEditStatusKind, setBulkEditStatusKind] = useState<"success" | "error" | "">("");
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [applyTitleTR, setApplyTitleTR] = useState(false);
   const [bulkTitleTR, setBulkTitleTR] = useState<string>("");
   const [applyTitleEN, setApplyTitleEN] = useState(false);
@@ -134,6 +136,15 @@ export default function ArtworksAdminPage() {
   const dirtyIds = artworks.filter(isDirty).map((a) => a.id);
 
   const selectedIdList = Object.keys(selectedIds).filter((id) => selectedIds[id]);
+
+  const parsePriceInput = (raw: string): number => {
+    const v = String(raw ?? "")
+      .trim()
+      .replace(/\s+/g, "")
+      .replace(/\./g, "")
+      .replace(/,/g, ".");
+    return Number(v);
+  };
 
   const saveAllChanges = async () => {
     if (bulkSaving) return;
@@ -319,22 +330,26 @@ export default function ArtworksAdminPage() {
     if (bulkEditSaving) return;
     if (selectedIdList.length === 0) return;
 
+    setBulkEditStatusKind("");
+
     const patch: Record<string, unknown> = {};
     if (applyTitleTR) patch.titleTR = bulkTitleTR;
     if (applyTitleEN) patch.titleEN = bulkTitleEN;
     if (applyCategory) patch.category = bulkCategory;
     if (applyPriceTRY) {
-      const n = bulkEditPriceTRY.trim() === "" ? NaN : Number(bulkEditPriceTRY);
+      const n = bulkEditPriceTRY.trim() === "" ? NaN : parsePriceInput(bulkEditPriceTRY);
       if (!Number.isFinite(n)) {
         setBulkEditStatus("Geçersiz TRY fiyatı");
+        setBulkEditStatusKind("error");
         return;
       }
       patch.priceTRY = n;
     }
     if (applyPriceUSD) {
-      const n = bulkEditPriceUSD.trim() === "" ? NaN : Number(bulkEditPriceUSD);
+      const n = bulkEditPriceUSD.trim() === "" ? NaN : parsePriceInput(bulkEditPriceUSD);
       if (!Number.isFinite(n)) {
         setBulkEditStatus("Geçersiz USD fiyatı");
+        setBulkEditStatusKind("error");
         return;
       }
       patch.priceUSD = n;
@@ -345,11 +360,13 @@ export default function ArtworksAdminPage() {
 
     if (Object.keys(patch).length === 0) {
       setBulkEditStatus("Değiştirilecek alan seçilmedi");
+      setBulkEditStatusKind("error");
       return;
     }
 
     setBulkEditSaving(true);
     setBulkEditStatus("");
+    setBulkEditStatusKind("");
     try {
       const res = await fetch("/api/admin/artworks/bulk", {
         method: "PUT",
@@ -361,14 +378,17 @@ export default function ArtworksAdminPage() {
       if (!res.ok) {
         const msg = typeof json?.error === "string" ? json.error : "Bulk update failed";
         setBulkEditStatus(msg);
+        setBulkEditStatusKind("error");
         return;
       }
-      setBulkEditStatus(`Güncellendi: ${selectedIdList.length}`);
+      setBulkEditStatus(`Güncellendi: ${selectedIdList.length} (tekrar Save gerekmez)`);
+      setBulkEditStatusKind("success");
       clearSelection();
       await loadArtworks();
       window.setTimeout(() => setBulkEditStatus(""), 2500);
     } catch {
       setBulkEditStatus("Bulk update failed");
+      setBulkEditStatusKind("error");
     } finally {
       setBulkEditSaving(false);
     }
@@ -519,196 +539,240 @@ export default function ArtworksAdminPage() {
             {bulkStatus ? <span className="text-sm text-zinc-400 self-center">{bulkStatus}</span> : null}
           </div>
 
-          <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="text-sm text-zinc-300">
-                Seçili: <span className="font-semibold text-zinc-100">{selectedIdList.length}</span>
+          <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30">
+            <button
+              type="button"
+              onClick={() => setBulkEditOpen((v) => !v)}
+              className="w-full px-4 py-3 flex items-center justify-between gap-3"
+            >
+              <div className="text-left">
+                <div className="text-sm font-semibold text-zinc-100">Toplu İşlemler</div>
+                <div className="text-xs text-zinc-400">Seçili: {selectedIdList.length}</div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={selectAllOnPage}
-                  className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-3 py-2 text-sm font-medium transition"
-                >
-                  Sayfadakileri seç
-                </button>
-                <button
-                  type="button"
-                  onClick={selectAllFiltered}
-                  className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-3 py-2 text-sm font-medium transition"
-                >
-                  Filtredekileri seç
-                </button>
-                <button
-                  type="button"
-                  onClick={clearSelection}
-                  disabled={selectedIdList.length === 0}
-                  className="rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-100 px-3 py-2 text-sm font-medium transition disabled:opacity-50"
-                >
-                  Seçimi temizle
-                </button>
+              <div className="text-zinc-400 text-sm">{bulkEditOpen ? "▲" : "▼"}</div>
+            </button>
+
+            {bulkEditOpen ? (
+              <div className="px-4 pb-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-sm text-zinc-300">
+                    Seçili: <span className="font-semibold text-zinc-100">{selectedIdList.length}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={selectAllOnPage}
+                      className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-3 py-2 text-sm font-medium transition"
+                    >
+                      Sayfadakileri seç
+                    </button>
+                    <button
+                      type="button"
+                      onClick={selectAllFiltered}
+                      className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-3 py-2 text-sm font-medium transition"
+                    >
+                      Filtredekileri seç
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearSelection}
+                      disabled={selectedIdList.length === 0}
+                      className="rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-100 px-3 py-2 text-sm font-medium transition disabled:opacity-50"
+                    >
+                      Seçimi temizle
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm text-zinc-300 select-none shrink-0 w-40">
+                      <input
+                        type="checkbox"
+                        checked={applyTitleTR}
+                        onChange={(e) => setApplyTitleTR(e.target.checked)}
+                        className="h-4 w-4 accent-amber-500"
+                      />
+                      Title (TR)
+                    </label>
+                    <input
+                      value={bulkTitleTR}
+                      onChange={(e) => setBulkTitleTR(e.target.value)}
+                      disabled={!applyTitleTR}
+                      className="flex-1 min-w-0 p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
+                      placeholder="Toplu Title (TR)"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm text-zinc-300 select-none shrink-0 w-40">
+                      <input
+                        type="checkbox"
+                        checked={applyTitleEN}
+                        onChange={(e) => setApplyTitleEN(e.target.checked)}
+                        className="h-4 w-4 accent-amber-500"
+                      />
+                      Title (EN)
+                    </label>
+                    <input
+                      value={bulkTitleEN}
+                      onChange={(e) => setBulkTitleEN(e.target.value)}
+                      disabled={!applyTitleEN}
+                      className="flex-1 min-w-0 p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
+                      placeholder="Toplu Title (EN)"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm text-zinc-300 select-none shrink-0 w-40">
+                      <input
+                        type="checkbox"
+                        checked={applyCategory}
+                        onChange={(e) => setApplyCategory(e.target.checked)}
+                        className="h-4 w-4 accent-amber-500"
+                      />
+                      Category
+                    </label>
+                    <select
+                      value={bulkCategory}
+                      onChange={(e) => setBulkCategory(e.target.value)}
+                      disabled={!applyCategory}
+                      className="flex-1 min-w-0 p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 focus:border-amber-500/50 disabled:opacity-50"
+                    >
+                      <option value="">Seç...</option>
+                      {categoryList.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm text-zinc-300 select-none shrink-0 w-40">
+                      <input
+                        type="checkbox"
+                        checked={applyPriceTRY}
+                        onChange={(e) => setApplyPriceTRY(e.target.checked)}
+                        className="h-4 w-4 accent-amber-500"
+                      />
+                      Price (TRY)
+                    </label>
+                    <input
+                      value={bulkEditPriceTRY}
+                      onChange={(e) => setBulkEditPriceTRY(e.target.value)}
+                      disabled={!applyPriceTRY}
+                      inputMode="decimal"
+                      placeholder="110000 / 110.000"
+                      className="flex-1 min-w-0 p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm text-zinc-300 select-none shrink-0 w-40">
+                      <input
+                        type="checkbox"
+                        checked={applyPriceUSD}
+                        onChange={(e) => setApplyPriceUSD(e.target.checked)}
+                        className="h-4 w-4 accent-amber-500"
+                      />
+                      Price (USD)
+                    </label>
+                    <input
+                      value={bulkEditPriceUSD}
+                      onChange={(e) => setBulkEditPriceUSD(e.target.value)}
+                      disabled={!applyPriceUSD}
+                      inputMode="decimal"
+                      placeholder="USD"
+                      className="flex-1 min-w-0 p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm text-zinc-300 select-none shrink-0 w-40">
+                      <input
+                        type="checkbox"
+                        checked={applyDimensions}
+                        onChange={(e) => setApplyDimensions(e.target.checked)}
+                        className="h-4 w-4 accent-amber-500"
+                      />
+                      Dimensions (cm)
+                    </label>
+                    <input
+                      value={bulkDimensionsCM}
+                      onChange={(e) => setBulkDimensionsCM(e.target.value)}
+                      disabled={!applyDimensions}
+                      placeholder="60×90 cm"
+                      className="flex-1 min-w-0 p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <label className="flex items-center gap-2 text-sm text-zinc-300 select-none shrink-0 w-40 pt-2">
+                      <input
+                        type="checkbox"
+                        checked={applyDescTR}
+                        onChange={(e) => setApplyDescTR(e.target.checked)}
+                        className="h-4 w-4 accent-amber-500"
+                      />
+                      Desc (TR)
+                    </label>
+                    <textarea
+                      value={bulkDescTR}
+                      onChange={(e) => setBulkDescTR(e.target.value)}
+                      disabled={!applyDescTR}
+                      rows={2}
+                      placeholder="Toplu açıklama (TR)"
+                      className="flex-1 min-w-0 p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50 resize-y"
+                    />
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <label className="flex items-center gap-2 text-sm text-zinc-300 select-none shrink-0 w-40 pt-2">
+                      <input
+                        type="checkbox"
+                        checked={applyDescEN}
+                        onChange={(e) => setApplyDescEN(e.target.checked)}
+                        className="h-4 w-4 accent-amber-500"
+                      />
+                      Desc (EN)
+                    </label>
+                    <textarea
+                      value={bulkDescEN}
+                      onChange={(e) => setBulkDescEN(e.target.value)}
+                      disabled={!applyDescEN}
+                      rows={2}
+                      placeholder="Toplu description (EN)"
+                      className="flex-1 min-w-0 p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50 resize-y"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={applyBulkEdit}
+                    disabled={bulkEditSaving || selectedIdList.length === 0}
+                    className="rounded-lg bg-emerald-500 hover:bg-emerald-600 text-zinc-950 px-4 py-2 text-sm font-semibold transition disabled:opacity-50"
+                  >
+                    {bulkEditSaving ? "Uygulanıyor..." : "Toplu Güncelle"}
+                  </button>
+                  {bulkEditStatus ? (
+                    <span
+                      className={`text-sm ${
+                        bulkEditStatusKind === "success"
+                          ? "text-emerald-400"
+                          : bulkEditStatusKind === "error"
+                            ? "text-red-400"
+                            : "text-zinc-400"
+                      }`}
+                    >
+                      {bulkEditStatus}
+                    </span>
+                  ) : null}
+                </div>
               </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
-                <input
-                  type="checkbox"
-                  checked={applyTitleTR}
-                  onChange={(e) => setApplyTitleTR(e.target.checked)}
-                  className="h-4 w-4 accent-amber-500"
-                />
-                Title (TR)
-              </label>
-              <input
-                value={bulkTitleTR}
-                onChange={(e) => setBulkTitleTR(e.target.value)}
-                disabled={!applyTitleTR}
-                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
-                placeholder="Toplu Title (TR)"
-              />
-
-              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
-                <input
-                  type="checkbox"
-                  checked={applyTitleEN}
-                  onChange={(e) => setApplyTitleEN(e.target.checked)}
-                  className="h-4 w-4 accent-amber-500"
-                />
-                Title (EN)
-              </label>
-              <input
-                value={bulkTitleEN}
-                onChange={(e) => setBulkTitleEN(e.target.value)}
-                disabled={!applyTitleEN}
-                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
-                placeholder="Toplu Title (EN)"
-              />
-
-              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
-                <input
-                  type="checkbox"
-                  checked={applyCategory}
-                  onChange={(e) => setApplyCategory(e.target.checked)}
-                  className="h-4 w-4 accent-amber-500"
-                />
-                Category
-              </label>
-              <select
-                value={bulkCategory}
-                onChange={(e) => setBulkCategory(e.target.value)}
-                disabled={!applyCategory}
-                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 focus:border-amber-500/50 disabled:opacity-50"
-              >
-                <option value="">Seç...</option>
-                {categoryList.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-
-              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
-                <input
-                  type="checkbox"
-                  checked={applyPriceTRY}
-                  onChange={(e) => setApplyPriceTRY(e.target.checked)}
-                  className="h-4 w-4 accent-amber-500"
-                />
-                Price (TRY)
-              </label>
-              <input
-                value={bulkEditPriceTRY}
-                onChange={(e) => setBulkEditPriceTRY(e.target.value)}
-                disabled={!applyPriceTRY}
-                inputMode="decimal"
-                placeholder="TRY"
-                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
-              />
-
-              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
-                <input
-                  type="checkbox"
-                  checked={applyPriceUSD}
-                  onChange={(e) => setApplyPriceUSD(e.target.checked)}
-                  className="h-4 w-4 accent-amber-500"
-                />
-                Price (USD)
-              </label>
-              <input
-                value={bulkEditPriceUSD}
-                onChange={(e) => setBulkEditPriceUSD(e.target.value)}
-                disabled={!applyPriceUSD}
-                inputMode="decimal"
-                placeholder="USD"
-                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
-              />
-
-              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
-                <input
-                  type="checkbox"
-                  checked={applyDimensions}
-                  onChange={(e) => setApplyDimensions(e.target.checked)}
-                  className="h-4 w-4 accent-amber-500"
-                />
-                Dimensions (cm)
-              </label>
-              <input
-                value={bulkDimensionsCM}
-                onChange={(e) => setBulkDimensionsCM(e.target.value)}
-                disabled={!applyDimensions}
-                placeholder="60×90 cm"
-                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
-              />
-
-              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
-                <input
-                  type="checkbox"
-                  checked={applyDescTR}
-                  onChange={(e) => setApplyDescTR(e.target.checked)}
-                  className="h-4 w-4 accent-amber-500"
-                />
-                Desc (TR)
-              </label>
-              <textarea
-                value={bulkDescTR}
-                onChange={(e) => setBulkDescTR(e.target.value)}
-                disabled={!applyDescTR}
-                rows={2}
-                placeholder="Toplu açıklama (TR)"
-                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50 resize-y"
-              />
-
-              <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
-                <input
-                  type="checkbox"
-                  checked={applyDescEN}
-                  onChange={(e) => setApplyDescEN(e.target.checked)}
-                  className="h-4 w-4 accent-amber-500"
-                />
-                Desc (EN)
-              </label>
-              <textarea
-                value={bulkDescEN}
-                onChange={(e) => setBulkDescEN(e.target.value)}
-                disabled={!applyDescEN}
-                rows={2}
-                placeholder="Toplu description (EN)"
-                className="w-full p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50 resize-y"
-              />
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={applyBulkEdit}
-                disabled={bulkEditSaving || selectedIdList.length === 0}
-                className="rounded-lg bg-emerald-500 hover:bg-emerald-600 text-zinc-950 px-4 py-2 text-sm font-semibold transition disabled:opacity-50"
-              >
-                {bulkEditSaving ? "Uygulanıyor..." : "Toplu Güncelle"}
-              </button>
-              {bulkEditStatus ? <span className="text-sm text-zinc-400">{bulkEditStatus}</span> : null}
-            </div>
+            ) : null}
           </div>
         </div>
 
@@ -828,7 +892,7 @@ export default function ArtworksAdminPage() {
                               parseFloat(e.target.value) || 0
                             )
                           }
-                          className="w-20 p-2 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 text-sm focus:border-amber-500/50 focus:outline-none"
+                          className="w-28 p-2 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 text-sm focus:border-amber-500/50 focus:outline-none"
                           min={0}
                           step={50}
                         />
@@ -844,7 +908,7 @@ export default function ArtworksAdminPage() {
                               parseFloat(e.target.value) || 0
                             )
                           }
-                          className="w-20 p-2 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 text-sm focus:border-amber-500/50 focus:outline-none"
+                          className="w-28 p-2 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 text-sm focus:border-amber-500/50 focus:outline-none"
                           min={0}
                           step={1}
                         />
