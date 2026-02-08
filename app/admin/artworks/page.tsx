@@ -27,6 +27,7 @@ export default function ArtworksAdminPage() {
   const [artworks, setArtworks] = useState<ArtworkRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<Record<string, { ok: boolean; message: string }>>({});
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [featuredFilter, setFeaturedFilter] = useState<string>("");
@@ -83,6 +84,7 @@ export default function ArtworksAdminPage() {
 
   const saveArtwork = async (artwork: ArtworkRow) => {
     setSavingId(artwork.id);
+    setSaveStatus((prev) => ({ ...prev, [artwork.id]: { ok: true, message: "" } }));
     try {
       const res = await fetch("/api/artworks", {
         method: "PUT",
@@ -101,13 +103,26 @@ export default function ArtworksAdminPage() {
           isFeatured: artwork.isFeatured,
         }),
       });
-      if (!res.ok) throw new Error("Save failed");
-      const updated = await res.json();
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = typeof json?.error === "string" ? json.error : "Save failed";
+        setSaveStatus((prev) => ({ ...prev, [artwork.id]: { ok: false, message: msg } }));
+        return;
+      }
+      const updated = json;
       setArtworks((prev) =>
         prev.map((a) => (a.id === artwork.id ? { ...a, ...updated } : a))
       );
+      setSaveStatus((prev) => ({ ...prev, [artwork.id]: { ok: true, message: "Saved" } }));
+      window.setTimeout(() => {
+        setSaveStatus((prev) => {
+          const next = { ...prev };
+          delete next[artwork.id];
+          return next;
+        });
+      }, 2500);
     } catch {
-      // could set error state
+      setSaveStatus((prev) => ({ ...prev, [artwork.id]: { ok: false, message: "Save failed" } }));
     } finally {
       setSavingId(null);
     }
@@ -396,6 +411,15 @@ export default function ArtworksAdminPage() {
                         >
                           {savingId === artwork.id ? "Saving..." : "Save"}
                         </button>
+                        {saveStatus[artwork.id]?.message ? (
+                          <div
+                            className={`mt-1 text-xs ${
+                              saveStatus[artwork.id].ok ? "text-green-400" : "text-red-400"
+                            }`}
+                          >
+                            {saveStatus[artwork.id].message}
+                          </div>
+                        ) : null}
                       </td>
                     </tr>
                   ))}

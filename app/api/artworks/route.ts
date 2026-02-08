@@ -9,6 +9,8 @@ import { dimensionsCMToIN } from "@/lib/dimensions";
 const COOKIE_NAME = "admin_session";
 const ARTWORKS_BASE = process.env.NEXT_PUBLIC_IMAGES_BASE ?? "/artworks";
 
+export const dynamic = "force-dynamic";
+
 /** Daily seed string (YYYY-MM-DD) so order is consistent during the same day. */
 function getDailySeed(): string {
   const now = new Date();
