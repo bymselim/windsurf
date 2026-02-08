@@ -3,13 +3,11 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 
 interface Category {
   name: string;
   color: string;
   icon: string;
-  previewImageUrl?: string;
   order?: number;
   artworkCount?: number;
 }
@@ -24,7 +22,6 @@ export default function AdminCategoriesPage() {
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState("#3b82f6");
   const [newIcon, setNewIcon] = useState("🎨");
-  const [newPreviewImageUrl, setNewPreviewImageUrl] = useState("");
   const [newOrder, setNewOrder] = useState("100");
   const [addError, setAddError] = useState("");
   const [adding, setAdding] = useState(false);
@@ -34,7 +31,6 @@ export default function AdminCategoriesPage() {
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState("");
   const [editIcon, setEditIcon] = useState("");
-  const [editPreviewImageUrl, setEditPreviewImageUrl] = useState("");
   const [editOrder, setEditOrder] = useState("0");
   const [editError, setEditError] = useState("");
 
@@ -95,17 +91,23 @@ export default function AdminCategoriesPage() {
           name,
           color: newColor,
           icon: newIcon,
-          previewImageUrl: newPreviewImageUrl.trim() || undefined,
           order: Number(newOrder),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Failed to add");
-      setCategories((prev) => [...prev, { ...data, artworkCount: 0 }]);
+      setCategories((prev) => {
+        const next = [...prev, { ...data, artworkCount: 0 }];
+        return next.sort((a, b) => {
+          const ao = typeof a.order === "number" && Number.isFinite(a.order) ? a.order : 0;
+          const bo = typeof b.order === "number" && Number.isFinite(b.order) ? b.order : 0;
+          if (ao !== bo) return ao - bo;
+          return String(a.name).localeCompare(String(b.name));
+        });
+      });
       setNewName("");
       setNewColor("#3b82f6");
       setNewIcon("🎨");
-      setNewPreviewImageUrl("");
       setNewOrder("100");
     } catch (err) {
       setAddError(err instanceof Error ? err.message : "Failed to add category");
@@ -119,7 +121,6 @@ export default function AdminCategoriesPage() {
     setEditName(cat.name);
     setEditColor(cat.color);
     setEditIcon(cat.icon);
-    setEditPreviewImageUrl(cat.previewImageUrl ?? "");
     setEditOrder(String(typeof cat.order === "number" && Number.isFinite(cat.order) ? cat.order : 0));
     setEditError("");
   };
@@ -146,14 +147,20 @@ export default function AdminCategoriesPage() {
           name,
           color: editColor,
           icon: editIcon,
-          previewImageUrl: editPreviewImageUrl.trim() || "",
           order: Number(editOrder),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Failed to update");
       setCategories((prev) =>
-        prev.map((c) => (c.name === editingName ? { ...c, ...data } : c))
+        prev
+          .map((c) => (c.name === editingName ? { ...c, ...data } : c))
+          .sort((a, b) => {
+            const ao = typeof a.order === "number" && Number.isFinite(a.order) ? a.order : 0;
+            const bo = typeof b.order === "number" && Number.isFinite(b.order) ? b.order : 0;
+            if (ao !== bo) return ao - bo;
+            return String(a.name).localeCompare(String(b.name));
+          })
       );
       setEditingName(null);
     } catch (err) {
@@ -228,16 +235,6 @@ export default function AdminCategoriesPage() {
                 className="w-full min-w-[160px] p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
               />
             </div>
-            <div>
-              <label className="block text-zinc-400 text-sm mb-1">Preview image URL (optional)</label>
-              <input
-                type="text"
-                value={newPreviewImageUrl}
-                onChange={(e) => setNewPreviewImageUrl(e.target.value)}
-                placeholder="https://..."
-                className="w-full min-w-[220px] p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
-              />
-            </div>
 
             <div>
               <label className="block text-zinc-400 text-sm mb-1">Order</label>
@@ -248,6 +245,7 @@ export default function AdminCategoriesPage() {
                 className="w-28 p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
               />
             </div>
+
             <div>
               <label className="block text-zinc-400 text-sm mb-1">Color</label>
               <div className="flex items-center gap-2">
@@ -265,8 +263,9 @@ export default function AdminCategoriesPage() {
                 />
               </div>
             </div>
+
             <div>
-              <label className="block text-zinc-400 text-sm mb-1">Icon (emoji)</label>
+              <label className="block text-zinc-400 text-sm mb-1">Icon</label>
               <input
                 type="text"
                 value={newIcon}
@@ -275,18 +274,19 @@ export default function AdminCategoriesPage() {
                 className="w-20 p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-center text-xl focus:border-amber-500/50 focus:outline-none"
               />
             </div>
+
             <button
               type="submit"
               disabled={adding}
-              className="px-5 py-3 bg-amber-500 hover:bg-amber-600 rounded-lg font-semibold text-zinc-950 disabled:opacity-50 transition"
+              className="px-5 py-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-semibold transition disabled:opacity-50"
             >
               {adding ? "Adding..." : "Add"}
             </button>
           </div>
-          {addError ? <p className="mt-3 text-sm text-red-400">{addError}</p> : null}
+
+          {addError ? <p className="text-red-400 mt-3">{addError}</p> : null}
         </form>
 
-        {/* List */}
         {loading ? (
           <p className="text-zinc-400">Loading categories...</p>
         ) : (
@@ -294,27 +294,12 @@ export default function AdminCategoriesPage() {
             <table className="w-full">
               <thead className="bg-zinc-900">
                 <tr>
-                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">
-                    Order
-                  </th>
-                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">
-                    Name
-                  </th>
-                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">
-                    Preview
-                  </th>
-                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">
-                    Color
-                  </th>
-                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">
-                    Icon
-                  </th>
-                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">
-                    Artwork count
-                  </th>
-                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">
-                    Actions
-                  </th>
+                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">Order</th>
+                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">Name</th>
+                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">Color</th>
+                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">Icon</th>
+                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">Artworks</th>
+                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -328,28 +313,12 @@ export default function AdminCategoriesPage() {
                     </td>
                     <td className="p-4 font-medium">{cat.name}</td>
                     <td className="p-4">
-                      {cat.previewImageUrl ? (
-                        <Image
-                          src={cat.previewImageUrl}
-                          alt=""
-                          width={64}
-                          height={48}
-                          unoptimized
-                          className="h-12 w-16 rounded-lg object-cover border border-zinc-700"
-                        />
-                      ) : (
-                        <span className="text-zinc-600 text-sm">—</span>
-                      )}
-                    </td>
-                    <td className="p-4">
                       <div className="flex items-center gap-2">
                         <span
                           className="w-6 h-6 rounded border border-zinc-600"
                           style={{ backgroundColor: cat.color }}
                         />
-                        <span className="text-zinc-400 font-mono text-sm">
-                          {cat.color}
-                        </span>
+                        <span className="text-zinc-400 font-mono text-sm">{cat.color}</span>
                       </div>
                     </td>
                     <td className="p-4 text-2xl">{cat.icon}</td>
@@ -384,13 +353,6 @@ export default function AdminCategoriesPage() {
                             placeholder="🎨"
                             className="w-14 p-1.5 bg-zinc-800 border border-zinc-700 rounded text-center text-lg"
                           />
-                          <input
-                            type="text"
-                            value={editPreviewImageUrl}
-                            onChange={(e) => setEditPreviewImageUrl(e.target.value)}
-                            placeholder="Preview URL"
-                            className="w-48 p-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm"
-                          />
                           <button
                             type="button"
                             onClick={saveEdit}
@@ -405,9 +367,7 @@ export default function AdminCategoriesPage() {
                           >
                             Cancel
                           </button>
-                          {editError && (
-                            <span className="text-red-400 text-sm">{editError}</span>
-                          )}
+                          {editError && <span className="text-red-400 text-sm">{editError}</span>}
                         </div>
                       ) : (
                         <div className="flex gap-2">
