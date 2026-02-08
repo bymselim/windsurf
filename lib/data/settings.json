@@ -1,0 +1,16 @@
+{
+  "passwords": {
+    "turkish": "123",
+    "international": "456"
+  },
+  "accessGate": {
+    "password": "1234",
+    "passwordTR": "123",
+    "passwordEN": "456",
+    "requireFullName": false,
+    "requirePhoneNumber": false,
+    "showKVKK": false,
+    "kvkkText": "KVKK Aydınlatma Metni (Özet)\n\nBu metin, 6698 sayılı Kişisel Verilerin Korunması Kanunu (\"KVKK\") kapsamında kişisel verilerinizin işlenmesine ilişkin aydınlatma amacıyla sunulmaktadır.\n\nVeri Sorumlusu: Galeri işletmesi adına veri sorumlusu.\n\nİşlenen Veriler: Ad soyad, telefon numarası ve erişim sırasında oluşan teknik veriler (IP, zaman damgası).\n\nİşleme Amaçları: Erişim kontrolü, güvenlik ve yasal yükümlülüklerin yerine getirilmesi.\n\nHukuki Sebep: Açık rızanız ve meşru menfaat.\n\nSaklama Süresi: Yasal zorunluluklar çerçevesinde saklanacaktır.\n\nHaklarınız: Kişisel verilerinize erişim, düzeltme, silme, işlemenin kısıtlanması ve itiraz haklarınızı kullanabilirsiniz. Başvuru için [iletişim] üzerinden yazılı talepte bulunabilirsiniz.\n\nDetaylı metin için galeri yönetimi ile iletişime geçiniz.",
+    "updatedAt": "2026-02-07T15:23:24.452Z"
+  }
+}

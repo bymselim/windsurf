@@ -1,0 +1,40 @@
+export type ArtworkCategory = string; // Dynamic from /api/categories (e.g. Stone, Balloon, Cosmo)
+
+export type MediaType = "image" | "video";
+
+/** Full artwork with dual TR/EN fields (API and admin). */
+export interface ArtworkFull {
+  id: string;
+  category: ArtworkCategory;
+  filename: string;
+  imageUrl: string;
+  mediaType?: MediaType;
+  titleTR: string;
+  titleEN: string;
+  descriptionTR: string | null;
+  descriptionEN: string | null;
+  priceTRY: number;
+  priceUSD: number;
+  dimensionsCM: string;
+  dimensionsIN: string;
+  isFeatured: boolean;
+}
+
+/** View model for a single locale (Turkish or International gallery). */
+export interface Artwork {
+  id: string;
+  title: string;
+  category: ArtworkCategory;
+  imageUrl: string;
+  filename: string;
+  mediaType?: MediaType;
+  description: string | null;
+  dimensions: string;
+  price: number;
+  /** Currency label for display: "TL" | "$" */
+  currency?: "TL" | "$";
+  isFeatured: boolean;
+}
+
+/** Gallery loads categories from GET /api/categories; this is only a fallback type. */
+export type CategoryOption = { value: string; label: string; icon?: string };

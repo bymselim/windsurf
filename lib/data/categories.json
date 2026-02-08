@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Stone",
+    "color": "#78716c",
+    "icon": "🪨"
+  },
+  {
+    "name": "Balloon",
+    "color": "#eab308",
+    "icon": "🎈"
+  },
+  {
+    "name": "Cosmo",
+    "color": "#a855f7",
+    "icon": "🌌"
+  },
+  {
+    "name": "Heart",
+    "color": "#3b82f6",
+    "icon": "🎨"
+  },
+  {
+    "name": "Sally",
+    "color": "#3b82f6",
+    "icon": "🎨"
+  },
+  {
+    "name": "Mirror",
+    "color": "#3b82f6",
+    "icon": "🎨"
+  },
+  {
+    "name": "Melted",
+    "color": "#3b82f6",
+    "icon": "🎨"
+  },
+  {
+    "name": "Sculpture",
+    "color": "#3b82f6",
+    "icon": "🎨"
+  }
+]
