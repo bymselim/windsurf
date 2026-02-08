@@ -20,6 +20,8 @@ type CategoryTabsProps = {
   allLabel?: string;
   /** Optional preview image for the All/Tümü card. */
   allPreviewImageUrl?: string;
+  /** Hide the All/Tümü tab/card and show only categories. */
+  hideAllTab?: boolean;
   rotateMs?: number;
   fadeMs?: number;
   mode?: "auto" | "allGrid";
@@ -134,6 +136,7 @@ export function CategoryTabs({
   onSelect,
   allLabel = "All",
   allPreviewImageUrl,
+  hideAllTab = false,
   rotateMs,
   fadeMs,
   mode = "auto",
@@ -142,16 +145,18 @@ export function CategoryTabs({
   const fade = typeof fadeMs === "number" && Number.isFinite(fadeMs) ? fadeMs : DEFAULT_FADE_MS;
   const tabs = useMemo(
     () =>
-      [
-        {
-          value: "All",
-          label: allLabel,
-          icon: undefined,
-          previewImageUrl: allPreviewImageUrl,
-        },
-        ...categories,
-      ],
-    [allLabel, allPreviewImageUrl, categories]
+      hideAllTab
+        ? [...categories]
+        : [
+            {
+              value: "All",
+              label: allLabel,
+              icon: undefined,
+              previewImageUrl: allPreviewImageUrl,
+            },
+            ...categories,
+          ],
+    [allLabel, allPreviewImageUrl, categories, hideAllTab]
   );
   const isAllActive = active === "All";
   const renderAllAsGrid = mode === "allGrid";

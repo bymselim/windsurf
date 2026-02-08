@@ -34,6 +34,7 @@ export default function GalleryPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [showNavHint, setShowNavHint] = useState(false);
   const [highlightTabs, setHighlightTabs] = useState(false);
   const seedRef = useRef<string>("");
@@ -110,7 +111,10 @@ export default function GalleryPage() {
 
   useEffect(() => {
     fetch("/api/artworks?limit=200&page=1&seed=preview")
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        setPreviewLoading(true);
+        return r.ok ? r.json() : null;
+      })
       .then((json) => {
         const raw = Array.isArray(json)
           ? (json as ArtworkFull[])
@@ -154,7 +158,8 @@ export default function GalleryPage() {
           }))
         );
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setPreviewLoading(false));
   }, []);
 
   useEffect(() => {
@@ -363,11 +368,13 @@ export default function GalleryPage() {
           <button
             type="button"
             onClick={() => setCategory("All")}
-            className="fixed left-3 top-1/2 -translate-y-1/2 z-40 rounded-xl border border-zinc-700 bg-zinc-950/70 px-3 py-2 text-xs text-zinc-200/70 hover:text-zinc-200 hover:bg-zinc-900/80 transition"
+            className="fixed left-3 top-[70%] -translate-y-1/2 z-40 w-20 rounded-2xl border border-zinc-700/70 bg-zinc-950/50 px-2 py-2 text-[11px] text-zinc-200/50 hover:text-zinc-200/80 hover:bg-zinc-900/60 transition"
             aria-label="All"
           >
-            <span className="mr-2">←</span>
-            <span>geri dön</span>
+            <div className="flex flex-col items-center justify-center gap-1">
+              <div className="text-base leading-none">←</div>
+              <div className="leading-none">Geri Dön</div>
+            </div>
           </button>
         ) : null}
 
@@ -383,12 +390,24 @@ export default function GalleryPage() {
           active={category}
           onSelect={setCategory}
           allPreviewImageUrl={process.env.NEXT_PUBLIC_ALL_PREVIEW_IMAGE_URL}
+          hideAllTab
           rotateMs={ui?.categoryPreviewRotateMs}
           fadeMs={ui?.categoryPreviewFadeMs}
           mode="allGrid"
         />
         </div>
       </div>
+
+      {category === "All" && previewLoading ? (
+        <div className="mx-auto flex max-w-3xl flex-col items-center justify-center px-4 pt-10 pb-4 text-center">
+          <div className="text-sm text-zinc-300">Melike ArtWorks Yükleniyor</div>
+          <div className="mt-2 flex items-center gap-1 text-zinc-500" aria-hidden>
+            <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-pulse [animation-delay:0ms]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-pulse [animation-delay:200ms]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-pulse [animation-delay:400ms]" />
+          </div>
+        </div>
+      ) : null}
 
       {showNavHint ? (
         <div className="mx-auto max-w-3xl px-4 pt-3">
