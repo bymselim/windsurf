@@ -10,6 +10,7 @@ interface Category {
   icon: string;
   order?: number;
   artworkCount?: number;
+  previewImageUrl?: string;
 }
 
 export default function AdminCategoriesPage() {
@@ -17,6 +18,11 @@ export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  const [previewOptionsByCategory, setPreviewOptionsByCategory] = useState<
+    Record<string, Array<{ id: string; thumbnailUrl?: string; imageUrl: string }>>
+  >({});
+  const [previewLoadingByCategory, setPreviewLoadingByCategory] = useState<Record<string, boolean>>({});
 
   // Add form
   const [newName, setNewName] = useState("");
@@ -32,6 +38,7 @@ export default function AdminCategoriesPage() {
   const [editColor, setEditColor] = useState("");
   const [editIcon, setEditIcon] = useState("");
   const [editOrder, setEditOrder] = useState("0");
+  const [editPreviewImageUrl, setEditPreviewImageUrl] = useState<string>("");
   const [editError, setEditError] = useState("");
 
   // Delete
@@ -56,6 +63,34 @@ export default function AdminCategoriesPage() {
       setCategories([]);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const loadPreviewOptions = useCallback(async (categoryName: string) => {
+    const cat = String(categoryName ?? "").trim();
+    if (!cat) return;
+    setPreviewLoadingByCategory((prev) => ({ ...prev, [cat]: true }));
+    try {
+      const params = new URLSearchParams();
+      params.set("category", cat);
+      params.set("page", "1");
+      params.set("limit", "200");
+      params.set("seed", "admin-preview");
+      const res = await fetch(`/api/artworks?${params.toString()}`, { credentials: "include" });
+      const json = await res.json().catch(() => ({}));
+      const items = Array.isArray(json?.items) ? (json.items as any[]) : Array.isArray(json) ? (json as any[]) : [];
+      const opts = items
+        .filter((a) => a && typeof a.id === "string" && typeof a.imageUrl === "string")
+        .map((a) => ({
+          id: String(a.id),
+          thumbnailUrl: typeof a.thumbnailUrl === "string" ? a.thumbnailUrl : undefined,
+          imageUrl: String(a.imageUrl),
+        }));
+      setPreviewOptionsByCategory((prev) => ({ ...prev, [cat]: opts }));
+    } catch {
+      setPreviewOptionsByCategory((prev) => ({ ...prev, [cat]: [] }));
+    } finally {
+      setPreviewLoadingByCategory((prev) => ({ ...prev, [cat]: false }));
     }
   }, []);
 
@@ -122,7 +157,9 @@ export default function AdminCategoriesPage() {
     setEditColor(cat.color);
     setEditIcon(cat.icon);
     setEditOrder(String(typeof cat.order === "number" && Number.isFinite(cat.order) ? cat.order : 0));
+    setEditPreviewImageUrl(typeof cat.previewImageUrl === "string" ? cat.previewImageUrl : "");
     setEditError("");
+    loadPreviewOptions(cat.name);
   };
 
   const cancelEdit = () => {
@@ -148,6 +185,7 @@ export default function AdminCategoriesPage() {
           color: editColor,
           icon: editIcon,
           order: Number(editOrder),
+          previewImageUrl: editPreviewImageUrl,
         }),
       });
       const data = await res.json();
@@ -298,6 +336,7 @@ export default function AdminCategoriesPage() {
                   <th className="p-4 text-left text-sm font-semibold text-zinc-300">Name</th>
                   <th className="p-4 text-left text-sm font-semibold text-zinc-300">Color</th>
                   <th className="p-4 text-left text-sm font-semibold text-zinc-300">Icon</th>
+                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">Preview</th>
                   <th className="p-4 text-left text-sm font-semibold text-zinc-300">Artworks</th>
                   <th className="p-4 text-left text-sm font-semibold text-zinc-300">Actions</th>
                 </tr>
@@ -322,6 +361,9 @@ export default function AdminCategoriesPage() {
                       </div>
                     </td>
                     <td className="p-4 text-2xl">{cat.icon}</td>
+                    <td className="p-4 text-zinc-400 text-sm">
+                      {cat.previewImageUrl ? "✓" : "—"}
+                    </td>
                     <td className="p-4 text-zinc-400">{cat.artworkCount ?? 0}</td>
                     <td className="p-4">
                       {editingName === cat.name ? (
@@ -353,6 +395,24 @@ export default function AdminCategoriesPage() {
                             placeholder="🎨"
                             className="w-14 p-1.5 bg-zinc-800 border border-zinc-700 rounded text-center text-lg"
                           />
+                          <select
+                            value={editPreviewImageUrl}
+                            onChange={(e) => setEditPreviewImageUrl(e.target.value)}
+                            className="w-56 p-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm text-zinc-100"
+                          >
+                            <option value="">Preview seçme (boş)</option>
+                            {(previewOptionsByCategory[cat.name] ?? []).map((a) => {
+                              const url = a.thumbnailUrl || a.imageUrl;
+                              return (
+                                <option key={a.id} value={url}>
+                                  {a.id.slice(0, 6)}… {a.thumbnailUrl ? "(thumb)" : "(img)"}
+                                </option>
+                              );
+                            })}
+                          </select>
+                          {previewLoadingByCategory[cat.name] ? (
+                            <span className="text-xs text-zinc-500">Loading previews…</span>
+                          ) : null}
                           <button
                             type="button"
                             onClick={saveEdit}
