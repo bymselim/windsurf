@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import Masonry from "react-masonry-css";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -20,6 +20,16 @@ const breakpointColumns = {
 };
 
 export function MasonryGrid({ artworks, category, onSelect }: MasonryGridProps) {
+  const [brokenIds, setBrokenIds] = useState<Set<string>>(new Set());
+
+  const markBroken = useCallback((id: string) => {
+    setBrokenIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
   const filtered = useMemo(() => {
     if (category === "All") return artworks;
     return artworks.filter((a) => a.category === category);
@@ -32,7 +42,9 @@ export function MasonryGrid({ artworks, category, onSelect }: MasonryGridProps) 
         className="flex -ml-4 w-auto"
         columnClassName="pl-4 bg-clip-padding"
       >
-        {filtered.map((artwork, index) => (
+        {filtered.map((artwork, index) => {
+          const isBroken = brokenIds.has(artwork.id);
+          return (
           <motion.div
             key={artwork.id}
             initial={{ opacity: 0, y: 12 }}
@@ -46,7 +58,11 @@ export function MasonryGrid({ artworks, category, onSelect }: MasonryGridProps) 
               className="group relative block w-full overflow-hidden rounded-lg bg-zinc-800/50 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:ring-offset-2 focus:ring-offset-zinc-950"
             >
               <div className="aspect-[4/5] relative overflow-hidden">
-                {isVideoArtwork(artwork) ? (
+                {isBroken ? (
+                  <div className="flex h-full w-full items-center justify-center bg-zinc-800 text-zinc-500 text-sm">
+                    Görsel yüklenemedi
+                  </div>
+                ) : isVideoArtwork(artwork) ? (
                   <video
                     src={artwork.imageUrl}
                     muted
@@ -55,6 +71,7 @@ export function MasonryGrid({ artworks, category, onSelect }: MasonryGridProps) 
                     preload="metadata"
                     className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                     aria-label={artwork.title}
+                    onError={() => markBroken(artwork.id)}
                   />
                 ) : (
                   <Image
@@ -64,6 +81,7 @@ export function MasonryGrid({ artworks, category, onSelect }: MasonryGridProps) 
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                     className="object-cover transition duration-300 group-hover:scale-105"
                     unoptimized={artwork.imageUrl.startsWith("http")}
+                    onError={() => markBroken(artwork.id)}
                   />
                 )}
               </div>
@@ -73,7 +91,8 @@ export function MasonryGrid({ artworks, category, onSelect }: MasonryGridProps) 
               </p>
             </button>
           </motion.div>
-        ))}
+          );
+        })}
       </Masonry>
     </div>
   );

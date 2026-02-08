@@ -66,6 +66,13 @@ export default function ArtworksAdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [imageModal, setImageModal] = useState<string | null>(null);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
+  const [validateLoading, setValidateLoading] = useState(false);
+  const [validateResult, setValidateResult] = useState<{
+    total: number;
+    ok: number;
+    dead: number;
+    deadList: Array<{ id: string; titleTR: string; imageUrl: string; reason?: string }>;
+  } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -83,6 +90,21 @@ export default function ArtworksAdminPage() {
     const saved =
       typeof window !== "undefined" && localStorage.getItem("admin-authenticated");
     setIsAuthenticated(saved === "true");
+  }, []);
+
+  const validateImageUrls = useCallback(async () => {
+    setValidateLoading(true);
+    setValidateResult(null);
+    try {
+      const res = await fetch("/api/admin/artworks/validate-urls", { credentials: "include" });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data) setValidateResult(data);
+      else setValidateResult({ total: 0, ok: 0, dead: 0, deadList: [] });
+    } catch {
+      setValidateResult({ total: 0, ok: 0, dead: 0, deadList: [] });
+    } finally {
+      setValidateLoading(false);
+    }
   }, []);
 
   const loadArtworks = useCallback(async () => {
@@ -574,7 +596,42 @@ export default function ArtworksAdminPage() {
             >
               Toplu Seç (Filtre)
             </button>
+
+            <button
+              type="button"
+              onClick={validateImageUrls}
+              disabled={validateLoading}
+              className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-4 py-3 text-sm font-semibold transition disabled:opacity-50"
+            >
+              {validateLoading ? "Kontrol ediliyor..." : "Resimleri kontrol et (ölü linkler)"}
+            </button>
           </div>
+
+          {validateResult && (
+            <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
+              <div className="text-sm text-zinc-300">
+                Toplam: <span className="font-semibold text-zinc-100">{validateResult.total}</span>
+                {" · "}
+                Erişilebilir: <span className="font-semibold text-green-500">{validateResult.ok}</span>
+                {" · "}
+                Ölü link: <span className="font-semibold text-red-500">{validateResult.dead}</span>
+              </div>
+              {validateResult.deadList.length > 0 && (
+                <ul className="mt-3 space-y-2 text-sm">
+                  {validateResult.deadList.map((d) => (
+                    <li key={d.id} className="flex flex-wrap items-center gap-2 rounded bg-zinc-800/50 p-2">
+                      <span className="font-mono text-amber-400">{d.id}</span>
+                      <span className="text-zinc-400 truncate max-w-[200px]">{d.titleTR || "—"}</span>
+                      <a href={d.imageUrl} target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-amber-500 truncate max-w-[280px]">
+                        {d.imageUrl}
+                      </a>
+                      {d.reason ? <span className="text-red-400/80 text-xs">{d.reason}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30">
             <button

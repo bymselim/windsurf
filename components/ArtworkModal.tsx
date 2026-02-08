@@ -40,8 +40,13 @@ export function ArtworkModal({
 }: ArtworkModalProps) {
   const ui = getGalleryUI(locale);
   const [showOrderModal, setShowOrderModal] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [artwork.id]);
 
   const canGoPrev = currentIndex > 0;
   const canGoNext = currentIndex < allInCategory.length - 1;
@@ -158,7 +163,11 @@ export function ArtworkModal({
               transition={{ duration: 0.25 }}
               className="relative flex max-h-[70vh] w-full max-w-4xl items-center justify-center"
             >
-              {isVideoArtwork(artwork) ? (
+              {imageError ? (
+                <div className="flex max-h-[70vh] w-full items-center justify-center rounded-lg bg-zinc-800 px-8 py-16 text-zinc-500">
+                  {locale === "tr" ? "Görsel yüklenemedi" : "Image unavailable"}
+                </div>
+              ) : isVideoArtwork(artwork) ? (
                 <video
                   src={artwork.imageUrl}
                   controls
@@ -166,6 +175,7 @@ export function ArtworkModal({
                   playsInline
                   className="max-h-[70vh] w-auto max-w-full object-contain"
                   style={{ maxHeight: "70vh" }}
+                  onError={() => setImageError(true)}
                 />
               ) : (
                 <Image
@@ -175,7 +185,8 @@ export function ArtworkModal({
                   height={1000}
                   className="max-h-[70vh] w-auto object-contain"
                   style={{ maxHeight: "70vh" }}
-                  unoptimized={artwork.imageUrl.startsWith("https://")}
+                  unoptimized={artwork.imageUrl.startsWith("http")}
+                  onError={() => setImageError(true)}
                 />
               )}
             </motion.div>
