@@ -46,6 +46,12 @@ export default function AdminUploadsPage() {
   const [uploaded, setUploaded] = useState<UploadedFile[]>([]);
   const [createdArtworks, setCreatedArtworks] = useState<CreatedArtwork[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  /** Parçalı yükleme: kaç dosya yüklendi / toplam (örn. "4 / 10") */
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  /** Yükleme sırasında her dosyanın durumu (sıra ile) */
+  const [fileStatuses, setFileStatuses] = useState<("pending" | "success" | "error" | "skipped")[]>([]);
+
+  const BATCH_SIZE = 3;
 
   useEffect(() => {
     const saved = typeof window !== "undefined" && localStorage.getItem("admin-authenticated");
@@ -134,49 +140,86 @@ export default function AdminUploadsPage() {
     setError(null);
     setUploadErrors([]);
     setSkippedCount(0);
+    setUploadProgress(null);
     if (!category.trim()) {
-      setError("Select a category first.");
+      setError("Önce kategori seçin.");
       return;
     }
     if (files.length === 0) {
-      setError("Select at least one file.");
+      setError("En az bir dosya seçin.");
       return;
     }
     setUploading(true);
-    try {
-      const form = new FormData();
-      form.set("category", category.trim());
-      for (const f of files) form.append("files", f);
+    const statuses: ("pending" | "success" | "error" | "skipped")[] = files.map(() => "pending");
+    setFileStatuses(statuses);
 
-      const res = await fetch("/api/admin/uploads", {
-        method: "POST",
-        credentials: "include",
-        body: form,
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(
-          typeof json?.details === "string"
-            ? `${json?.error ?? "Upload failed"}: ${json.details}`
-            : (json?.error ?? "Upload failed")
-        );
-        return;
+    const allUploaded: UploadedFile[] = [];
+    const allCreated: CreatedArtwork[] = [];
+    const allErrors: UploadErrorItem[] = [];
+    let totalSkipped = 0;
+    const batches: File[][] = [];
+    for (let i = 0; i < files.length; i += BATCH_SIZE) {
+      batches.push(files.slice(i, i + BATCH_SIZE));
+    }
+    try {
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        setUploadProgress(`${allUploaded.length + totalSkipped + allErrors.length} / ${files.length}`);
+
+        const form = new FormData();
+        form.set("category", category.trim());
+        for (const f of batch) form.append("files", f);
+
+        const res = await fetch("/api/admin/uploads", {
+          method: "POST",
+          credentials: "include",
+          body: form,
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          const msg =
+            typeof json?.details === "string"
+              ? `${json?.error ?? "Yükleme hatası"}: ${json.details}`
+              : (json?.error ?? "Yükleme hatası");
+          setError(msg);
+          const startIdx = i * BATCH_SIZE;
+          for (let j = 0; j < batch.length; j++) {
+            statuses[startIdx + j] = "error";
+            allErrors.push({ name: batch[j].name, error: msg });
+          }
+          setFileStatuses([...statuses]);
+          continue;
+        }
+        const responseFiles = Array.isArray(json?.files) ? json.files as Array<UploadedFile & { error?: string; skipped?: boolean }> : [];
+        const created = Array.isArray(json?.createdArtworks)
+          ? (json.createdArtworks as CreatedArtwork[])
+          : [];
+        const errs = Array.isArray(json?.errors) ? (json.errors as UploadErrorItem[]) : [];
+        const skipped = typeof json?.skipped === "number" && Number.isFinite(json.skipped) ? json.skipped : 0;
+        const startIdx = i * BATCH_SIZE;
+        for (let j = 0; j < responseFiles.length; j++) {
+          const u = responseFiles[j];
+          if (u?.error) statuses[startIdx + j] = "error";
+          else if (u?.skipped) statuses[startIdx + j] = "skipped";
+          else statuses[startIdx + j] = "success";
+        }
+        setFileStatuses([...statuses]);
+        allUploaded.push(...responseFiles.filter((u) => !(u as { error?: string }).error && !(u as { skipped?: boolean }).skipped) as UploadedFile[]);
+        allCreated.push(...created);
+        allErrors.push(...errs);
+        totalSkipped += skipped;
       }
-      const uploadedFiles = Array.isArray(json?.files) ? (json.files as UploadedFile[]) : [];
-      const created = Array.isArray(json?.createdArtworks)
-        ? (json.createdArtworks as CreatedArtwork[])
-        : [];
-      const errs = Array.isArray(json?.errors) ? (json.errors as UploadErrorItem[]) : [];
-      const skipped = typeof json?.skipped === "number" && Number.isFinite(json.skipped) ? json.skipped : 0;
-      setUploaded(uploadedFiles);
-      setCreatedArtworks(created);
-      setUploadErrors(errs);
-      setSkippedCount(skipped);
+      setUploaded(allUploaded);
+      setCreatedArtworks(allCreated);
+      setUploadErrors(allErrors);
+      setSkippedCount(totalSkipped);
       setFiles([]);
-    } catch {
-      setError("Upload failed");
+      setFileStatuses([]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Yükleme başarısız.");
     } finally {
       setUploading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -298,26 +341,76 @@ export default function AdminUploadsPage() {
                 </div>
               </div>
               <p className="mt-2 text-xs text-zinc-500">
-                Selected: <span className="font-mono">{files.length}</span> files • Total: {Math.round(totalSize / 1024 / 1024)} MB
+                Seçili: <span className="font-mono">{files.length}</span> dosya • Toplam: {Math.round(totalSize / 1024 / 1024)} MB
+                {files.length > BATCH_SIZE && (
+                  <span className="block mt-0.5 text-amber-500/80">
+                    Çok dosya seçildi; {BATCH_SIZE}’lü gruplar halinde yüklenecek (limit aşımı olmaz).
+                  </span>
+                )}
               </p>
+
+              {files.length > 0 && (
+                <div className="mt-3 rounded-lg border border-zinc-700 bg-zinc-900/50 max-h-48 overflow-y-auto">
+                  <div className="px-3 py-2 text-xs font-medium text-zinc-400 border-b border-zinc-800">
+                    Dosyalar • Yükleme başarılıysa galeride görünür (ölü link olmaz)
+                  </div>
+                  <ul className="divide-y divide-zinc-800">
+                    {files.map((f, idx) => {
+                      const status = fileStatuses[idx] ?? "pending";
+                      return (
+                        <li key={`${f.name}-${f.size}-${f.lastModified}`} className="flex items-center gap-2 px-3 py-2 text-sm">
+                          <span className="shrink-0 w-5 h-5 flex items-center justify-center rounded" aria-hidden>
+                            {status === "success" && <span className="text-green-500 text-lg leading-none" title="Yüklendi">✓</span>}
+                            {status === "error" && <span className="text-red-500 text-lg leading-none" title="Hata">✕</span>}
+                            {status === "skipped" && <span className="text-zinc-500 text-sm" title="Zaten var (atlandı)">−</span>}
+                            {status === "pending" && (uploading ? <span className="w-4 h-4 border-2 border-amber-500/60 border-t-transparent rounded-full animate-spin" /> : <span className="text-zinc-500">○</span>)}
+                          </span>
+                          <span className={`truncate flex-1 ${status === "error" ? "text-red-300/90" : status === "success" ? "text-zinc-200" : "text-zinc-400"}`}>
+                            {f.name}
+                          </span>
+                          <span className="text-xs text-zinc-500 shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
             </div>
 
-            <div className="flex gap-3">
+            {uploading && files.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-zinc-400">
+                  <span>İlerleme</span>
+                  <span>{uploadProgress ?? "0 / 0"}</span>
+                </div>
+                <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+                  <div
+                    className="h-full bg-amber-500 transition-all duration-300"
+                    style={{ width: `${fileStatuses.length ? (fileStatuses.filter((s) => s !== "pending").length / fileStatuses.length) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 disabled={uploading || !category.trim()}
                 onClick={startUpload}
                 className="px-4 py-3 bg-amber-500 hover:bg-amber-600 rounded-lg font-medium text-zinc-950 disabled:opacity-50 transition"
               >
-                {uploading ? "Uploading..." : "Upload"}
+                {uploading ? (uploadProgress ? `Yükleniyor ${uploadProgress}` : "Yükleniyor...") : "Yükle"}
               </button>
+              {uploadProgress && (
+                <span className="text-sm text-zinc-400">({uploadProgress})</span>
+              )}
               <button
                 type="button"
                 disabled={uploaded.length === 0}
                 onClick={copyAll}
                 className="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-medium text-zinc-100 disabled:opacity-50 transition"
               >
-                Copy URLs
+                URL’leri kopyala
               </button>
             </div>
 
