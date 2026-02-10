@@ -210,9 +210,6 @@ export function ArtworkModal({
               ) : (
                 <h2 id="artwork-title" className="text-lg font-bold text-zinc-100">
                   {artwork.category}
-                  {artwork.dimensions && (
-                    <span className="text-sm font-normal text-zinc-400"> - {artwork.dimensions}</span>
-                  )}
                 </h2>
               )}
               {artwork.priceVariants && artwork.priceVariants.length > 0 ? (
