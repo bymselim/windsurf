@@ -223,7 +223,7 @@ export function ArtworkModal({
               ) : null}
               {artwork.description && (
                 <div className="mt-4 p-4 bg-zinc-900/50 rounded-lg">
-                  <p className="text-zinc-300 text-sm leading-relaxed">
+                  <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-line">
                     {artwork.description}
                   </p>
                 </div>

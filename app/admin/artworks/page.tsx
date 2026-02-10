@@ -451,10 +451,13 @@ export default function ArtworksAdminPage() {
   }, [pageArtworks, selectedIds]);
 
   const formatBullets = (text: string): string => {
-    const lines = String(text ?? "")
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean);
+    const raw = String(text ?? "").trim();
+    if (!raw) return "";
+    let lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return "";
+    if (lines.length === 1 && raw.includes(",")) {
+      lines = raw.split(/\s*,\s*/).map((l) => l.trim()).filter(Boolean);
+    }
     if (lines.length === 0) return "";
     const alreadyBullets = lines.every((l) => /^(-\s+|•\s+)/.test(l));
     if (alreadyBullets) return lines.map((l) => l.replace(/^•\s+/, "- ")).join("\n");
