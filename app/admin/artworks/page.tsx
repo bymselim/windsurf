@@ -85,6 +85,8 @@ export default function ArtworksAdminPage() {
   const [clearAllMessage, setClearAllMessage] = useState<{ ok: boolean; text: string } | null>(null);
   /** Hangi artwork'ün priceVariants düzenleme alanı açık */
   const [expandedPriceVariants, setExpandedPriceVariants] = useState<Record<string, boolean>>({});
+  const [translateLoading, setTranslateLoading] = useState(false);
+  const [translateStatus, setTranslateStatus] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -180,6 +182,53 @@ export default function ArtworksAdminPage() {
     }
     if (isAuthenticated) loadArtworks();
   }, [isAuthenticated, loadArtworks, router]);
+
+  const translateDescriptionsTRtoEN = useCallback(async () => {
+    const selectedIdList = Object.keys(selectedIds).filter((id) => selectedIds[id]);
+    const toProcess =
+      selectedIdList.length > 0
+        ? artworks.filter((a) => selectedIds[a.id])
+        : artworks.filter((a) => String(a.descriptionTR ?? "").trim());
+    if (toProcess.length === 0) {
+      setTranslateStatus("Çevrilecek eser yok (seçili veya TR açıklaması olan).");
+      return;
+    }
+    setTranslateLoading(true);
+    setTranslateStatus("");
+    let done = 0;
+    let err = 0;
+    for (const art of toProcess) {
+      const tr = String(art.descriptionTR ?? "").trim();
+      if (!tr) continue;
+      setTranslateStatus(`Çevriliyor ${done + 1}/${toProcess.length}...`);
+      try {
+        const res = await fetch("/api/admin/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ text: tr }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && typeof data.translated === "string") {
+          setArtworks((prev) =>
+            prev.map((a) =>
+              a.id === art.id ? { ...a, descriptionEN: data.translated } : a
+            )
+          );
+          done++;
+        } else {
+          err++;
+        }
+      } catch {
+        err++;
+      }
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    setTranslateLoading(false);
+    setTranslateStatus(
+      err > 0 ? `${done} çevrildi, ${err} hata. Kaydet butonuna basın.` : `${done} eserin EN açıklaması güncellendi. Kaydet butonuna basın.`
+    );
+  }, [artworks, selectedIds]);
 
   const updateArtwork = (id: string, field: keyof ArtworkRow, value: unknown) => {
     setArtworks((prev) =>
@@ -733,6 +782,25 @@ export default function ArtworksAdminPage() {
               )}
             </div>
           )}
+
+          {!loading && artworks.length > 0 ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
+              <button
+                type="button"
+                onClick={translateDescriptionsTRtoEN}
+                disabled={translateLoading}
+                className="rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-zinc-950 px-4 py-2 text-sm font-medium transition"
+              >
+                {translateLoading ? "Çevriliyor..." : "TR açıklamalarını EN’ye çevir"}
+              </button>
+              <span className="text-sm text-zinc-400">
+                {selectedIdList.length > 0 ? "Seçili eserler" : "TR açıklaması olan tüm eserler"} çevrilir.
+              </span>
+              {translateStatus ? (
+                <span className="text-sm text-zinc-300">{translateStatus}</span>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30">
             <button
