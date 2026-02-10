@@ -12,8 +12,10 @@ interface AccessLog {
   sessionStart?: string;
   sessionEnd?: string | null;
   device?: string;
+  deviceName?: string;
   ip?: string;
   country?: string;
+  city?: string;
   orderClicked?: boolean;
 }
 
@@ -22,6 +24,14 @@ export default function AccessLogsPage() {
   const [password, setPassword] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Tekil kullanıcı sayısı: telefon numarasına göre (maskelenmiş olsa bile aynı telefon = aynı kişi)
+  const uniqueUsers = new Set(
+    logs
+      .map((l) => l.phone ?? l.phoneNumber ?? "")
+      .filter((p) => p && p !== "—")
+  ).size;
+  const totalTraffic = logs.length;
 
   const loadLogs = async () => {
     try {
@@ -119,7 +129,7 @@ export default function AccessLogsPage() {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">Access Logs</h1>
             <p className="text-zinc-400">
-              {logs.length} total entries • Sorted by latest
+              {totalTraffic} toplam giriş • {uniqueUsers} tekil kullanıcı • Sorted by latest
             </p>
           </div>
           <div className="flex gap-3">
@@ -150,6 +160,21 @@ export default function AccessLogsPage() {
           </div>
         </div>
 
+        {logs.length > 0 && (
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/50">
+              <p className="text-zinc-500 text-sm mb-1">Toplam Trafik</p>
+              <p className="text-3xl font-bold text-zinc-100">{totalTraffic}</p>
+              <p className="text-xs text-zinc-500 mt-1">Toplam giriş sayısı</p>
+            </div>
+            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/50">
+              <p className="text-zinc-500 text-sm mb-1">Tekil Kullanıcı</p>
+              <p className="text-3xl font-bold text-amber-400">{uniqueUsers}</p>
+              <p className="text-xs text-zinc-500 mt-1">Farklı telefon numarası</p>
+            </div>
+          </div>
+        )}
+
         {logs.length > 0 ? (
           <div className="overflow-x-auto rounded-lg border border-zinc-800">
             <table className="w-full">
@@ -171,7 +196,7 @@ export default function AccessLogsPage() {
                     IP
                   </th>
                   <th className="p-4 text-left font-semibold text-zinc-300 border-b border-zinc-800">
-                    Country
+                    Location
                   </th>
                   <th className="p-4 text-left font-semibold text-zinc-300 border-b border-zinc-800">
                     Session End
@@ -201,9 +226,19 @@ export default function AccessLogsPage() {
                       </td>
                       <td className="p-4 font-medium">{log.fullName}</td>
                       <td className="p-4 font-mono text-amber-400">{phone}</td>
-                      <td className="p-4 text-zinc-400 capitalize">{log.device ?? "—"}</td>
-                      <td className="p-4 font-mono text-zinc-400">{log.ip ?? "—"}</td>
-                      <td className="p-4 text-zinc-400">{log.country ?? "—"}</td>
+                      <td className="p-4">
+                        <div className="text-zinc-400 capitalize">{log.device ?? "—"}</div>
+                        {log.deviceName && (
+                          <div className="text-xs text-zinc-500 mt-0.5">{log.deviceName}</div>
+                        )}
+                      </td>
+                      <td className="p-4 font-mono text-zinc-400 text-xs">{log.ip ?? "—"}</td>
+                      <td className="p-4">
+                        <div className="text-zinc-400">{log.country ?? "—"}</div>
+                        {log.city && (
+                          <div className="text-xs text-zinc-500 mt-0.5">{log.city}</div>
+                        )}
+                      </td>
                       <td className="p-4">
                         {end ? (
                           <div>

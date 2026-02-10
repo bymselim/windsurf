@@ -11,8 +11,10 @@ export interface AccessLogEntry {
   fullName: string;
   phone: string;
   device: "mobile" | "desktop" | "unknown";
+  deviceName?: string; // Örn: "iPhone 14 Pro", "Samsung Galaxy S23", "MacBook Pro", "Windows PC"
   ip: string;
   country: string;
+  city?: string; // Örn: "Istanbul", "New York", "London"
   sessionStart: string;
   sessionEnd: string | null;
   pagesVisited: string[];
@@ -38,9 +40,88 @@ function parseDevice(userAgent: string): "mobile" | "desktop" | "unknown" {
   return "desktop";
 }
 
+/** User-Agent'tan cihaz adını parse et (basit yaklaşım). */
+function parseDeviceName(userAgent: string): string | undefined {
+  if (!userAgent) return undefined;
+  const ua = userAgent;
+
+  // iPhone
+  const iPhoneMatch = ua.match(/iPhone(?:\s+OS\s+[\d_]+)?/i);
+  if (iPhoneMatch) {
+    const modelMatch = ua.match(/iPhone\s+(\d+)/i);
+    if (modelMatch) {
+      return `iPhone ${modelMatch[1]}`;
+    }
+    return "iPhone";
+  }
+
+  // iPad
+  if (/iPad/i.test(ua)) {
+    return "iPad";
+  }
+
+  // Android - Samsung
+  if (/Samsung/i.test(ua)) {
+    const modelMatch = ua.match(/SM-([A-Z0-9]+)/i) || ua.match(/Samsung[^)]*([A-Z][0-9]+)/i);
+    if (modelMatch) {
+      return `Samsung ${modelMatch[1]}`;
+    }
+    return "Samsung";
+  }
+
+  // Android - Google Pixel
+  if (/Pixel/i.test(ua)) {
+    const modelMatch = ua.match(/Pixel\s+(\d+)/i);
+    if (modelMatch) {
+      return `Pixel ${modelMatch[1]}`;
+    }
+    return "Pixel";
+  }
+
+  // Android - Xiaomi
+  if (/Mi\s+(\d+)/i.test(ua) || /Redmi/i.test(ua)) {
+    const modelMatch = ua.match(/(Mi|Redmi)\s+([A-Z0-9]+)/i);
+    if (modelMatch) {
+      return modelMatch[0];
+    }
+    return "Xiaomi";
+  }
+
+  // Android genel
+  if (/Android/i.test(ua)) {
+    return "Android Device";
+  }
+
+  // Mac
+  if (/Macintosh/i.test(ua)) {
+    if (/MacBookPro/i.test(ua)) return "MacBook Pro";
+    if (/MacBookAir/i.test(ua)) return "MacBook Air";
+    if (/MacBook/i.test(ua)) return "MacBook";
+    if (/iMac/i.test(ua)) return "iMac";
+    return "Mac";
+  }
+
+  // Windows
+  if (/Windows/i.test(ua)) {
+    return "Windows PC";
+  }
+
+  // Linux
+  if (/Linux/i.test(ua)) {
+    return "Linux";
+  }
+
+  return undefined;
+}
+
 function normalizeEntry(raw: Record<string, unknown>, index: number): AccessLogEntry {
   if (raw.id && typeof raw.fullName === "string" && "sessionStart" in raw) {
-    return raw as unknown as AccessLogEntry;
+    const entry = raw as unknown as AccessLogEntry;
+    return {
+      ...entry,
+      deviceName: typeof entry.deviceName === "string" ? entry.deviceName : undefined,
+      city: typeof entry.city === "string" ? entry.city : undefined,
+    };
   }
   const ts = typeof raw.timestamp === "string" ? raw.timestamp : new Date().toISOString();
   const phone = raw.phoneNumber != null ? String(raw.phoneNumber) : "—";
@@ -49,8 +130,10 @@ function normalizeEntry(raw: Record<string, unknown>, index: number): AccessLogE
     fullName: typeof raw.fullName === "string" ? raw.fullName : "—",
     phone: phone !== "—" ? maskPhone(phone) : "—",
     device: "unknown",
+    deviceName: undefined,
     ip: "—",
     country: "—",
+    city: undefined,
     sessionStart: ts,
     sessionEnd: null,
     pagesVisited: [],
@@ -92,6 +175,30 @@ async function writeLogs(entries: AccessLogEntry[]): Promise<void> {
 }
 
 /**
+ * IP'den şehir bilgisini al (ücretsiz ip-api.com kullanarak).
+ */
+async function getCityFromIP(ip: string): Promise<string | undefined> {
+  if (!ip || ip === "—" || ip.startsWith("127.") || ip.startsWith("192.168.") || ip.startsWith("10.") || ip.startsWith("172.")) {
+    return undefined;
+  }
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(`http://ip-api.com/json/${ip}?fields=city`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    const data = await res.json().catch(() => null);
+    if (data && typeof data.city === "string" && data.city) {
+      return data.city;
+    }
+  } catch {
+    // Best-effort only: ignore failures
+  }
+  return undefined;
+}
+
+/**
  * Create a new session log entry on successful gate login.
  * Returns the log id (store in JWT for later updates).
  */
@@ -104,13 +211,17 @@ export async function createAccessLogEntry(params: {
 }): Promise<string> {
   const id = randomUUID();
   const now = new Date().toISOString();
+  const deviceName = parseDeviceName(params.userAgent);
+  const city = await getCityFromIP(params.ip);
   const entry: AccessLogEntry = {
     id,
     fullName: params.fullName.trim() || "—",
     phone: params.phoneNumber ? maskPhone(params.phoneNumber) : "—",
     device: parseDevice(params.userAgent),
+    deviceName,
     ip: params.ip || "—",
     country: params.country || "—",
+    city,
     sessionStart: now,
     sessionEnd: null,
     pagesVisited: [],

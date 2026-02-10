@@ -59,6 +59,8 @@ export default function ArtworksAdminPage() {
   const [bulkDescTR, setBulkDescTR] = useState<string>("");
   const [applyDescEN, setApplyDescEN] = useState(false);
   const [bulkDescEN, setBulkDescEN] = useState<string>("");
+  const [applyPriceVariants, setApplyPriceVariants] = useState(false);
+  const [bulkPriceVariants, setBulkPriceVariants] = useState<PriceVariant[]>([]);
   const [bulkPriceCategory, setBulkPriceCategory] = useState<string>("");
   const [bulkPriceTRY, setBulkPriceTRY] = useState<string>("");
   const [bulkPriceUSD, setBulkPriceUSD] = useState<string>("");
@@ -140,6 +142,13 @@ export default function ArtworksAdminPage() {
   const clearAllArtworks = useCallback(async () => {
     if (clearAllConfirm !== "DELETE_ALL_ARTWORKS") {
       setClearAllMessage({ ok: false, text: "Onay için kutuya DELETE_ALL_ARTWORKS yazın." });
+      return;
+    }
+    const confirmed = window.confirm(
+      "TÜM ESERLER SİLİNECEK!\n\nBu işlem geri alınamaz. Emin misiniz?\n\n(Fotoğraflar Blob'da kalır, sadece kayıtlar silinir.)"
+    );
+    if (!confirmed) {
+      setClearAllMessage({ ok: false, text: "İşlem iptal edildi." });
       return;
     }
     setClearAllLoading(true);
@@ -486,6 +495,22 @@ export default function ArtworksAdminPage() {
     if (applyDimensions) patch.dimensionsCM = bulkDimensionsCM;
     if (applyDescTR) patch.descriptionTR = bulkDescTR;
     if (applyDescEN) patch.descriptionEN = bulkDescEN;
+    if (applyPriceVariants) {
+      if (bulkPriceVariants.length === 0) {
+        setBulkEditStatus("En az bir fiyat varyantı ekleyin");
+        setBulkEditStatusKind("error");
+        return;
+      }
+      const validVariants = bulkPriceVariants.filter(
+        (v) => v.size.trim() !== "" && typeof v.priceTRY === "number" && v.priceTRY > 0
+      );
+      if (validVariants.length === 0) {
+        setBulkEditStatus("Geçerli varyant yok (size ve fiyat gerekli)");
+        setBulkEditStatusKind("error");
+        return;
+      }
+      patch.priceVariants = validVariants;
+    }
 
     if (Object.keys(patch).length === 0) {
       setBulkEditStatus("Değiştirilecek alan seçilmedi");
@@ -712,38 +737,6 @@ export default function ArtworksAdminPage() {
             </div>
           )}
 
-          <div className="mt-4 rounded-xl border border-red-900/50 bg-zinc-900/30 p-4">
-            <div className="text-sm font-semibold text-red-400/90 mb-2">Tüm eserleri sil (sıfırdan yükleme)</div>
-            <p className="text-xs text-zinc-500 mb-3">
-              Tüm eser kayıtları silinir (fotoğraflar Blob’da kalır). Sonra Admin → Yüklemeler’den kategorilere göre yeniden yükleyebilirsiniz.
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="text"
-                value={clearAllConfirm}
-                onChange={(e) => {
-                setClearAllMessage(null);
-                setClearAllConfirm(e.target.value);
-              }}
-                placeholder="DELETE_ALL_ARTWORKS yazın"
-                className="w-64 p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-100 text-sm placeholder-zinc-500 focus:border-red-500/50 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={clearAllArtworks}
-                disabled={clearAllLoading || clearAllConfirm !== "DELETE_ALL_ARTWORKS"}
-                className="rounded-lg bg-red-900/70 hover:bg-red-800/80 text-white px-4 py-2 text-sm font-medium transition disabled:opacity-50 disabled:pointer-events-none"
-              >
-                {clearAllLoading ? "Siliniyor..." : "Tüm eserleri sil"}
-              </button>
-            </div>
-            {clearAllMessage && (
-              <p className={`mt-2 text-sm ${clearAllMessage.ok ? "text-green-400" : "text-red-400"}`}>
-                {clearAllMessage.text}
-              </p>
-            )}
-          </div>
-
           <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30">
             <button
               type="button"
@@ -967,6 +960,70 @@ export default function ArtworksAdminPage() {
                       Madde Yap
                     </button>
                   </div>
+
+                  <div className="lg:col-span-2">
+                    <label className="flex items-center gap-2 text-sm text-zinc-300 select-none mb-2">
+                      <input
+                        type="checkbox"
+                        checked={applyPriceVariants}
+                        onChange={(e) => setApplyPriceVariants(e.target.checked)}
+                        className="h-4 w-4 accent-amber-500"
+                      />
+                      Fiyat Varyantları (Seçili eserlere uygula)
+                    </label>
+                    {applyPriceVariants && (
+                      <div className="mt-2 space-y-2 rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
+                        <div className="text-xs text-zinc-400 mb-2">Örn: &quot;90 cm çap&quot; ve &quot;22.000&quot; ₺</div>
+                        {bulkPriceVariants.map((variant, idx) => (
+                          <div key={idx} className="flex gap-2 items-center">
+                            <input
+                              type="text"
+                              value={variant.size}
+                              onChange={(e) => {
+                                const next = [...bulkPriceVariants];
+                                next[idx] = { ...next[idx], size: e.target.value };
+                                setBulkPriceVariants(next);
+                              }}
+                              placeholder="90 cm çap"
+                              className="flex-1 p-2 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-sm placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
+                            />
+                            <input
+                              type="number"
+                              value={variant.priceTRY}
+                              onChange={(e) => {
+                                const next = [...bulkPriceVariants];
+                                next[idx] = { ...next[idx], priceTRY: parseFloat(e.target.value) || 0 };
+                                setBulkPriceVariants(next);
+                              }}
+                              placeholder="Fiyat"
+                              className="w-32 p-2 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-sm placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
+                              min={0}
+                              step={50}
+                            />
+                            <span className="text-sm text-zinc-500">₺</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = [...bulkPriceVariants];
+                                next.splice(idx, 1);
+                                setBulkPriceVariants(next);
+                              }}
+                              className="px-2 py-1 text-sm text-red-400 hover:text-red-300"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setBulkPriceVariants([...bulkPriceVariants, { size: "", priceTRY: 0 }])}
+                          className="w-full mt-1 px-3 py-2 text-sm bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-200 transition"
+                        >
+                          + Yeni Varyant Ekle
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -991,6 +1048,38 @@ export default function ArtworksAdminPage() {
                       {bulkEditStatus}
                     </span>
                   ) : null}
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-zinc-800">
+                  <div className="text-sm font-semibold text-red-400/90 mb-2">Tüm eserleri sil (sıfırdan yükleme)</div>
+                  <p className="text-xs text-zinc-500 mb-3">
+                    Tüm eser kayıtları silinir (fotoğraflar Blob&apos;da kalır). Sonra Admin → Yüklemeler&apos;den kategorilere göre yeniden yükleyebilirsiniz.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="text"
+                      value={clearAllConfirm}
+                      onChange={(e) => {
+                        setClearAllMessage(null);
+                        setClearAllConfirm(e.target.value);
+                      }}
+                      placeholder="DELETE_ALL_ARTWORKS yazın"
+                      className="w-64 p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-100 text-sm placeholder-zinc-500 focus:border-red-500/50 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={clearAllArtworks}
+                      disabled={clearAllLoading || clearAllConfirm !== "DELETE_ALL_ARTWORKS"}
+                      className="rounded-lg bg-red-900/70 hover:bg-red-800/80 text-white px-4 py-2 text-sm font-medium transition disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      {clearAllLoading ? "Siliniyor..." : "Tüm eserleri sil"}
+                    </button>
+                  </div>
+                  {clearAllMessage && (
+                    <p className={`mt-2 text-sm ${clearAllMessage.ok ? "text-green-400" : "text-red-400"}`}>
+                      {clearAllMessage.text}
+                    </p>
+                  )}
                 </div>
               </div>
             ) : null}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readArtworksFromFile, writeArtworksToFile } from "@/lib/artworks-io";
+import { readArtworksFromFile, writeArtworksToFile, type PriceVariant } from "@/lib/artworks-io";
 import { dimensionsCMToIN } from "@/lib/dimensions";
 
 const COOKIE_NAME = "admin_session";
@@ -13,6 +13,7 @@ type BulkPatch = {
   dimensionsCM?: string;
   descriptionTR?: string;
   descriptionEN?: string;
+  priceVariants?: PriceVariant[];
 };
 
 export async function PUT(request: NextRequest) {
@@ -68,6 +69,18 @@ export async function PUT(request: NextRequest) {
       priceUSD: typeof patch.priceUSD === "number" ? patch.priceUSD : current.priceUSD,
       dimensionsCM,
       dimensionsIN,
+      priceVariants:
+        Array.isArray(patch.priceVariants) && patch.priceVariants.length > 0
+          ? patch.priceVariants.filter(
+              (v): v is PriceVariant =>
+                typeof v === "object" &&
+                v !== null &&
+                typeof (v as { size?: unknown }).size === "string" &&
+                typeof (v as { priceTRY?: unknown }).priceTRY === "number"
+            )
+          : patch.priceVariants === null || patch.priceVariants === undefined
+            ? current.priceVariants
+            : undefined,
     };
 
     updated.push(current.id);

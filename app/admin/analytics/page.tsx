@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 type LogEntry = {
@@ -9,7 +10,9 @@ type LogEntry = {
   fullName: string;
   phone: string;
   device: string;
+  deviceName?: string;
   country: string;
+  city?: string;
   sessionStart: string;
   sessionEnd: string | null;
   pagesVisited: string[];
@@ -17,9 +20,19 @@ type LogEntry = {
   orderClicked: boolean;
 };
 
+type ArtworkInfo = {
+  id: string;
+  titleTR: string;
+  titleEN: string;
+  imageUrl: string;
+  thumbnailUrl?: string;
+  category: string;
+};
+
 function useAnalytics() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [artworksMap, setArtworksMap] = useState<Record<string, ArtworkInfo>>({});
 
   useEffect(() => {
     fetch("/api/access-logs", { credentials: "include" })
@@ -29,6 +42,19 @@ function useAnalytics() {
       })
       .catch(() => setLogs([]))
       .finally(() => setLoading(false));
+
+    fetch("/api/artworks", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const map: Record<string, ArtworkInfo> = {};
+        if (Array.isArray(data)) {
+          data.forEach((a: ArtworkInfo) => {
+            map[a.id] = a;
+          });
+        }
+        setArtworksMap(map);
+      })
+      .catch(() => setArtworksMap({}));
   }, []);
 
   const totalVisits = logs.length;
@@ -49,14 +75,16 @@ function useAnalytics() {
 
   const deviceCounts: Record<string, number> = {};
   logs.forEach((l) => {
-    const d = l.device || "unknown";
+    const d = l.deviceName || l.device || "unknown";
     deviceCounts[d] = (deviceCounts[d] || 0) + 1;
   });
-  const deviceDistribution = Object.entries(deviceCounts).map(([name, count]) => ({
-    name,
-    count,
-    pct: totalVisits ? (count / totalVisits) * 100 : 0,
-  }));
+  const deviceDistribution = Object.entries(deviceCounts)
+    .map(([name, count]) => ({
+      name,
+      count,
+      pct: totalVisits ? (count / totalVisits) * 100 : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
 
   const countryCounts: Record<string, number> = {};
   logs.forEach((l) => {
@@ -91,6 +119,7 @@ function useAnalytics() {
     mostViewedArtworks,
     orderClickedCount,
     orderClickRate,
+    artworksMap,
   };
 }
 
@@ -100,7 +129,9 @@ function exportToCSV(logs: LogEntry[]) {
     "fullName",
     "phone",
     "device",
+    "deviceName",
     "country",
+    "city",
     "sessionStart",
     "sessionEnd",
     "pagesVisited",
@@ -113,7 +144,9 @@ function exportToCSV(logs: LogEntry[]) {
       l.fullName,
       l.phone,
       l.device,
+      l.deviceName ?? "",
       l.country,
+      l.city ?? "",
       l.sessionStart,
       l.sessionEnd ?? "",
       (l.pagesVisited || []).join("; "),
@@ -165,6 +198,7 @@ export default function AnalyticsPage() {
     mostViewedArtworks,
     orderClickedCount,
     orderClickRate,
+    artworksMap,
   } = analytics;
 
   return (
@@ -235,7 +269,7 @@ export default function AnalyticsPage() {
                 {deviceDistribution.map(({ name, count, pct }) => (
                   <div key={name}>
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="text-zinc-400 capitalize">{name}</span>
+                      <span className="text-zinc-400">{name}</span>
                       <span className="text-zinc-300">{count} ({pct.toFixed(0)}%)</span>
                     </div>
                     <div className="h-3 rounded-full bg-zinc-800 overflow-hidden">
@@ -252,24 +286,41 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            {/* Country distribution */}
+            {/* Country & City distribution */}
             <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/50">
-              <h2 className="font-semibold text-zinc-200 mb-4">Country distribution</h2>
+              <h2 className="font-semibold text-zinc-200 mb-4">Country & City distribution</h2>
               <div className="space-y-3">
-                {countryDistribution.slice(0, 10).map(({ name, count, pct }) => (
-                  <div key={name}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-zinc-400">{name}</span>
-                      <span className="text-zinc-300">{count} ({pct.toFixed(0)}%)</span>
+                {countryDistribution.slice(0, 10).map(({ name, count, pct }) => {
+                  const cityCounts: Record<string, number> = {};
+                  logs.forEach((l) => {
+                    if (l.country === name && l.city) {
+                      cityCounts[l.city] = (cityCounts[l.city] || 0) + 1;
+                    }
+                  });
+                  const topCities = Object.entries(cityCounts)
+                    .map(([city, cityCount]) => ({ city, count: cityCount }))
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 3);
+                  return (
+                    <div key={name}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-zinc-400 font-medium">{name}</span>
+                        <span className="text-zinc-300">{count} ({pct.toFixed(0)}%)</span>
+                      </div>
+                      {topCities.length > 0 && (
+                        <div className="text-xs text-zinc-500 ml-2 mb-1">
+                          {topCities.map((c) => c.city).join(", ")}
+                        </div>
+                      )}
+                      <div className="h-3 rounded-full bg-zinc-800 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-amber-500/70 transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-3 rounded-full bg-zinc-800 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-amber-500/70 transition-all duration-500"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {countryDistribution.length === 0 && (
                   <p className="text-zinc-500 text-sm">No data yet</p>
                 )}
@@ -279,25 +330,57 @@ export default function AnalyticsPage() {
             {/* Most viewed artworks */}
             <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/50">
               <h2 className="font-semibold text-zinc-200 mb-4">Top 10 most viewed artworks</h2>
-              <ol className="space-y-2">
-                {mostViewedArtworks.map(({ id, count }, i) => (
-                  <li
-                    key={id}
-                    className="flex items-center gap-3 text-sm"
-                  >
-                    <span className="text-zinc-500 w-6">{i + 1}.</span>
-                    <span className="text-zinc-300 font-mono flex-1">{id}</span>
-                    <span className="text-zinc-400">{count} views</span>
-                    <div className="w-24 h-2 rounded-full bg-zinc-800 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-amber-500/80"
-                        style={{
-                          width: `${totalVisits ? Math.min(100, (count / Math.max(...mostViewedArtworks.map((a) => a.count), 1)) * 100) : 0}%`,
-                        }}
-                      />
-                    </div>
-                  </li>
-                ))}
+              <ol className="space-y-3">
+                {mostViewedArtworks.map(({ id, count }, i) => {
+                  const artwork = artworksMap[id];
+                  const previewUrl = artwork?.thumbnailUrl || artwork?.imageUrl || "";
+                  return (
+                    <li
+                      key={id}
+                      className="flex items-center gap-3 text-sm hover:bg-zinc-800/50 rounded-lg p-2 transition"
+                    >
+                      <span className="text-zinc-500 w-6 shrink-0">{i + 1}.</span>
+                      {previewUrl ? (
+                        <div className="relative w-12 h-12 shrink-0 rounded overflow-hidden bg-zinc-800">
+                          <Image
+                            src={previewUrl}
+                            alt={artwork?.titleTR || id}
+                            fill
+                            className="object-cover"
+                            sizes="48px"
+                            unoptimized={previewUrl.startsWith("http")}
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-12 h-12 shrink-0 rounded bg-zinc-800 flex items-center justify-center text-zinc-600 text-xs">
+                          ?
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <Link
+                          href={`/admin/artworks#${id}`}
+                          className="block text-zinc-300 hover:text-amber-400 transition truncate"
+                          title={`${artwork?.titleTR || id} (${artwork?.category || "—"})`}
+                        >
+                          {artwork?.titleTR || artwork?.titleEN || id}
+                        </Link>
+                        <div className="text-xs text-zinc-500 mt-0.5">
+                          <span className="font-mono">{id}</span>
+                          {artwork?.category && <span className="ml-2">· {artwork.category}</span>}
+                        </div>
+                      </div>
+                      <span className="text-zinc-400 shrink-0">{count} views</span>
+                      <div className="w-24 h-2 rounded-full bg-zinc-800 overflow-hidden shrink-0">
+                        <div
+                          className="h-full rounded-full bg-amber-500/80"
+                          style={{
+                            width: `${totalVisits ? Math.min(100, (count / Math.max(...mostViewedArtworks.map((a) => a.count), 1)) * 100) : 0}%`,
+                          }}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
                 {mostViewedArtworks.length === 0 && (
                   <p className="text-zinc-500 text-sm">No lightbox views yet</p>
                 )}
