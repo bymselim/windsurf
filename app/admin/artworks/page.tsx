@@ -453,11 +453,10 @@ export default function ArtworksAdminPage() {
   const formatBullets = (text: string): string => {
     const raw = String(text ?? "").trim();
     if (!raw) return "";
-    let lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
-    if (lines.length === 0) return "";
-    if (lines.length === 1 && raw.includes(",")) {
-      lines = raw.split(/\s*,\s*/).map((l) => l.trim()).filter(Boolean);
-    }
+    const lines = raw
+      .split(/\n|;\s*/)
+      .map((l) => l.trim())
+      .filter(Boolean);
     if (lines.length === 0) return "";
     const alreadyBullets = lines.every((l) => /^(-\s+|•\s+)/.test(l));
     if (alreadyBullets) return lines.map((l) => l.replace(/^•\s+/, "- ")).join("\n");

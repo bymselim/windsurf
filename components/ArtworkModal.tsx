@@ -224,7 +224,7 @@ export function ArtworkModal({
               {artwork.description && (
                 <div className="mt-4 p-4 bg-zinc-900/50 rounded-lg">
                   <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-line">
-                    {artwork.description}
+                    {artwork.description.replace(/;\s*/g, "\n")}
                   </p>
                 </div>
               )}
