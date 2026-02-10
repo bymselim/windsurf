@@ -1107,6 +1107,33 @@ export default function ArtworksAdminPage() {
           <p className="text-zinc-400 py-12">Loading artworks...</p>
         ) : (
           <>
+            {filtered.length > 0 && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+                <p className="text-zinc-400 text-sm">
+                  Showing {start + 1}–{Math.min(start + PAGE_SIZE, sorted.length)} of {sorted.length}{" "}
+                  (filtered from {artworks.length})
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage <= 1}
+                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg disabled:opacity-50 text-sm transition"
+                  >
+                    Önceki
+                  </button>
+                  <span className="px-4 py-2 text-zinc-400 text-sm">
+                    Sayfa {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg disabled:opacity-50 text-sm transition"
+                  >
+                    Sonraki
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="overflow-x-auto rounded-lg border border-zinc-800">
               <table className="w-full min-w-[1200px]">
                 <thead className="bg-zinc-900">
@@ -1442,31 +1469,33 @@ export default function ArtworksAdminPage() {
               </div>
             )}
 
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
-              <p className="text-zinc-400 text-sm">
-                Showing {start + 1}–{Math.min(start + PAGE_SIZE, sorted.length)} of {sorted.length}{" "}
-                (filtered from {artworks.length})
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage <= 1}
-                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg disabled:opacity-50 text-sm"
-                >
-                  Previous
-                </button>
-                <span className="px-4 py-2 text-zinc-400 text-sm">
-                  Page {currentPage} / {totalPages}
-                </span>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage >= totalPages}
-                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg disabled:opacity-50 text-sm"
-                >
-                  Next
-                </button>
+            {filtered.length > 0 && (
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+                <p className="text-zinc-400 text-sm">
+                  Showing {start + 1}–{Math.min(start + PAGE_SIZE, sorted.length)} of {sorted.length}{" "}
+                  (filtered from {artworks.length})
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage <= 1}
+                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg disabled:opacity-50 text-sm transition"
+                  >
+                    Önceki
+                  </button>
+                  <span className="px-4 py-2 text-zinc-400 text-sm">
+                    Sayfa {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg disabled:opacity-50 text-sm transition"
+                  >
+                    Sonraki
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
       </div>
