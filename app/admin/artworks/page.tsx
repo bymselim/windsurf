@@ -225,7 +225,7 @@ export default function ArtworksAdminPage() {
       prev.map((art) => {
         if (art.id !== artworkId) return art;
         const variants = [...(art.priceVariants ?? [])];
-        variants.push({ size: "", priceTRY: 0, priceUSD: 0 });
+        variants.push({ size: "", priceTRY: 0 });
         return { ...art, priceVariants: variants };
       })
     );
@@ -973,9 +973,9 @@ export default function ArtworksAdminPage() {
                     </label>
                     {applyPriceVariants && (
                       <div className="mt-2 space-y-2 rounded-lg border border-zinc-700 bg-zinc-800/50 p-3">
-                        <div className="text-xs text-zinc-400 mb-2">Örn: &quot;90 cm çap&quot; ve &quot;22.000&quot; ₺</div>
+                        <div className="text-xs text-zinc-400 mb-2">Örn: &quot;90 cm çap&quot; → 22.000 ₺ / 700 $ (USD opsiyonel)</div>
                         {bulkPriceVariants.map((variant, idx) => (
-                          <div key={idx} className="flex gap-2 items-center">
+                          <div key={idx} className="flex gap-2 items-center flex-wrap">
                             <input
                               type="text"
                               value={variant.size}
@@ -985,7 +985,7 @@ export default function ArtworksAdminPage() {
                                 setBulkPriceVariants(next);
                               }}
                               placeholder="90 cm çap"
-                              className="flex-1 p-2 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-sm placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
+                              className="flex-1 min-w-[140px] p-2 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-sm placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
                             />
                             <input
                               type="number"
@@ -995,12 +995,29 @@ export default function ArtworksAdminPage() {
                                 next[idx] = { ...next[idx], priceTRY: parseFloat(e.target.value) || 0 };
                                 setBulkPriceVariants(next);
                               }}
-                              placeholder="Fiyat"
-                              className="w-32 p-2 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-sm placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
+                              placeholder="TRY"
+                              className="w-28 p-2 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-sm placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
                               min={0}
                               step={50}
                             />
                             <span className="text-sm text-zinc-500">₺</span>
+                            <input
+                              type="number"
+                              value={variant.priceUSD ?? ""}
+                              onChange={(e) => {
+                                const next = [...bulkPriceVariants];
+                                next[idx] = {
+                                  ...next[idx],
+                                  priceUSD: e.target.value === "" ? undefined : parseFloat(e.target.value) || 0,
+                                };
+                                setBulkPriceVariants(next);
+                              }}
+                              placeholder="USD"
+                              className="w-24 p-2 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-sm placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
+                              min={0}
+                              step={1}
+                            />
+                            <span className="text-sm text-zinc-500">$</span>
                             <button
                               type="button"
                               onClick={() => {
@@ -1008,7 +1025,7 @@ export default function ArtworksAdminPage() {
                                 next.splice(idx, 1);
                                 setBulkPriceVariants(next);
                               }}
-                              className="px-2 py-1 text-sm text-red-400 hover:text-red-300"
+                              className="px-2 py-1 text-sm text-red-400 hover:text-red-300 shrink-0"
                             >
                               ✕
                             </button>
@@ -1016,7 +1033,7 @@ export default function ArtworksAdminPage() {
                         ))}
                         <button
                           type="button"
-                          onClick={() => setBulkPriceVariants([...bulkPriceVariants, { size: "", priceTRY: 0 }])}
+                          onClick={() => setBulkPriceVariants([...bulkPriceVariants, { size: "", priceTRY: 0, priceUSD: undefined }])}
                           className="w-full mt-1 px-3 py-2 text-sm bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-200 transition"
                         >
                           + Yeni Varyant Ekle
@@ -1235,9 +1252,9 @@ export default function ArtworksAdminPage() {
                         </button>
                         {expandedPriceVariants[artwork.id] && (
                           <div className="mt-2 space-y-2 rounded-lg border border-zinc-700 bg-zinc-800/50 p-2">
-                            <div className="text-xs text-zinc-400 mb-1">Örn: &quot;90 cm çap 22.000 ₺&quot;</div>
+                            <div className="text-xs text-zinc-400 mb-1">Örn: &quot;90 cm çap&quot; → 22.000 ₺ / 700 $</div>
                             {(artwork.priceVariants ?? []).map((variant, idx) => (
-                              <div key={idx} className="flex gap-2 items-center">
+                              <div key={idx} className="flex gap-2 items-center flex-wrap">
                                 <input
                                   type="text"
                                   value={variant.size}
@@ -1245,7 +1262,7 @@ export default function ArtworksAdminPage() {
                                     updatePriceVariant(artwork.id, idx, "size", e.target.value)
                                   }
                                   placeholder="90 cm çap"
-                                  className="flex-1 p-1.5 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-xs focus:border-amber-500/50 focus:outline-none"
+                                  className="flex-1 min-w-[120px] p-1.5 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-xs focus:border-amber-500/50 focus:outline-none"
                                 />
                                 <input
                                   type="number"
@@ -1258,16 +1275,33 @@ export default function ArtworksAdminPage() {
                                       parseFloat(e.target.value) || 0
                                     )
                                   }
-                                  placeholder="Fiyat"
+                                  placeholder="TRY"
                                   className="w-24 p-1.5 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-xs focus:border-amber-500/50 focus:outline-none"
                                   min={0}
                                   step={50}
                                 />
                                 <span className="text-xs text-zinc-500">₺</span>
+                                <input
+                                  type="number"
+                                  value={variant.priceUSD ?? ""}
+                                  onChange={(e) =>
+                                    updatePriceVariant(
+                                      artwork.id,
+                                      idx,
+                                      "priceUSD",
+                                      e.target.value === "" ? undefined : parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                  placeholder="USD"
+                                  className="w-20 p-1.5 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-xs focus:border-amber-500/50 focus:outline-none"
+                                  min={0}
+                                  step={1}
+                                />
+                                <span className="text-xs text-zinc-500">$</span>
                                 <button
                                   type="button"
                                   onClick={() => removePriceVariant(artwork.id, idx)}
-                                  className="px-2 py-1 text-xs text-red-400 hover:text-red-300"
+                                  className="px-2 py-1 text-xs text-red-400 hover:text-red-300 shrink-0"
                                 >
                                   ✕
                                 </button>
