@@ -1146,7 +1146,7 @@ export default function ArtworksAdminPage() {
                         </button>
                         {expandedPriceVariants[artwork.id] && (
                           <div className="mt-2 space-y-2 rounded-lg border border-zinc-700 bg-zinc-800/50 p-2">
-                            <div className="text-xs text-zinc-400 mb-1">Örn: "90 cm çap 22.000 ₺"</div>
+                            <div className="text-xs text-zinc-400 mb-1">Örn: &quot;90 cm çap 22.000 ₺&quot;</div>
                             {(artwork.priceVariants ?? []).map((variant, idx) => (
                               <div key={idx} className="flex gap-2 items-center">
                                 <input
