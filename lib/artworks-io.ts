@@ -6,6 +6,12 @@ import { kvGetJson, kvSetJson, isKvAvailable } from "./kv-adapter";
 const ARTWORKS_JSON = path.join(process.cwd(), "lib", "data", "artworks.json");
 const KV_KEY = "luxury_gallery:artworks";
 
+export interface PriceVariant {
+  size: string; // Örn: "90 cm çap", "100 cm çap"
+  priceTRY: number;
+  priceUSD?: number;
+}
+
 export interface ArtworkJson {
   id: string;
   category: string;
@@ -20,6 +26,8 @@ export interface ArtworkJson {
   priceUSD: number;
   dimensionsCM: string;
   dimensionsIN: string;
+  /** Çoklu fiyat/ölçü kombinasyonları. Varsa modal'da bunlar gösterilir, tek fiyat değil. */
+  priceVariants?: PriceVariant[];
   tags?: string[];
   isFeatured: boolean;
 }
@@ -50,6 +58,15 @@ function normalizeEntry(raw: unknown): ArtworkJson {
         : dimensionsCMToIN(typeof r.dimensionsCM === "string" ? r.dimensionsCM : dimensions),
     tags: Array.isArray(r.tags) ? (r.tags as string[]) : undefined,
     isFeatured: Boolean(r.isFeatured),
+    priceVariants: Array.isArray(r.priceVariants)
+      ? (r.priceVariants as PriceVariant[]).filter(
+          (v) =>
+            typeof v === "object" &&
+            v !== null &&
+            typeof v.size === "string" &&
+            typeof v.priceTRY === "number"
+        )
+      : undefined,
   };
 }
 

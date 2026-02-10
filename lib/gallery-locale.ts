@@ -16,6 +16,7 @@ export function mapFullToArtwork(full: ArtworkFull, locale: GalleryLocale): Artw
       dimensions: full.dimensionsCM,
       price: full.priceTRY,
       currency: "TL",
+      priceVariants: full.priceVariants,
       isFeatured: full.isFeatured,
     };
   }
@@ -30,6 +31,11 @@ export function mapFullToArtwork(full: ArtworkFull, locale: GalleryLocale): Artw
     dimensions: `${full.dimensionsIN} (${full.dimensionsCM})`,
     price: full.priceUSD,
     currency: "$",
+    priceVariants: full.priceVariants?.map((v) => ({
+      size: v.size,
+      priceTRY: v.priceTRY,
+      priceUSD: v.priceUSD ?? Math.round(v.priceTRY / 30),
+    })),
     isFeatured: full.isFeatured,
   };
 }

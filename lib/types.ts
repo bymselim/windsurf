@@ -2,6 +2,12 @@ export type ArtworkCategory = string; // Dynamic from /api/categories (e.g. Ston
 
 export type MediaType = "image" | "video";
 
+export interface PriceVariant {
+  size: string; // Örn: "90 cm çap", "100 cm çap"
+  priceTRY: number;
+  priceUSD?: number;
+}
+
 /** Full artwork with dual TR/EN fields (API and admin). */
 export interface ArtworkFull {
   id: string;
@@ -18,6 +24,7 @@ export interface ArtworkFull {
   priceUSD: number;
   dimensionsCM: string;
   dimensionsIN: string;
+  priceVariants?: PriceVariant[];
   isFeatured: boolean;
 }
 
@@ -34,6 +41,7 @@ export interface Artwork {
   price: number;
   /** Currency label for display: "TL" | "$" */
   currency?: "TL" | "$";
+  priceVariants?: PriceVariant[];
   isFeatured: boolean;
 }
 

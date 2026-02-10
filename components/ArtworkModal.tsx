@@ -201,7 +201,23 @@ export function ArtworkModal({
               <p className="text-sm text-zinc-400">
                 {artwork.category} · {artwork.dimensions}
               </p>
-              {typeof artwork.price === "number" && artwork.price > 0 ? (
+              {artwork.priceVariants && artwork.priceVariants.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {artwork.priceVariants.map((variant, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-baseline justify-between gap-3 rounded-lg bg-zinc-800/60 px-3 py-2 border border-amber-500/20"
+                    >
+                      <span className="text-sm text-zinc-300">{variant.size}</span>
+                      <span className="text-lg font-bold text-amber-500 whitespace-nowrap">
+                        {artwork.currency === "TL"
+                          ? `${variant.priceTRY.toLocaleString("tr-TR")} ₺`
+                          : `$${((variant.priceUSD ?? variant.priceTRY / 30)).toLocaleString("en-US")}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : typeof artwork.price === "number" && artwork.price > 0 ? (
                 <p className="mt-0.5 text-base font-semibold text-amber-500">
                   {artwork.currency === "TL"
                     ? `${artwork.price.toLocaleString()} TL`

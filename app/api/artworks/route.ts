@@ -75,6 +75,7 @@ function toResponseItem(item: ArtworkJson) {
     priceUSD: item.priceUSD,
     dimensionsCM: item.dimensionsCM,
     dimensionsIN: item.dimensionsIN,
+    priceVariants: Array.isArray(item.priceVariants) && item.priceVariants.length > 0 ? item.priceVariants : undefined,
     isFeatured: item.isFeatured,
   };
 }
@@ -164,6 +165,18 @@ export async function PUT(request: NextRequest) {
     dimensionsIN,
     isFeatured: Boolean(body.isFeatured),
     tags: current.tags,
+    priceVariants:
+      Array.isArray(body.priceVariants) && body.priceVariants.length > 0
+        ? body.priceVariants.filter(
+            (v: unknown) =>
+              typeof v === "object" &&
+              v !== null &&
+              typeof (v as { size?: unknown }).size === "string" &&
+              typeof (v as { priceTRY?: unknown }).priceTRY === "number"
+          )
+        : body.priceVariants === null || body.priceVariants === undefined
+          ? current.priceVariants
+          : undefined,
   };
 
   await writeArtworksToFile(entries);

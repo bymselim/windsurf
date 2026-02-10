@@ -7,6 +7,12 @@ import { useRouter } from "next/navigation";
 
 const PAGE_SIZE = 50;
 
+interface PriceVariant {
+  size: string;
+  priceTRY: number;
+  priceUSD?: number;
+}
+
 interface ArtworkRow {
   id: string;
   category: string;
@@ -20,6 +26,7 @@ interface ArtworkRow {
   priceUSD: number;
   dimensionsCM: string;
   dimensionsIN: string;
+  priceVariants?: PriceVariant[];
   isFeatured: boolean;
 }
 
@@ -76,6 +83,8 @@ export default function ArtworksAdminPage() {
   const [clearAllConfirm, setClearAllConfirm] = useState("");
   const [clearAllLoading, setClearAllLoading] = useState(false);
   const [clearAllMessage, setClearAllMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  /** Hangi artwork'ün priceVariants düzenleme alanı açık */
+  const [expandedPriceVariants, setExpandedPriceVariants] = useState<Record<string, boolean>>({});
   const router = useRouter();
 
   useEffect(() => {
@@ -174,6 +183,8 @@ export default function ArtworksAdminPage() {
   const isDirty = (a: ArtworkRow): boolean => {
     const o = originalById[a.id];
     if (!o) return true;
+    const priceVariantsEqual =
+      JSON.stringify(a.priceVariants ?? []) === JSON.stringify(o.priceVariants ?? []);
     return (
       a.category !== o.category ||
       a.titleTR !== o.titleTR ||
@@ -183,7 +194,42 @@ export default function ArtworksAdminPage() {
       a.priceTRY !== o.priceTRY ||
       a.priceUSD !== o.priceUSD ||
       a.dimensionsCM !== o.dimensionsCM ||
-      a.isFeatured !== o.isFeatured
+      a.isFeatured !== o.isFeatured ||
+      !priceVariantsEqual
+    );
+  };
+
+  const updatePriceVariant = (artworkId: string, variantIndex: number, field: keyof PriceVariant, value: unknown) => {
+    setArtworks((prev) =>
+      prev.map((art) => {
+        if (art.id !== artworkId) return art;
+        const variants = [...(art.priceVariants ?? [])];
+        if (!variants[variantIndex]) return art;
+        variants[variantIndex] = { ...variants[variantIndex], [field]: value };
+        return { ...art, priceVariants: variants };
+      })
+    );
+  };
+
+  const addPriceVariant = (artworkId: string) => {
+    setArtworks((prev) =>
+      prev.map((art) => {
+        if (art.id !== artworkId) return art;
+        const variants = [...(art.priceVariants ?? [])];
+        variants.push({ size: "", priceTRY: 0, priceUSD: 0 });
+        return { ...art, priceVariants: variants };
+      })
+    );
+  };
+
+  const removePriceVariant = (artworkId: string, variantIndex: number) => {
+    setArtworks((prev) =>
+      prev.map((art) => {
+        if (art.id !== artworkId) return art;
+        const variants = [...(art.priceVariants ?? [])];
+        variants.splice(variantIndex, 1);
+        return { ...art, priceVariants: variants.length > 0 ? variants : undefined };
+      })
     );
   };
 
@@ -263,6 +309,7 @@ export default function ArtworksAdminPage() {
           dimensionsCM: artwork.dimensionsCM,
           priceTRY: artwork.priceTRY,
           priceUSD: artwork.priceUSD,
+          priceVariants: artwork.priceVariants && artwork.priceVariants.length > 0 ? artwork.priceVariants : null,
           isFeatured: artwork.isFeatured,
         }),
       });
@@ -1085,6 +1132,67 @@ export default function ArtworksAdminPage() {
                           min={0}
                           step={50}
                         />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedPriceVariants((prev) => ({
+                              ...prev,
+                              [artwork.id]: !prev[artwork.id],
+                            }))
+                          }
+                          className="mt-1 text-xs text-amber-500 hover:text-amber-400 underline"
+                        >
+                          {expandedPriceVariants[artwork.id] ? "Fiyat Varyantları ↑" : "Fiyat Varyantları ↓"}
+                        </button>
+                        {expandedPriceVariants[artwork.id] && (
+                          <div className="mt-2 space-y-2 rounded-lg border border-zinc-700 bg-zinc-800/50 p-2">
+                            <div className="text-xs text-zinc-400 mb-1">Örn: "90 cm çap 22.000 ₺"</div>
+                            {(artwork.priceVariants ?? []).map((variant, idx) => (
+                              <div key={idx} className="flex gap-2 items-center">
+                                <input
+                                  type="text"
+                                  value={variant.size}
+                                  onChange={(e) =>
+                                    updatePriceVariant(artwork.id, idx, "size", e.target.value)
+                                  }
+                                  placeholder="90 cm çap"
+                                  className="flex-1 p-1.5 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-xs focus:border-amber-500/50 focus:outline-none"
+                                />
+                                <input
+                                  type="number"
+                                  value={variant.priceTRY}
+                                  onChange={(e) =>
+                                    updatePriceVariant(
+                                      artwork.id,
+                                      idx,
+                                      "priceTRY",
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                  placeholder="Fiyat"
+                                  className="w-24 p-1.5 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-xs focus:border-amber-500/50 focus:outline-none"
+                                  min={0}
+                                  step={50}
+                                />
+                                <span className="text-xs text-zinc-500">₺</span>
+                                <button
+                                  type="button"
+                                  onClick={() => removePriceVariant(artwork.id, idx)}
+                                  className="px-2 py-1 text-xs text-red-400 hover:text-red-300"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => addPriceVariant(artwork.id)}
+                              className="w-full mt-1 px-2 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-200 transition"
+                            >
+                              + Yeni Varyant Ekle
+                            </button>
+                          </div>
+                        )}
                       </td>
                       <td className="p-2">
                         <input
