@@ -25,7 +25,6 @@ type UiSettings = {
   welcomeEN: string;
   quotesTR: Array<{ text: string; author?: string; linkUrl?: string; linkLabel?: string }>;
   quotesEN: Array<{ text: string; author?: string; linkUrl?: string; linkLabel?: string }>;
-  showArtworkTitle: boolean;
 };
 
 export default function SettingsPage() {
@@ -97,7 +96,6 @@ export default function SettingsPage() {
                     (q) => q && typeof q.text === "string" && q.text.trim().length > 0
                   )
                 : [],
-              showArtworkTitle: typeof uiObj.showArtworkTitle === "boolean" ? uiObj.showArtworkTitle : true,
             });
           }
         }
@@ -143,7 +141,6 @@ export default function SettingsPage() {
                   (q) => q && typeof q.text === "string" && q.text.trim().length > 0
                 )
               : [],
-            showArtworkTitle: typeof uiObj.showArtworkTitle === "boolean" ? uiObj.showArtworkTitle : true,
           });
         }
       }
@@ -472,7 +469,6 @@ export default function SettingsPage() {
                     welcomeEN: prev?.welcomeEN ?? "",
                     quotesTR: prev?.quotesTR ?? [],
                     quotesEN: prev?.quotesEN ?? [],
-                    showArtworkTitle: prev?.showArtworkTitle ?? true,
                   }))
                 }
                 className="w-full p-3 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none text-sm"
@@ -498,7 +494,6 @@ export default function SettingsPage() {
                     welcomeEN: prev?.welcomeEN ?? "",
                     quotesTR: prev?.quotesTR ?? [],
                     quotesEN: prev?.quotesEN ?? [],
-                    showArtworkTitle: prev?.showArtworkTitle ?? true,
                   }))
                 }
                 className="w-full p-3 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none text-sm"
@@ -519,7 +514,6 @@ export default function SettingsPage() {
                     welcomeEN: prev?.welcomeEN ?? "",
                     quotesTR: prev?.quotesTR ?? [],
                     quotesEN: prev?.quotesEN ?? [],
-                    showArtworkTitle: prev?.showArtworkTitle ?? true,
                   }))
                 }
                 rows={5}
@@ -541,41 +535,11 @@ export default function SettingsPage() {
                     welcomeEN: prev?.welcomeEN ?? "",
                     quotesTR: prev?.quotesTR ?? [],
                     quotesEN: prev?.quotesEN ?? [],
-                    showArtworkTitle: prev?.showArtworkTitle ?? true,
                   }))
                 }
                 rows={5}
                 className="w-full p-3 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none text-sm"
               />
-            </div>
-
-            <div className="p-4 bg-zinc-900/50 rounded-lg border border-zinc-800">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={ui?.showArtworkTitle ?? true}
-                  onChange={(e) =>
-                    setUi((prev) => ({
-                      categoryPreviewRotateMs: prev?.categoryPreviewRotateMs ?? 2000,
-                      categoryPreviewFadeMs: prev?.categoryPreviewFadeMs ?? 600,
-                      galleryIntroTR: prev?.galleryIntroTR ?? "",
-                      galleryIntroEN: prev?.galleryIntroEN ?? "",
-                      welcomeTR: prev?.welcomeTR ?? "",
-                      welcomeEN: prev?.welcomeEN ?? "",
-                      quotesTR: prev?.quotesTR ?? [],
-                      quotesEN: prev?.quotesEN ?? [],
-                      showArtworkTitle: e.target.checked,
-                    }))
-                  }
-                  className="h-4 w-4 accent-amber-500"
-                />
-                <div>
-                  <div className="text-sm text-zinc-300 font-medium">Eser başlığını göster</div>
-                  <div className="text-xs text-zinc-500 mt-0.5">
-                    Kapalıysa: sadece kategori adı, ölçü, fiyat, açıklama ve sipariş tuşu gösterilir
-                  </div>
-                </div>
-              </label>
             </div>
 
             <button

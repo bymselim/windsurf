@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FiArrowLeft, FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { HiOutlineShoppingBag } from "react-icons/hi";
 import type { Artwork } from "@/lib/types";
-import { displayTitle, isVideoArtwork } from "@/lib/artwork-utils";
+import { isVideoArtwork } from "@/lib/artwork-utils";
 import { OrderModal } from "./OrderModal";
 import { getGalleryUI, type GalleryLocale } from "@/lib/gallery-locale";
 
@@ -23,8 +23,6 @@ type ArtworkModalProps = {
   onArtworkViewed?: (artworkId: string) => void;
   /** Called when user clicks order (analytics). */
   onOrderClicked?: () => void;
-  /** Show artwork title. If false, only category name, dimensions, price, description, and order button are shown. */
-  showArtworkTitle?: boolean;
 };
 
 const SWIPE_THRESHOLD = 50;
@@ -39,7 +37,6 @@ export function ArtworkModal({
   locale = "en",
   onArtworkViewed,
   onOrderClicked,
-  showArtworkTitle = true,
 }: ArtworkModalProps) {
   const ui = getGalleryUI(locale);
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -198,20 +195,9 @@ export function ArtworkModal({
           {/* Artwork details - scrollable, extra padding for Order button */}
           <div className="relative shrink-0 border-t border-zinc-800 bg-zinc-900/95 px-4 py-4 pb-[100px] md:pb-[100px]">
             <div className="mx-auto max-w-4xl">
-              {showArtworkTitle ? (
-                <>
-                  <h2 id="artwork-title" className="text-lg font-bold text-zinc-100">
-                    {artwork.category}
-                  </h2>
-                  <p className="text-sm text-zinc-400">
-                    {displayTitle(artwork)} · {artwork.dimensions}
-                  </p>
-                </>
-              ) : (
-                <h2 id="artwork-title" className="text-lg font-bold text-zinc-100">
-                  {artwork.category}
-                </h2>
-              )}
+              <h2 id="artwork-title" className="text-lg font-bold text-zinc-100">
+                {artwork.category}
+              </h2>
               {artwork.priceVariants && artwork.priceVariants.length > 0 ? (
                 <div className="mt-3 space-y-2">
                   {artwork.priceVariants.map((variant, idx) => (

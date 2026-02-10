@@ -62,9 +62,6 @@ export async function getUiSettings(): Promise<UiSettings> {
     return out;
   };
 
-  const showTitleRaw = ui.showArtworkTitle;
-  const showTitle = typeof showTitleRaw === "boolean" ? showTitleRaw : DEFAULT_UI.showArtworkTitle;
-
   return {
     categoryPreviewRotateMs: Math.max(500, Math.min(30000, Math.round(rotate))),
     categoryPreviewFadeMs: Math.max(100, Math.min(5000, Math.round(fade))),
@@ -74,7 +71,6 @@ export async function getUiSettings(): Promise<UiSettings> {
     welcomeEN: typeof welcomeENRaw === "string" ? welcomeENRaw : DEFAULT_UI.welcomeEN,
     quotesTR: normalizeQuoteArray(quotesTRRaw),
     quotesEN: normalizeQuoteArray(quotesENRaw),
-    showArtworkTitle: showTitle,
   };
 }
 
@@ -95,8 +91,6 @@ export async function updateUiSettings(updates: Partial<UiSettings>): Promise<Ui
     welcomeEN: typeof updates.welcomeEN === "string" ? updates.welcomeEN : current.welcomeEN,
     quotesTR: Array.isArray(updates.quotesTR) ? (updates.quotesTR as QuoteItem[]) : current.quotesTR,
     quotesEN: Array.isArray(updates.quotesEN) ? (updates.quotesEN as QuoteItem[]) : current.quotesEN,
-    showArtworkTitle:
-      typeof updates.showArtworkTitle === "boolean" ? updates.showArtworkTitle : current.showArtworkTitle,
   };
 
   const data = await readSettingsFile();
@@ -119,8 +113,6 @@ export interface UiSettings {
   welcomeEN: string;
   quotesTR: QuoteItem[];
   quotesEN: QuoteItem[];
-  /** Galeri modal'ında eser başlığını göster (true) veya sadece kategori adını göster (false) */
-  showArtworkTitle: boolean;
 }
 
 export interface SettingsJson {
@@ -151,7 +143,6 @@ const DEFAULT_UI: UiSettings = {
   welcomeEN: "",
   quotesTR: [],
   quotesEN: [],
-  showArtworkTitle: true,
 };
 
 /**

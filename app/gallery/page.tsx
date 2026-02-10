@@ -23,7 +23,6 @@ export default function GalleryPage() {
     welcomeEN: string;
     quotesTR: Array<{ text: string; author?: string; linkUrl?: string; linkLabel?: string }>;
     quotesEN: Array<{ text: string; author?: string; linkUrl?: string; linkLabel?: string }>;
-    showArtworkTitle: boolean;
   } | null>(null);
   const [headerItem, setHeaderItem] = useState<
     | null
@@ -276,7 +275,6 @@ export default function GalleryPage() {
                 (q) => q && typeof q.text === "string" && q.text.trim().length > 0
               )
             : [],
-          showArtworkTitle: typeof obj.showArtworkTitle === "boolean" ? obj.showArtworkTitle : true,
         });
       })
       .catch(() => {});
@@ -453,7 +451,6 @@ export default function GalleryPage() {
             onPrev={goPrev}
             onNext={goNext}
             locale="tr"
-            showArtworkTitle={ui?.showArtworkTitle ?? true}
           />
         ) : null}
       </AnimatePresence>

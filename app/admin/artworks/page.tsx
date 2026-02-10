@@ -53,8 +53,6 @@ export default function ArtworksAdminPage() {
   const [bulkEditPriceTRY, setBulkEditPriceTRY] = useState<string>("");
   const [applyPriceUSD, setApplyPriceUSD] = useState(false);
   const [bulkEditPriceUSD, setBulkEditPriceUSD] = useState<string>("");
-  const [applyDimensions, setApplyDimensions] = useState(false);
-  const [bulkDimensionsCM, setBulkDimensionsCM] = useState<string>("");
   const [applyDescTR, setApplyDescTR] = useState(false);
   const [bulkDescTR, setBulkDescTR] = useState<string>("");
   const [applyDescEN, setApplyDescEN] = useState(false);
@@ -202,7 +200,6 @@ export default function ArtworksAdminPage() {
       (a.descriptionEN ?? "") !== (o.descriptionEN ?? "") ||
       a.priceTRY !== o.priceTRY ||
       a.priceUSD !== o.priceUSD ||
-      a.dimensionsCM !== o.dimensionsCM ||
       a.isFeatured !== o.isFeatured ||
       !priceVariantsEqual
     );
@@ -492,7 +489,6 @@ export default function ArtworksAdminPage() {
       }
       patch.priceUSD = n;
     }
-    if (applyDimensions) patch.dimensionsCM = bulkDimensionsCM;
     if (applyDescTR) patch.descriptionTR = bulkDescTR;
     if (applyDescEN) patch.descriptionEN = bulkDescEN;
     if (applyPriceVariants) {
@@ -573,8 +569,7 @@ export default function ArtworksAdminPage() {
         <div className="mb-8">
           <h1 className="text-2xl md:text-3xl font-bold">Artworks Editor (TR / EN)</h1>
           <p className="text-zinc-400 mt-1">
-            {artworks.length} total • Edit Turkish & English fields side-by-side • Dimensions: enter
-            CM only (inch auto)
+            {artworks.length} total • Edit Turkish & English fields side-by-side
           </p>
 
           <div className="mt-4 flex flex-wrap gap-3">
@@ -886,25 +881,6 @@ export default function ArtworksAdminPage() {
                     />
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-2 text-sm text-zinc-300 select-none shrink-0 w-40">
-                      <input
-                        type="checkbox"
-                        checked={applyDimensions}
-                        onChange={(e) => setApplyDimensions(e.target.checked)}
-                        className="h-4 w-4 accent-amber-500"
-                      />
-                      Dimensions (cm)
-                    </label>
-                    <input
-                      value={bulkDimensionsCM}
-                      onChange={(e) => setBulkDimensionsCM(e.target.value)}
-                      disabled={!applyDimensions}
-                      placeholder="60×90 cm"
-                      className="flex-1 min-w-0 p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 disabled:opacity-50"
-                    />
-                  </div>
-
                   <div className="flex items-start gap-3">
                     <label className="flex items-center gap-2 text-sm text-zinc-300 select-none shrink-0 w-40 pt-2">
                       <input
@@ -1171,9 +1147,6 @@ export default function ArtworksAdminPage() {
                       Price (USD)
                     </th>
                     <th className="p-2 text-left text-sm font-semibold text-zinc-300">
-                      Dimensions (cm)
-                    </th>
-                    <th className="p-2 text-left text-sm font-semibold text-zinc-300">
                       Desc (TR)
                     </th>
                     <th className="p-2 text-left text-sm font-semibold text-zinc-300">
@@ -1359,20 +1332,6 @@ export default function ArtworksAdminPage() {
                           min={0}
                           step={1}
                         />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          type="text"
-                          value={artwork.dimensionsCM}
-                          onChange={(e) =>
-                            updateArtwork(artwork.id, "dimensionsCM", e.target.value)
-                          }
-                          className="w-28 p-2 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 text-sm focus:border-amber-500/50 focus:outline-none"
-                          placeholder="60×90 cm"
-                        />
-                        <span className="text-xs text-zinc-500 ml-1 block">
-                          → {artwork.dimensionsIN}
-                        </span>
                       </td>
                       <td className="p-2">
                         <textarea
