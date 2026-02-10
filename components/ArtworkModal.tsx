@@ -198,17 +198,22 @@ export function ArtworkModal({
           {/* Artwork details - scrollable, extra padding for Order button */}
           <div className="relative shrink-0 border-t border-zinc-800 bg-zinc-900/95 px-4 py-4 pb-[100px] md:pb-[100px]">
             <div className="mx-auto max-w-4xl">
-              <h2 id="artwork-title" className="text-lg font-bold text-zinc-100">
-                {artwork.category}
-              </h2>
               {showArtworkTitle ? (
-                <p className="text-sm text-zinc-400">
-                  {displayTitle(artwork)} · {artwork.dimensions}
-                </p>
+                <>
+                  <h2 id="artwork-title" className="text-lg font-bold text-zinc-100">
+                    {artwork.category}
+                  </h2>
+                  <p className="text-sm text-zinc-400">
+                    {displayTitle(artwork)} · {artwork.dimensions}
+                  </p>
+                </>
               ) : (
-                <p className="text-sm text-zinc-400">
-                  {artwork.dimensions}
-                </p>
+                <h2 id="artwork-title" className="text-lg font-bold text-zinc-100">
+                  {artwork.category}
+                  {artwork.dimensions && (
+                    <span className="text-sm font-normal text-zinc-400"> - {artwork.dimensions}</span>
+                  )}
+                </h2>
               )}
               {artwork.priceVariants && artwork.priceVariants.length > 0 ? (
                 <div className="mt-3 space-y-2">
