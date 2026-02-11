@@ -15,7 +15,7 @@ export interface CategoryJson {
 
 export async function readCategoriesFromFile(): Promise<CategoryJson[]> {
   const kvVal = await kvGetJson<CategoryJson[]>(KV_KEY);
-  if (Array.isArray(kvVal)) return kvVal;
+  if (Array.isArray(kvVal) && kvVal.length > 0) return kvVal;
   try {
     const data = await fs.readFile(CATEGORIES_JSON, "utf-8");
     const parsed = JSON.parse(data) as CategoryJson[];
