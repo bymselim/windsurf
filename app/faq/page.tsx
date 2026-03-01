@@ -4,6 +4,7 @@ import { FAQ_ITEMS } from "@/lib/faq-data";
 export const metadata = {
   title: "Sıkça Sorulan Sorular | Melike Sevinç Artworks",
   description: "Eserler hakkında sıkça sorulan sorular ve cevapları.",
+  robots: "noindex, nofollow",
 };
 
 export default function FAQPage() {

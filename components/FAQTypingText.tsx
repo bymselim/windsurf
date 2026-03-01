@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 
-const WORD_DELAY_MS = 80;
+const WORD_DELAY_MS = 160;
 const LINE_BREAK = "[L]";
 
 function tokenize(text: string): string[] {

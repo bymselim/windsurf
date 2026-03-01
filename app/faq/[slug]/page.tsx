@@ -14,6 +14,7 @@ export async function generateMetadata({ params }: Props) {
   return {
     title: `${item.question} | SSS | Melike Sevinç Artworks`,
     description: item.answer.slice(0, 160) + "...",
+    robots: "noindex, nofollow",
   };
 }
 

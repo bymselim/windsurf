@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -322,14 +321,6 @@ export function AuthGate({ gallery }: AuthGateProps = {}) {
         <p className="text-[11px] sm:text-xs text-zinc-500 leading-relaxed">
           Bu sayfa melikesevinc.com&apos;un VIP misafirlerine özeldir.
           <span className="block mt-0.5 text-zinc-600">This page is exclusive to VIP guests of melikesevinc.com.</span>
-        </p>
-        <p className="mt-3">
-          <Link
-            href="/faq"
-            className="text-xs text-zinc-500 hover:text-amber-500/80 transition"
-          >
-            Sıkça Sorulan Sorular / FAQ
-          </Link>
         </p>
       </footer>
 
