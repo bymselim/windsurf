@@ -198,6 +198,65 @@ bilinçli yetişkinlerle kurulan bir ilişki için üretilir.
 Buraya kadar okunduysa, zaten doğru yerdesiniz.
 Okunmadıysa, bu da bir cevaptır.`,
   },
+  {
+    slug: "5",
+    question: "Eğitim veriyor musunuz?",
+    answer: `"Eğitim veriyor musunuz?" sorusu üzerine
+Bu soru bana sıklıkla geliyor.
+Çoğu zaman, ortaya çıkan sonucu teknik bir tarifle tekrar edilebilecek bir üretim biçimi sanarak soruluyor.
+Öncelikle şunu netleştireyim:
+Evet, eğitim veriyorum.
+Ancak bu, kısa süreli bir workshop ya da birkaç teknik püf noktası aktarımı değildir.
+Bu üretim biçimi; yıllar süren deneyim, ciddi maddi yatırım ve endüstriyel disiplin gerektirir.
+Bugüne kadar yalnızca teknik geliştirme, ekipman, tesis altyapısı ve deneme süreçleri için yaklaşık 400.000$'lık bir yatırım yaptım.
+Bu yatırımın içinde başarısız denemeler, çöpe giden yüzeyler, sökülen katmanlar ve yeniden yapılan işler vardır.
+Yani görünen sonuç, görünmeyen uzun bir sürecin ürünüdür.
+Eğitim bedeli 50.000 €'dur.
+Ancak bu eğitime başlamadan önce bir ön koşul vardır.
+Adayın, en az bir yıl profesyonel bir boya ustasının yanında çalışmış olması gerekir.
+Tabancanın atomizasyon mantığını bilmeyen,
+astarın yüzey hazırlığındaki rolünü deneyimlememiş,
+zımpara disiplinini içselleştirmemiş,
+sertleştirici oranlarının kimyasal etkisini anlamamış,
+verniğin davranışını uygulamalı olarak görmemiş birinin bu süreci anlaması mümkün değildir.
+Bu bir eleme değil, bir gerçekliktir.
+Bu üretim sistemini kurmak isteyen biri için yalnızca eğitim yeterli değildir.
+Minimum 60.000–70.000 € arası makine ve ekipman yatırımı gerekir.
+Buna uygun alan, kompresyon dengesi, hava kontrolü, yüzey hazırlık ekipmanları ve sarf malzemeleri dahil değildir.
+Kendi başına denemeye çalışanlar oldu mu?
+Evet.
+Ekipman alanlar, benzer yüzeyler denemeye çalışanlar, teknik olarak yaklaşmaya çalışanlar oldu.
+Ancak şunu fark ettiler:
+Bu iş, yalnızca makine ve malzemeyle kurulmaz.
+Çünkü burada belirleyici olan;
+katman geçişlerini okuma yeteneği,
+yüzeyin "olduğu anı" sezebilme refleksi,
+nerede duracağını bilme disiplini
+ve estetik karar verme hızıdır.
+Teknik bilgi aktarılabilir.
+Makine satın alınabilir.
+Ancak sezgi, tekrar ve yüzlerce hatalı denemeyle gelişir.
+Bu nedenle birkaç ay içinde bırakmak zorunda kalanlar oldu.
+Çünkü üretimin görünmeyen kısmı, göründüğünden daha ağırdır.
+Bu sürecin kapısı herkese açıktır.
+Ancak eşik yüksektir.
+Bu alan, "deneyeyim" merakıyla değil,
+uzun vadeli disiplin ve ciddi yatırım iradesiyle girilecek bir alandır.
+Benim üretim pratiğim;
+hızla çoğaltılabilir bir sistem değil,
+kişisel olarak inşa edilmiş bir metodolojidir.
+Eğitim almak isteyen biri,
+öncelikle bu sürecin ağırlığını ve maliyetini kabullenmelidir.
+Eğer soru "Nasıl yapıyorsunuz?" merakından geliyorsa,
+cevap: uzun yıllar ve yüksek yatırım.
+Eğer soru "Ben de yapabilir miyim?" ise,
+cevap: doğru altyapı, doğru disiplin ve ciddi bir bütçe ile — evet, mümkündür.
+Ancak bu yol kısa değildir.
+Ucuz değildir.
+Ve hafif değildir.
+Bu alan, hızlı sonuç isteyenler için değil;
+süreçle yaşamayı kabul edenler içindir.`,
+  },
 ];
 
 export function getFAQBySlug(slug: string): FAQItem | undefined {
