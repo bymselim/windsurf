@@ -34,6 +34,14 @@ export default async function HomePage() {
             International Gallery
           </Link>
         </div>
+        <p className="mt-6 text-center">
+          <Link
+            href="/faq"
+            className="text-sm text-zinc-500 hover:text-amber-500/80 transition"
+          >
+            Sıkça Sorulan Sorular
+          </Link>
+        </p>
       </div>
     </div>
   );
