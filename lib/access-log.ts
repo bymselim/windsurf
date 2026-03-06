@@ -6,10 +6,13 @@ import { kvGetJson, kvSetJson, isKvAvailable } from "./kv-adapter";
 const LOG_FILE = path.join(process.cwd(), "lib", "data", "access-logs.json");
 const KV_KEY = "luxury_gallery:access_logs";
 
+export type GalleryType = "turkish" | "international";
+
 export interface AccessLogEntry {
   id: string;
   fullName: string;
   phone: string;
+  gallery?: GalleryType; // Hangi panele giriş yapıldığı
   device: "mobile" | "desktop" | "unknown";
   deviceName?: string; // Örn: "iPhone 14 Pro", "Samsung Galaxy S23", "MacBook Pro", "Windows PC"
   ip: string;
@@ -20,13 +23,6 @@ export interface AccessLogEntry {
   pagesVisited: string[];
   artworksViewed: string[];
   orderClicked: boolean;
-}
-
-/** Mask phone for storage: show first 4 and last 4, middle as *** */
-export function maskPhone(phone: string): string {
-  const s = String(phone).trim().replace(/\D/g, "");
-  if (s.length <= 8) return "***";
-  return s.slice(0, 4) + "***" + s.slice(-4);
 }
 
 function parseDevice(userAgent: string): "mobile" | "desktop" | "unknown" {
@@ -128,7 +124,7 @@ function normalizeEntry(raw: Record<string, unknown>, index: number): AccessLogE
   return {
     id: "legacy-" + index,
     fullName: typeof raw.fullName === "string" ? raw.fullName : "—",
-    phone: phone !== "—" ? maskPhone(phone) : "—",
+    phone: phone !== "—" ? String(phone).trim() : "—",
     device: "unknown",
     deviceName: undefined,
     ip: "—",
@@ -205,6 +201,7 @@ async function getCityFromIP(ip: string): Promise<string | undefined> {
 export async function createAccessLogEntry(params: {
   fullName: string;
   phoneNumber: string;
+  gallery?: GalleryType;
   userAgent: string;
   ip: string;
   country: string;
@@ -216,7 +213,8 @@ export async function createAccessLogEntry(params: {
   const entry: AccessLogEntry = {
     id,
     fullName: params.fullName.trim() || "—",
-    phone: params.phoneNumber ? maskPhone(params.phoneNumber) : "—",
+    phone: params.phoneNumber ? String(params.phoneNumber).trim().replace(/\D/g, "") || "—" : "—",
+    gallery: params.gallery,
     device: parseDevice(params.userAgent),
     deviceName,
     ip: params.ip || "—",

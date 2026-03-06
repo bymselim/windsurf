@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
   const logId = await createAccessLogEntry({
     fullName: name || "—",
     phoneNumber: phone,
+    gallery,
     userAgent,
     ip,
     country,

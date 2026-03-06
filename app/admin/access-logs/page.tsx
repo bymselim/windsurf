@@ -9,6 +9,7 @@ interface AccessLog {
   fullName: string;
   phoneNumber?: string;
   phone?: string;
+  gallery?: "turkish" | "international";
   timestamp?: string;
   sessionStart?: string;
   sessionEnd?: string | null;
@@ -26,13 +27,29 @@ export default function AccessLogsPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Tekil kullanıcı sayısı: telefon numarasına göre (maskelenmiş olsa bile aynı telefon = aynı kişi)
   const uniqueUsers = new Set(
     logs
       .map((l) => l.phone ?? l.phoneNumber ?? "")
       .filter((p) => p && p !== "—")
   ).size;
   const totalTraffic = logs.length;
+
+  // Telefon başına giriş sayısı ve farklı IP sayısı
+  const phoneStats = (() => {
+    const byPhone = new Map<string, { count: number; ips: Set<string> }>();
+    for (const log of logs) {
+      const p = log.phone ?? log.phoneNumber ?? "";
+      if (!p || p === "—") continue;
+      let s = byPhone.get(p);
+      if (!s) {
+        s = { count: 0, ips: new Set<string>() };
+        byPhone.set(p, s);
+      }
+      s.count += 1;
+      if (log.ip && log.ip !== "—") s.ips.add(log.ip);
+    }
+    return byPhone;
+  })();
 
   const loadLogs = async () => {
     try {
@@ -198,6 +215,9 @@ export default function AccessLogsPage() {
                     Phone
                   </th>
                   <th className="p-4 text-left font-semibold text-zinc-300 border-b border-zinc-800">
+                    Panel
+                  </th>
+                  <th className="p-4 text-left font-semibold text-zinc-300 border-b border-zinc-800">
                     Device
                   </th>
                   <th className="p-4 text-left font-semibold text-zinc-300 border-b border-zinc-800">
@@ -219,6 +239,10 @@ export default function AccessLogsPage() {
                   const ts = log.sessionStart ?? log.timestamp ?? "";
                   const phone = log.phone ?? log.phoneNumber ?? "—";
                   const end = log.sessionEnd ?? null;
+                  const stats = phone !== "—" ? phoneStats.get(phone) : null;
+                  const loginCount = stats?.count ?? 1;
+                  const hasMultipleIps = (stats?.ips.size ?? 0) > 1;
+                  const galleryLabel = log.gallery === "international" ? "International" : log.gallery === "turkish" ? "Turkish" : "—";
                   return (
                     <tr
                       key={log.id ?? `${ts}-${log.fullName}-${index}`}
@@ -233,7 +257,23 @@ export default function AccessLogsPage() {
                         </div>
                       </td>
                       <td className="p-4 font-medium">{log.fullName}</td>
-                      <td className="p-4 font-mono text-amber-400">{phone}</td>
+                      <td className="p-4">
+                        <span
+                          className={`font-mono ${hasMultipleIps ? "text-red-400" : "text-amber-400"}`}
+                          title={hasMultipleIps ? "Farklı IP'lerden giriş" : undefined}
+                        >
+                          {phone}
+                          {loginCount > 1 && (
+                            <span className="ml-1.5 text-zinc-500">({loginCount})</span>
+                          )}
+                          {hasMultipleIps && (
+                            <span className="ml-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500/30 text-red-400 text-xs">
+                              !
+                            </span>
+                          )}
+                        </span>
+                      </td>
+                      <td className="p-4 text-zinc-400">{galleryLabel}</td>
                       <td className="p-4">
                         <div className="text-zinc-400 capitalize">{log.device ?? "—"}</div>
                         {log.deviceName && (
