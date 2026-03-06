@@ -55,6 +55,8 @@ coverage
 lib/data/admin-password.txt
 lib/data/access-logs.json
 lib/data/gate-logs.json
+lib/data/blocked-phones.json
+lib/data/phone-credits.json
 
 # Misc
 *.log

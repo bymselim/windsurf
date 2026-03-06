@@ -3,6 +3,11 @@ import { createSession } from "@/lib/auth";
 import { createAccessLogEntry } from "@/lib/access-log";
 import { addGateLog } from "@/lib/gate-log";
 import { validateGatePassword } from "@/lib/gate-password";
+import { isPhoneBlocked } from "@/lib/blocked-phones";
+import {
+  getRemainingCredits,
+  decrementCredits,
+} from "@/lib/phone-credits";
 import {
   getAccessGateSettings,
   getPasswordForGallery,
@@ -36,6 +41,19 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    if (await isPhoneBlocked(phone)) {
+      return NextResponse.json(
+        { error: "BLOCKED", message: "This phone number is not allowed to access." },
+        { status: 403 }
+      );
+    }
+    const remaining = await getRemainingCredits(phone);
+    if (remaining <= 0) {
+      return NextResponse.json(
+        { error: "CREDITS_EXPIRED", message: "Yetkilendirmeniz sona erdi. Lütfen tekrar yetkilendirme isteyiniz." },
+        { status: 403 }
+      );
+    }
     if (!password || typeof password !== "string") {
       return NextResponse.json(
         { error: "Access password is required." },
@@ -49,6 +67,21 @@ export async function POST(request: NextRequest) {
       );
     }
   } else {
+    if (phone && (await isPhoneBlocked(phone))) {
+      return NextResponse.json(
+        { error: "BLOCKED", message: "This phone number is not allowed to access." },
+        { status: 403 }
+      );
+    }
+    if (phone) {
+      const remaining = await getRemainingCredits(phone);
+      if (remaining <= 0) {
+        return NextResponse.json(
+          { error: "CREDITS_EXPIRED", message: "Yetkilendirmeniz sona erdi. Lütfen tekrar yetkilendirme isteyiniz." },
+          { status: 403 }
+        );
+      }
+    }
     const gatePassword = getPasswordForGallery(settings, gallery);
     if (!password || typeof password !== "string") {
       return NextResponse.json(
@@ -82,6 +115,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (phone) {
+    await decrementCredits(phone);
+  }
   if (usePhoneBased) {
     await addGateLog({
       phone,
