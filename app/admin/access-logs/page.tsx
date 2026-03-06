@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { setAdminPassword, clearAdminPassword } from "@/lib/admin-auth-client";
 
 interface AccessLog {
   id?: string;
@@ -76,6 +77,7 @@ export default function AccessLogsPage() {
     setIsAuthenticated(true);
     if (typeof window !== "undefined") {
       localStorage.setItem("admin-authenticated", "true");
+      setAdminPassword(password);
     }
     loadLogs();
   };
@@ -85,8 +87,8 @@ export default function AccessLogsPage() {
     setPassword("");
     if (typeof window !== "undefined") {
       localStorage.removeItem("admin-authenticated");
+      clearAdminPassword();
     }
-    // Cookie will expire; optional: call logout API to clear it
   };
 
   if (!isAuthenticated) {

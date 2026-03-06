@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FiLock, FiPhone, FiUser, FiCheck } from "react-icons/fi";
+import { getAdminAuthHeaders } from "@/lib/admin-auth-client";
 
 type AccessGateSettings = {
   password?: string;
@@ -63,8 +64,18 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    fetch("/api/admin/settings", { credentials: "include" })
+    fetch("/api/admin/settings", {
+      credentials: "include",
+      headers: { ...getAdminAuthHeaders() },
+    })
       .then((r) => {
+        if (r.status === 401) {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("admin-authenticated");
+            window.location.href = "/admin/access-logs";
+          }
+          return null;
+        }
         if (!r.ok) return null;
         return r.json();
       })
@@ -113,11 +124,21 @@ export default function SettingsPage() {
     try {
       const res = await fetch("/api/admin/settings", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...getAdminAuthHeaders(),
+        },
         credentials: "include",
         body: JSON.stringify({ ui }),
       });
       const data = await res.json();
+      if (res.status === 401) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("admin-authenticated");
+          window.location.href = "/admin/access-logs";
+        }
+        return;
+      }
       if (!res.ok) {
         setUiMessage(data?.error ? `❌ ${data.error}` : "❌ Failed to save");
         return;
@@ -198,7 +219,10 @@ export default function SettingsPage() {
     try {
       const res = await fetch("/api/admin/settings", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...getAdminAuthHeaders(),
+        },
         credentials: "include",
         body: JSON.stringify({
           accessGate: {
@@ -210,6 +234,13 @@ export default function SettingsPage() {
         }),
       });
       const data = await res.json();
+      if (res.status === 401) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("admin-authenticated");
+          window.location.href = "/admin/access-logs";
+        }
+        return;
+      }
       if (!res.ok) {
         setGateMessage(data?.error ? `❌ ${data.error}` : "❌ Failed to save");
         return;
@@ -236,7 +267,10 @@ export default function SettingsPage() {
     try {
       const res = await fetch("/api/admin/settings", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...getAdminAuthHeaders(),
+        },
         credentials: "include",
         body: JSON.stringify({
           accessGate:
@@ -246,6 +280,13 @@ export default function SettingsPage() {
         }),
       });
       const data = await res.json();
+      if (res.status === 401) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("admin-authenticated");
+          window.location.href = "/admin/access-logs";
+        }
+        return;
+      }
       if (!res.ok) {
         setGateMessage(data?.error ? `❌ ${data.error}` : "❌ Failed to update");
         return;

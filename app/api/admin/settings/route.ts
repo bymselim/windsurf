@@ -8,8 +8,16 @@ import {
   getUiSettings,
   updateUiSettings,
 } from "@/lib/access-gate-settings";
+import { getAdminPassword } from "@/lib/admin-password";
 
 const COOKIE_NAME = "admin_session";
+
+async function verifyAdminAuth(request: NextRequest): Promise<boolean> {
+  const cookieAuth = request.cookies.get(COOKIE_NAME)?.value === "1";
+  const headerPassword = request.headers.get("x-admin-password") ?? "";
+  const storedPassword = await getAdminPassword();
+  return cookieAuth || headerPassword === storedPassword;
+}
 
 function maskPassword(password: string): string {
   if (!password || password.length === 0) return "••••••••";
@@ -21,7 +29,7 @@ function maskPassword(password: string): string {
  * GET: Admin only. Returns access gate settings with passwords masked.
  */
 export async function GET(request: NextRequest) {
-  if (request.cookies.get(COOKIE_NAME)?.value !== "1") {
+  if (!(await verifyAdminAuth(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const settings = await getAccessGateSettings();
@@ -48,7 +56,7 @@ export async function GET(request: NextRequest) {
  * When updating password, send currentGatePassword to verify.
  */
 export async function PUT(request: NextRequest) {
-  if (request.cookies.get(COOKIE_NAME)?.value !== "1") {
+  if (!(await verifyAdminAuth(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
