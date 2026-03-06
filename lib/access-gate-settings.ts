@@ -14,6 +14,8 @@ export interface AccessGateSettings {
   passwordEN: string;
   requireFullName: boolean;
   requirePhoneNumber: boolean;
+  /** When true, password is computed from phone (m+month+sum) instead of static. */
+  usePhoneBasedPassword: boolean;
   showKVKK: boolean;
   kvkkText: string;
   updatedAt: string;
@@ -129,6 +131,7 @@ const DEFAULT_ACCESS_GATE: AccessGateSettings = {
   passwordEN: DEFAULT_PW,
   requireFullName: true,
   requirePhoneNumber: true,
+  usePhoneBasedPassword: false,
   showKVKK: true,
   kvkkText: "",
   updatedAt: new Date().toISOString(),
@@ -151,6 +154,7 @@ const DEFAULT_UI: UiSettings = {
 export interface AccessGateConfig {
   requireFullName: boolean;
   requirePhoneNumber: boolean;
+  usePhoneBasedPassword: boolean;
   showKVKK: boolean;
   kvkkText: string;
 }
@@ -254,6 +258,7 @@ export async function getAccessGateConfig(): Promise<AccessGateConfig> {
   return {
     requireFullName: s.requireFullName,
     requirePhoneNumber: s.requirePhoneNumber,
+    usePhoneBasedPassword: Boolean(s.usePhoneBasedPassword),
     showKVKK: s.showKVKK,
     kvkkText: s.kvkkText || "",
   };

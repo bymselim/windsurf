@@ -140,6 +140,12 @@ export default function AccessLogsPage() {
               Dashboard
             </Link>
             <Link
+              href="/admin/gate-logs"
+              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition"
+            >
+              Gate Logs
+            </Link>
+            <Link
               href="/admin/settings"
               className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg border border-zinc-700 transition"
             >

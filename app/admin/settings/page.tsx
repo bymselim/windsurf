@@ -11,6 +11,7 @@ type AccessGateSettings = {
   passwordEN: string;
   requireFullName: boolean;
   requirePhoneNumber: boolean;
+  usePhoneBasedPassword?: boolean;
   showKVKK: boolean;
   kvkkText: string;
   updatedAt: string;
@@ -41,6 +42,7 @@ export default function SettingsPage() {
   const [gateMessage, setGateMessage] = useState("");
   const [requireFullName, setRequireFullName] = useState(true);
   const [requirePhoneNumber, setRequirePhoneNumber] = useState(true);
+  const [usePhoneBasedPassword, setUsePhoneBasedPassword] = useState(false);
   const [showKVKK, setShowKVKK] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -72,6 +74,7 @@ export default function SettingsPage() {
           setAccessGate(ag);
           setRequireFullName(Boolean(ag.requireFullName));
           setRequirePhoneNumber(Boolean(ag.requirePhoneNumber));
+          setUsePhoneBasedPassword(Boolean(ag.usePhoneBasedPassword));
           setShowKVKK(Boolean(ag.showKVKK));
         }
         if (data?.ui && typeof data.ui === "object") {
@@ -201,6 +204,7 @@ export default function SettingsPage() {
           accessGate: {
             requireFullName,
             requirePhoneNumber,
+            usePhoneBasedPassword,
             showKVKK,
           },
         }),
@@ -297,7 +301,8 @@ export default function SettingsPage() {
             Control the login form visitors see at the gallery gate.
           </p>
 
-          {/* A. Gallery passwords (Turkish & International) */}
+          {/* A. Gallery passwords (Turkish & International) - hidden when phone-based */}
+          {!usePhoneBasedPassword && (
           <div className="space-y-6 mb-6">
             <div className="p-4 bg-zinc-900/50 rounded-lg border border-zinc-800">
               <h3 className="font-bold mb-2 text-zinc-100">
@@ -351,6 +356,7 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+          )}
 
           {/* B. Form field toggles */}
           <div className="space-y-3 mb-4">
@@ -371,6 +377,15 @@ export default function SettingsPage() {
                 className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-amber-500 focus:ring-amber-500/50"
               />
               <span className="text-zinc-300 text-sm">Require Phone Number</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={usePhoneBasedPassword}
+                onChange={(e) => setUsePhoneBasedPassword(e.target.checked)}
+                className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-amber-500 focus:ring-amber-500/50"
+              />
+              <span className="text-zinc-300 text-sm">Phone-based password (m+month+sum)</span>
             </label>
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -418,7 +433,7 @@ export default function SettingsPage() {
                   </span>
                 </div>
               )}
-              {requirePhoneNumber && (
+              {(requirePhoneNumber || usePhoneBasedPassword) && (
                 <div className="flex items-center gap-2 text-sm text-zinc-400">
                   <FiPhone className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
                   <span className="bg-zinc-700/50 rounded px-2 py-1.5 w-full text-zinc-500">

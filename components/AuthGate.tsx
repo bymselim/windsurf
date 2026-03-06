@@ -29,16 +29,18 @@ const ROTATE_MS = 3500;
 type AccessGateConfig = {
   requireFullName: boolean;
   requirePhoneNumber: boolean;
+  usePhoneBasedPassword: boolean;
   showKVKK: boolean;
   kvkkText: string;
 };
 
 function buildSchema(config: AccessGateConfig) {
+  const phoneRequired = config.requirePhoneNumber || config.usePhoneBasedPassword;
   return z.object({
     fullName: config.requireFullName
       ? z.string().min(2, "Name must be at least 2 characters").max(100)
       : z.string().max(100).optional().or(z.literal("")),
-    phoneNumber: config.requirePhoneNumber
+    phoneNumber: phoneRequired
       ? z
           .string()
           .min(10, "Enter a valid phone number")
@@ -86,6 +88,7 @@ export function AuthGate({ gallery }: AuthGateProps = {}) {
           setConfig({
             requireFullName: Boolean(data.requireFullName),
             requirePhoneNumber: Boolean(data.requirePhoneNumber),
+            usePhoneBasedPassword: Boolean(data.usePhoneBasedPassword),
             showKVKK: Boolean(data.showKVKK),
             kvkkText: typeof data.kvkkText === "string" ? data.kvkkText : "",
           });
@@ -93,6 +96,7 @@ export function AuthGate({ gallery }: AuthGateProps = {}) {
           setConfig({
             requireFullName: true,
             requirePhoneNumber: true,
+            usePhoneBasedPassword: false,
             showKVKK: true,
             kvkkText: "",
           });
@@ -103,6 +107,7 @@ export function AuthGate({ gallery }: AuthGateProps = {}) {
           setConfig({
             requireFullName: true,
             requirePhoneNumber: true,
+            usePhoneBasedPassword: false,
             showKVKK: true,
             kvkkText: "",
           });
@@ -228,7 +233,7 @@ export function AuthGate({ gallery }: AuthGateProps = {}) {
             </div>
           )}
 
-          {config.requirePhoneNumber && (
+          {(config.requirePhoneNumber || config.usePhoneBasedPassword) && (
             <div>
               <label htmlFor="phoneNumber" className="mb-1.5 block text-sm font-medium text-zinc-300">
                 Phone Number

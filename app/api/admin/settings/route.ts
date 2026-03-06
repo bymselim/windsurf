@@ -72,6 +72,9 @@ export async function PUT(request: NextRequest) {
     if (typeof accessGate.showKVKK === "boolean") {
       updates.showKVKK = accessGate.showKVKK;
     }
+    if (typeof accessGate.usePhoneBasedPassword === "boolean") {
+      updates.usePhoneBasedPassword = accessGate.usePhoneBasedPassword;
+    }
     if (typeof accessGate.kvkkText === "string") {
       updates.kvkkText = accessGate.kvkkText;
     }

@@ -54,6 +54,7 @@ coverage
 # Admin / sensitive data (runtime generated)
 lib/data/admin-password.txt
 lib/data/access-logs.json
+lib/data/gate-logs.json
 
 # Misc
 *.log

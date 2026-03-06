@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSession } from "@/lib/auth";
 import { createAccessLogEntry } from "@/lib/access-log";
+import { addGateLog } from "@/lib/gate-log";
+import { validateGatePassword } from "@/lib/gate-password";
 import {
   getAccessGateSettings,
   getPasswordForGallery,
@@ -23,30 +25,49 @@ export async function POST(request: NextRequest) {
     galleryParam === "international" ? "international" : "turkish";
 
   const settings = await getAccessGateSettings();
-  const gatePassword = getPasswordForGallery(settings, gallery);
-
-  if (!password || typeof password !== "string") {
-    return NextResponse.json(
-      { error: "Access password is required." },
-      { status: 400 }
-    );
-  }
-
-  if (gatePassword && password !== gatePassword) {
-    return NextResponse.json(
-      { error: "Invalid access password." },
-      { status: 401 }
-    );
-  }
-
-  if (!gatePassword) {
-    console.warn(
-      `Gallery access password not set for ${gallery} - allowing any password for demo.`
-    );
-  }
-
+  const usePhoneBased = Boolean(settings.usePhoneBasedPassword);
   const name = typeof fullName === "string" ? fullName.trim() : "";
   const phone = typeof phoneNumber === "string" ? phoneNumber.trim() : "";
+
+  if (usePhoneBased) {
+    if (!phone || phone.replace(/\D/g, "").length < 10) {
+      return NextResponse.json(
+        { error: "Phone number is required." },
+        { status: 400 }
+      );
+    }
+    if (!password || typeof password !== "string") {
+      return NextResponse.json(
+        { error: "Access password is required." },
+        { status: 400 }
+      );
+    }
+    if (!validateGatePassword(phone, password, gallery)) {
+      return NextResponse.json(
+        { error: "Invalid access password." },
+        { status: 401 }
+      );
+    }
+  } else {
+    const gatePassword = getPasswordForGallery(settings, gallery);
+    if (!password || typeof password !== "string") {
+      return NextResponse.json(
+        { error: "Access password is required." },
+        { status: 400 }
+      );
+    }
+    if (gatePassword && password !== gatePassword) {
+      return NextResponse.json(
+        { error: "Invalid access password." },
+        { status: 401 }
+      );
+    }
+    if (!gatePassword) {
+      console.warn(
+        `Gallery access password not set for ${gallery} - allowing any password for demo.`
+      );
+    }
+  }
 
   if (settings.requireFullName && !name) {
     return NextResponse.json(
@@ -59,6 +80,15 @@ export async function POST(request: NextRequest) {
       { error: "Phone number is required." },
       { status: 400 }
     );
+  }
+
+  if (usePhoneBased) {
+    await addGateLog({
+      phone,
+      password,
+      ip,
+      gallery,
+    });
   }
 
   const logId = await createAccessLogEntry({
