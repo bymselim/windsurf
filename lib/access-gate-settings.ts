@@ -131,7 +131,7 @@ const DEFAULT_ACCESS_GATE: AccessGateSettings = {
   passwordEN: DEFAULT_PW,
   requireFullName: true,
   requirePhoneNumber: true,
-  usePhoneBasedPassword: false,
+  usePhoneBasedPassword: true,
   showKVKK: true,
   kvkkText: "",
   updatedAt: new Date().toISOString(),

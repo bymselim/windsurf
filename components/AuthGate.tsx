@@ -233,11 +233,10 @@ export function AuthGate({ gallery }: AuthGateProps = {}) {
             </div>
           )}
 
-          {(config.requirePhoneNumber || config.usePhoneBasedPassword) && (
-            <div>
-              <label htmlFor="phoneNumber" className="mb-1.5 block text-sm font-medium text-zinc-300">
-                Phone Number
-              </label>
+          <div>
+            <label htmlFor="phoneNumber" className="mb-1.5 block text-sm font-medium text-zinc-300">
+              Phone Number
+            </label>
               <div className="relative">
                 <FiPhone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
                 <input
@@ -253,7 +252,6 @@ export function AuthGate({ gallery }: AuthGateProps = {}) {
                 <p className="mt-1 text-xs text-amber-400">{errors.phoneNumber.message}</p>
               )}
             </div>
-          )}
 
           <div>
             <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-zinc-300">
