@@ -11,15 +11,29 @@ type Props = {
 };
 
 export function FAQAnswerClient({ text, matrixEnding, slug }: Props) {
+  const [typingComplete, setTypingComplete] = useState(false);
   const [showMatrix, setShowMatrix] = useState(false);
 
   const handleTypingComplete = () => {
-    if (matrixEnding) setShowMatrix(true);
+    setTypingComplete(true);
   };
 
   return (
     <>
-      <FAQTypingText text={text} onComplete={handleTypingComplete} />
+      <div className="space-y-8">
+        <FAQTypingText text={text} onComplete={handleTypingComplete} />
+        {typingComplete && matrixEnding && !showMatrix && (
+          <div className="flex justify-center pt-4">
+            <button
+              type="button"
+              onClick={() => setShowMatrix(true)}
+              className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-medium rounded-lg transition"
+            >
+              Gerçek Cevap için Tıklayın
+            </button>
+          </div>
+        )}
+      </div>
       {showMatrix && matrixEnding && (
         <MatrixEffect text={matrixEnding} slug={slug} />
       )}
