@@ -11,6 +11,7 @@ interface Category {
   order?: number;
   artworkCount?: number;
   previewImageUrl?: string;
+  hidden?: boolean;
 }
 
 export default function AdminCategoriesPage() {
@@ -194,6 +195,7 @@ export default function AdminCategoriesPage() {
           icon: editIcon,
           order: Number(editOrder),
           previewImageUrl: editPreviewImageUrl,
+          hidden: categories.find((c) => c.name === editingName)?.hidden ?? false,
         }),
       });
       const data = await res.json();
@@ -346,6 +348,7 @@ export default function AdminCategoriesPage() {
                   <th className="p-4 text-left text-sm font-semibold text-zinc-300">Icon</th>
                   <th className="p-4 text-left text-sm font-semibold text-zinc-300">Preview</th>
                   <th className="p-4 text-left text-sm font-semibold text-zinc-300">Artworks</th>
+                  <th className="p-4 text-left text-sm font-semibold text-zinc-300">Gizle</th>
                   <th className="p-4 text-left text-sm font-semibold text-zinc-300">Actions</th>
                 </tr>
               </thead>
@@ -373,6 +376,38 @@ export default function AdminCategoriesPage() {
                       {cat.previewImageUrl ? "✓" : "—"}
                     </td>
                     <td className="p-4 text-zinc-400">{cat.artworkCount ?? 0}</td>
+                    <td className="p-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!cat.hidden}
+                          onChange={async (e) => {
+                            const hidden = e.target.checked;
+                            try {
+                              const res = await fetch("/api/admin/categories", {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                credentials: "include",
+                                body: JSON.stringify({ name: cat.name, hidden }),
+                              });
+                              if (res.ok) {
+                                setCategories((prev) =>
+                                  prev.map((c) =>
+                                    c.name === cat.name ? { ...c, hidden } : c
+                                  )
+                                );
+                              }
+                            } catch {
+                              // ignore
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-amber-500 focus:ring-amber-500/50"
+                        />
+                        <span className="text-sm text-zinc-400">
+                          {cat.hidden ? "Gizli" : "Görünür"}
+                        </span>
+                      </label>
+                    </td>
                     <td className="p-4">
                       {editingName === cat.name ? (
                         <div className="flex flex-wrap gap-2 items-center">

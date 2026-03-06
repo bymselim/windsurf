@@ -11,6 +11,7 @@ export interface CategoryJson {
   icon: string;
   previewImageUrl?: string;
   order?: number;
+  hidden?: boolean;
 }
 
 export async function readCategoriesFromFile(): Promise<CategoryJson[]> {

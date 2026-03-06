@@ -4,6 +4,7 @@ import path from "path";
 import {
   readCategoriesFromFile,
   writeCategoriesToFile,
+  type CategoryJson,
 } from "@/lib/categories-io";
 import { readArtworksFromFile, writeArtworksToFile } from "@/lib/artworks-io";
 
@@ -46,12 +47,17 @@ async function ensureCategoryFolder(categoryName: string): Promise<void> {
   }
 }
 
-function requireAdmin(request: NextRequest): boolean {
-  return request.cookies.get(COOKIE_NAME)?.value === "1";
+async function requireAdmin(request: NextRequest): Promise<boolean> {
+  const cookieAuth = request.cookies.get(COOKIE_NAME)?.value === "1";
+  if (cookieAuth) return true;
+  const { getAdminPassword } = await import("@/lib/admin-password");
+  const headerPw = request.headers.get("x-admin-password") ?? "";
+  const stored = await getAdminPassword();
+  return headerPw === stored;
 }
 
 export async function GET(request: NextRequest) {
-  if (!requireAdmin(request)) {
+  if (!(await requireAdmin(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const categories = await readCategoriesFromFile();
@@ -74,7 +80,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!requireAdmin(request)) {
+  if (!(await requireAdmin(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = await request.json();
@@ -111,7 +117,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  if (!requireAdmin(request)) {
+  if (!(await requireAdmin(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = await request.json();
@@ -135,12 +141,14 @@ export async function PUT(request: NextRequest) {
   if (nameChanged && categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
     return NextResponse.json({ error: "Target category name already exists" }, { status: 400 });
   }
+  const hidden = typeof body?.hidden === "boolean" ? body.hidden : (categories[index] as { hidden?: boolean }).hidden;
   categories[index] = {
     name,
     color,
     icon,
     previewImageUrl: previewImageUrl === "" ? undefined : previewImageUrl,
     order: Number.isFinite(order) ? Math.round(order) : (categories[index] as { order?: number }).order ?? 0,
+    hidden: hidden ?? false,
   };
   await writeCategoriesToFile(categories);
   if (nameChanged) {
@@ -157,8 +165,28 @@ export async function PUT(request: NextRequest) {
   return NextResponse.json(categories[index]);
 }
 
+export async function PATCH(request: NextRequest) {
+  if (!(await requireAdmin(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const body = await request.json();
+  const name = String(body?.name ?? "").trim();
+  const hidden = typeof body?.hidden === "boolean" ? body.hidden : undefined;
+  if (!name || hidden === undefined) {
+    return NextResponse.json({ error: "name and hidden (boolean) required" }, { status: 400 });
+  }
+  const categories = await readCategoriesFromFile();
+  const index = categories.findIndex((c) => c.name === name);
+  if (index === -1) {
+    return NextResponse.json({ error: "Category not found" }, { status: 404 });
+  }
+  (categories[index] as CategoryJson).hidden = hidden;
+  await writeCategoriesToFile(categories);
+  return NextResponse.json(categories[index]);
+}
+
 export async function DELETE(request: NextRequest) {
-  if (!requireAdmin(request)) {
+  if (!(await requireAdmin(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = await request.json();
