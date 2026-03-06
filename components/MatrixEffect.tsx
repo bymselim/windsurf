@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const FADE_DURATION_MS = 4000;
+const FADE_DURATION_MS = 15000;
 
 type Props = {
   text: string;
