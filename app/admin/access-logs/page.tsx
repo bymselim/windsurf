@@ -251,9 +251,6 @@ export default function AccessLogsPage() {
               Login to Admin
             </button>
           </form>
-          <p className="mt-4 text-sm text-zinc-500 text-center">
-            Default password: admin123
-          </p>
         </div>
       </div>
     );

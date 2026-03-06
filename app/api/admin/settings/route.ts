@@ -35,7 +35,9 @@ export async function GET(request: NextRequest) {
   const settings = await getAccessGateSettings();
   const passwords = await getPasswords();
   const ui = await getUiSettings();
+  const adminPassword = await getAdminPassword();
   return NextResponse.json({
+    adminPassword,
     accessGate: {
       ...settings,
       password: settings.password != null ? maskPassword(settings.password) : undefined,

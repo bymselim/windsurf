@@ -37,6 +37,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
+  const [adminPassword, setAdminPassword] = useState<string>("");
   const [accessGate, setAccessGate] = useState<AccessGateSettings | null>(null);
   const [newPasswordTR, setNewPasswordTR] = useState("");
   const [newPasswordEN, setNewPasswordEN] = useState("");
@@ -80,6 +81,7 @@ export default function SettingsPage() {
         return r.json();
       })
       .then((data) => {
+        if (typeof data?.adminPassword === "string") setAdminPassword(data.adminPassword);
         if (data?.accessGate) {
           const ag = data.accessGate;
           setAccessGate(ag);
@@ -208,6 +210,7 @@ export default function SettingsPage() {
     }
 
     setMessage("✅ Password changed successfully!");
+    setAdminPassword(newPassword);
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
@@ -630,7 +633,7 @@ export default function SettingsPage() {
 
           <div className="mb-4 p-3 bg-zinc-900/50 rounded-lg border border-zinc-800">
             <span className="text-zinc-500 text-sm">Current admin password: </span>
-            <span className="font-mono text-zinc-400">••••••••</span>
+            <span className="font-mono text-zinc-100">{adminPassword || "—"}</span>
           </div>
 
           {message && (
@@ -691,7 +694,7 @@ export default function SettingsPage() {
           <div className="mt-6 p-4 bg-zinc-900/50 rounded-lg border border-zinc-800">
             <h3 className="font-semibold mb-2 text-zinc-200">Password info</h3>
             <ul className="text-sm text-zinc-400 space-y-1">
-              <li>• Default admin password: admin123 (if never changed)</li>
+              <li>• Admin password is set via environment or changed here</li>
               <li>• Minimum 6 characters for admin password</li>
               <li>• Gallery access password is set above (min 4 characters)</li>
             </ul>
