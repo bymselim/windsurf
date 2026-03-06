@@ -35,8 +35,9 @@ type AccessGateConfig = {
   kvkkText: string;
 };
 
-function buildSchema(config: AccessGateConfig) {
+function buildSchema(config: AccessGateConfig, gallery?: AuthGateGallery) {
   const phoneRequired = config.requirePhoneNumber || config.usePhoneBasedPassword;
+  const kvkkError = gallery === "turkish" ? "KVKK sözleşmesini kabul etmelisiniz." : "You must agree to the KVKK terms.";
   return z.object({
     fullName: config.requireFullName
       ? z.string().min(2, "Name must be at least 2 characters").max(100)
@@ -49,9 +50,7 @@ function buildSchema(config: AccessGateConfig) {
       : z.string().optional().or(z.literal("")),
     password: z.string().min(1, "Password is required"),
     kvkkAccepted: config.showKVKK
-      ? z.literal(true, {
-          errorMap: () => ({ message: "You must agree to the KVKK terms." }),
-        })
+      ? z.literal(true, { errorMap: () => ({ message: kvkkError }) })
       : z.boolean().optional(),
   });
 }
@@ -123,8 +122,8 @@ export function AuthGate({ gallery }: AuthGateProps = {}) {
   }, []);
 
   const schema = useMemo(
-    () => (config ? buildSchema(config) : null),
-    [config]
+    () => (config ? buildSchema(config, gallery) : null),
+    [config, gallery]
   );
 
   const defaultValues: FormData = useMemo(
@@ -293,15 +292,30 @@ export function AuthGate({ gallery }: AuthGateProps = {}) {
                 {...register("kvkkAccepted")}
               />
               <label htmlFor="kvkkAccepted" className="text-sm text-zinc-400">
-                I agree to the{" "}
-                <button
-                  type="button"
-                  onClick={() => setKvkkOpen(true)}
-                  className="inline font-medium text-amber-500 underline underline-offset-2 hover:text-amber-400"
-                >
-                  KVKK terms
-                </button>
-                .
+                {gallery === "turkish" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setKvkkOpen(true)}
+                      className="inline font-medium text-amber-500 underline underline-offset-2 hover:text-amber-400"
+                    >
+                      KVKK sözleşmesini
+                    </button>
+                    {" "}kabul ediyorum.
+                  </>
+                ) : (
+                  <>
+                    I agree to the{" "}
+                    <button
+                      type="button"
+                      onClick={() => setKvkkOpen(true)}
+                      className="inline font-medium text-amber-500 underline underline-offset-2 hover:text-amber-400"
+                    >
+                      KVKK terms
+                    </button>
+                    .
+                  </>
+                )}
               </label>
             </div>
           )}
