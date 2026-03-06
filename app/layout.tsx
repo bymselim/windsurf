@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Luxury Art Gallery",
+  title: "Melike Sevinc Art Catalog",
   description: "Exclusive art collection",
 };
 

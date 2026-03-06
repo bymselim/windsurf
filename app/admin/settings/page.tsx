@@ -46,6 +46,7 @@ export default function SettingsPage() {
   const [requirePhoneNumber, setRequirePhoneNumber] = useState(true);
   const [usePhoneBasedPassword, setUsePhoneBasedPassword] = useState(false);
   const [showKVKK, setShowKVKK] = useState(true);
+  const [kvkkText, setKvkkText] = useState("");
   const [saving, setSaving] = useState(false);
 
   const [ui, setUi] = useState<UiSettings | null>(null);
@@ -89,6 +90,7 @@ export default function SettingsPage() {
           setRequirePhoneNumber(Boolean(ag.requirePhoneNumber));
           setUsePhoneBasedPassword(Boolean(ag.usePhoneBasedPassword));
           setShowKVKK(Boolean(ag.showKVKK));
+          setKvkkText(typeof ag.kvkkText === "string" ? ag.kvkkText : "");
         }
         if (data?.ui && typeof data.ui === "object") {
           const uiObj = data.ui as Record<string, unknown>;
@@ -233,6 +235,7 @@ export default function SettingsPage() {
             requirePhoneNumber,
             usePhoneBasedPassword,
             showKVKK,
+            kvkkText,
           },
         }),
       });
@@ -248,7 +251,10 @@ export default function SettingsPage() {
         setGateMessage(data?.error ? `❌ ${data.error}` : "❌ Failed to save");
         return;
       }
-      if (data?.accessGate) setAccessGate(data.accessGate);
+      if (data?.accessGate) {
+        setAccessGate(data.accessGate);
+        if (typeof data.accessGate.kvkkText === "string") setKvkkText(data.accessGate.kvkkText);
+      }
       setGateMessage("✅ Form settings saved.");
     } catch {
       setGateMessage("❌ Failed to save");
@@ -440,6 +446,21 @@ export default function SettingsPage() {
               />
               <span className="text-zinc-300 text-sm">Show KVKK Checkbox</span>
             </label>
+            {showKVKK && (
+              <div className="mt-3">
+                <label className="block text-zinc-300 text-sm mb-2">KVKK Aydınlatma Metni</label>
+                <textarea
+                  value={kvkkText}
+                  onChange={(e) => setKvkkText(e.target.value)}
+                  placeholder="KVKK metnini buraya yazın. Boş bırakırsanız varsayılan metin kullanılır."
+                  rows={10}
+                  className="w-full p-3 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/50 text-sm resize-y min-h-[120px]"
+                />
+                <p className="mt-1 text-xs text-zinc-500">
+                  Bu metin giriş formundaki KVKK linkine tıklandığında modalda gösterilir.
+                </p>
+              </div>
+            )}
             <p className="text-xs text-zinc-500 mt-2">
               These settings are saved on the server and apply to the next visitor login.
             </p>
