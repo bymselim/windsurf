@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getFAQBySlug } from "@/lib/faq-data";
-import { FAQAnswerClient } from "./FAQAnswerClient";
+import { FAQGate } from "./FAQGate";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -27,13 +26,7 @@ export default async function FAQAnswerPage({ params }: Props) {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="border-b border-zinc-800 bg-zinc-900/50">
         <div className="mx-auto max-w-3xl px-4 py-6">
-          <Link
-            href="/faq"
-            className="text-sm text-zinc-400 hover:text-amber-500 transition"
-          >
-            ← SSS listesine dön
-          </Link>
-          <h1 className="mt-4 text-xl font-semibold text-zinc-100">
+          <h1 className="text-xl font-semibold text-zinc-100">
             {item.question}
           </h1>
         </div>
@@ -41,7 +34,7 @@ export default async function FAQAnswerPage({ params }: Props) {
 
       <main className="mx-auto max-w-3xl px-4 py-10">
         <article className="text-zinc-300 leading-relaxed text-base">
-          <FAQAnswerClient text={item.answer} />
+          <FAQGate slug={slug} item={item} />
         </article>
       </main>
     </div>

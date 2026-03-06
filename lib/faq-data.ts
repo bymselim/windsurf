@@ -2,6 +2,8 @@ export interface FAQItem {
   slug: string;
   question: string;
   answer: string;
+  /** When set, after typing the answer, shows Matrix-style effect with this text, then fades to black. */
+  matrixEnding?: string;
 }
 
 export const FAQ_ITEMS: FAQItem[] = [
@@ -256,6 +258,89 @@ Ucuz değildir.
 Ve hafif değildir.
 Bu alan, hızlı sonuç isteyenler için değil;
 süreçle yaşamayı kabul edenler içindir.`,
+  },
+  {
+    slug: "6",
+    question: "Bu eserler Nasıl ve neden bu kadar pahalı?",
+    answer: `Sık Sorulan Sorular Hakkında Küçük Bir Açıklama
+Eserlerim hakkında en sık gelen sorular genellikle aynı başlıklarda toplanıyor:
+"Bu eser neden bu fiyat?",
+"Neyden yapıldı?",
+"Bu kadar pahalı olmasının sebebi nedir?"
+"Nasıl bu kadar pahalı olabilir?"
+"Bu paraya satamazsınız!!!"
+"Bu kadar etmez!!!"
+
+Bu ve benzeri soruların, bu soruların üzerinden sonrasında edilene tüm hakaretlerin cevapları bu cevap sayfasında...
+
+Eğer bu metni sonuna kadar sabırla okursanız, bugün sizde bir farkındalığın uyanmasını sağlayabilecek bir soru ile tüm cevaplarınızı bulabilirsiniz. Belki de bugün sizin aydınlanma gününüz bile olabilir.
+
+Bu soruların çoğu iyi niyetli meraktan geliyor olabilir. Ya da belki düşün dünyanızın kabul edemediği bir alandasınız. Ancak bazen bu soruların arkasında sanat eserlerini endüstriyel bir ürün gibi değerlendirme alışkanlığı da bulunabiliyor. Bu nedenle burada kısa ama önemli bir açıklama yapmak istiyorum. Aslında kısa demek doğru olmayabilir… çünkü konu biraz daha derin… ve devamı da var.
+Sanat eserlerinin fiyatı, market rafındaki bir ürün gibi yalnızca malzeme maliyetiyle belirlenmez. Sanat eserlerinin değeri; sanatçının vizyonu, üretim süreci, kullanılan teknikler, üretim adedi, sanatçının kariyeri, eserlerin bulunduğu koleksiyonlar ve en önemlisi arz ve talep dengesi ile belirlenir.
+Ekonomi biliminin en temel kurallarından biri şudur:
+Bir şey sınırlıysa ve ona talep varsa, değeri artar.
+Limitli üretim sanat eserleri tam olarak bu prensiple çalışır. Üretilen eser sayısı sınırlıdır ve bu eserleri koleksiyonlarına dahil etmek isteyen insanlar vardır. Dolayısıyla fiyatı belirleyen temel unsur, yalnızca üretim süreci değil, aynı zamanda bu talebin kendisidir.
+Ama burada bitmiyor… çünkü konunun psikolojik ve sosyolojik bir tarafı da var.
+İnsan davranışlarını açıklayan en temel modellerden biri Maslow'un İhtiyaçlar Hiyerarşisi olarak bilinen piramittir. Bu modele göre insanlar önce temel ihtiyaçlarını karşılar: barınma, güvenlik, geçim, stabil bir yaşam. Bu ihtiyaçlar karşılandıktan sonra insanlar hayatlarında farklı alanlara yönelmeye başlarlar: estetik, sanat, koleksiyon, kültür ve kendini ifade etme gibi.
+Sanat koleksiyonerliği de tam olarak bu seviyede ortaya çıkar. İnsanlar yalnızca bir nesne satın almak için değil, beğendikleri bir sanat eserini hayatlarına dahil etmek için sanat eseri satın alırlar.
+Bu yüzden eserlerimi satın alan kişiler çoğu zaman fiyat üzerinden değil, eserle kurdukları bağ üzerinden karar verirler. Hatta birçok koleksiyoner için eseri satın almak, yalnızca bir alışveriş değil; sanatçının üretim dünyasının bir parçası olma hissidir.
+Bu noktada ilginç bir detay daha var… ve evet, burada da bitmiyor.
+Çünkü eserlerimin çoğu limitli üretim olduğu için üretim süreci belirli bir sıraya göre ilerler. Bu nedenle birçok koleksiyoner, eseri satın almak için belirli bir süre beklemeyi doğal ve hatta keyifli bir süreç olarak görür. Bazı eserler için yaklaşık bir ay üretim sırası oluşması bu yüzden şaşırtıcı değildir.
+Sanat eserleri bazen hızlı tüketilen objeler değildir. Tam tersine, çoğu zaman beklenen, arzulanan ve koleksiyonlara dahil edilen eserlerdir.
+Ama burada bir başka önemli konu daha var.
+Sanat eserleri yalnızca satın alınan nesneler değildir. Aynı zamanda fikrî ve sanatsal değere sahip kültürel üretimlerdir. Bu nedenle sanat eserlerinin kullanımı, sergilenmesi ve çoğaltılması gibi konular da belirli hukuki ve etik çerçevelere sahiptir.
+Bir sanat eserinin amacı dışında kullanılması, izinsiz çoğaltılması veya yanlış şekilde temsil edilmesi durumlarında sanat eserleri ile ilgili yasalar kapsamında çeşitli haklar devreye girebilir. Bu haklar; eserin kullanımının durdurulması, sergilenmesinin engellenmesi veya toplatılması gibi uygulamaları içerebilir.
+Bu noktaya kadar okuyanlar muhtemelen şunu fark etmiş olabilir… ama yine de söylemekte fayda var.
+Sanat eserleri herkes için üretilmez.
+Sanat eserleri, onları gerçekten isteyen, anlayan ve hayatına dahil etmek isteyen kişiler için üretilir.
+Bu nedenle bir sanat eserinin fiyatını tartışmaktan önce belki de sorulması gereken daha ilginç bir soru vardır:
+"Bu eseri gerçekten istiyor muyum?"
+Ve eğer cevap evetse, ikinci soru genellikle şöyle olur:
+"Bu eseri hayatıma dahil etmek için ne yapabilirim?"
+Ama eğer cevap hayırsa… veya bu soru hiç sorulmuyorsa… o zaman sanat eseri zaten olması gereken yerde kalır:
+İzlenen, beğenilen ve saygı duyulan bir yerde.
+Ve aslında mesele tam olarak budur.
+Sanat eserleri herkes tarafından satın alınmak zorunda değildir.
+Ama herkes tarafından görülebilir.
+Ve bazen bu bile başlı başına yeterlidir.
+
+Bu noktada küçük ama net bir hatırlatma yapmak gerekir. Profilimde gördüğünüz eserlerin büyük çoğunluğu, burada gördüğünüz bedellerle yeni koleksiyonerlerine satılmış eserlerdir. Yani tartışılan fiyatlar teorik ya da varsayımsal rakamlar değil, koleksiyonerlerin eserleri koleksiyonlarına dahil ederken ödedikleri gerçek bedellerdir.
+Bu nedenle sorgulanması gereken şey; bir sanat eserinin değerinin neden bu şekilde belirlendiği değil, bu değeri gören ve severek satın alan koleksiyonerlerin varlığıdır. Sanat eserlerinin değeri çoğu zaman malzeme üzerinden değil, beğeni, vizyon ve koleksiyon kültürü üzerinden oluşur.
+Eserlerimi satın alan kişiler çoğu zaman yalnızca bir obje satın aldıklarını düşünmezler. Onlar için bu eserler; estetik bir tercih, bir koleksiyon parçası ve bir sanatçı ile kurulan entelektüel bağın sonucudur. Bu nedenle birçok koleksiyoner bir eseri satın almak için üretim sırasını beklemeyi doğal ve hatta keyifli bir süreç olarak görür.
+Dolayısıyla bir eserin fiyatını eleştirmek yerine belki de daha doğru soru şudur:
+Bu eseri satın alanlarla benim aramda nasıl bir fark var?
+Çünkü sanat eserleri herkes tarafından satın alınmak zorunda değildir.
+Ancak eğer bir eser size yüksek geliyorsa ve sizin için ulaşılabilir görünmüyorsa, bu durum çoğu zaman sanatçı ile koleksiyonerler arasında oluşan değer algısı ile bulunduğunuz yaşam standardı, gelir seviyesi ve estetik yaklaşım arasındaki farktan kaynaklanır.
+
+Özetle, bu fiyatlar size yüksek, aşırı, pahalı geliyorsa, bu sizin yaşadığınız hayat ve standartlarınızla ilgilidir. Ürettiğim her eser, benim elimden çıktığı için, sınırlı üretim olduğu için, eserdeki ruhu hisseden ve yüksek gelir grubundan koleksiyonerlere hitap ettiği için satılıyor.
+
+Bu kriterleri karşılamadığınız ve sahip olmadığınız için, size uçuk, yüksek, farklı hissettiriyor olabilir. 
+
+Son olarak, beğenerek fiyat talebinde bulunduğunuz bu eser, bu açıklamadan sonra size değersiz geliyorsa, eserin hedef kitlesi olmadığınızı da teyit etmiş oluyorsunuz. 
+
+Ürettiğim eserler Türkiye'nin ve dünyanın %1 'lik kesimine hitap ediyor, %1'lik kesim satın alıyor, hissediyor, sıra bekliyor, paylaşıyor, sanatın ruhunu mekanlarında görmek istiyor. 
+
+%99 'luk kalan kesim izliyor, eleştiriyor, önce beğenip, sonra hakaretler ediyor. Sizce siz hangi taraftasınız? 
+
+Sorgulamanız gereken eserlerimin fiyatları değil, sizin hayatta hangi tarafta kaldığınızdır. 
+
+Hayat kısa kuşlar uçuyor...`,
+  },
+  {
+    slug: "7",
+    question: "Nasıl bu kadar pahalı? (Kısa)",
+    answer: `Sanat herkese gösterilir. Ama herkes için üretilmez. Eserlerim dünyanın %1 'lik kesimine hitap ediyor, profilimde gördüğünüz postlar ve videolardaki tüm eserler bu %1'lik kesimin, benim sanatıma saygı duyan ve sanatımı hisseden insanları tarafından satın alındı. Ben sanatımı istediğim kitleye duyurabildiğim için mutluyum, sanatseverlerim eserlerime sahip oldukları için mutlular. Onlar mekanlarını eserlerimle güzelleştirirken, sanatımın ruhunu hissederken, bana ürettiğim bu sanatın ve eseri üretirken harcadığım zamanın bedelini ödedikleri için onlara müteşekkirim. 
+
+%99 'lük kısmı ise izliyor, fiyatı uçuk buluyor, neyden yapıldı diye sorular soruyor, hakaretler ediyor, kendince yaptığım eserlere değer biçiyor, biçtiği değerin ne beni ne de sanatseverlerimi ilgilendirmediğinin farkında olmuyor. 
+
+Ve eğer şuanda bu mesajı okuyorsanız, hangi tarafta olduğunuzun ve hedef kitlem olmadığınızın farkındasınız değil mi? 
+
+O yüzden Sanat herkese gösterilir. Ama herkes için üretilmez. Sadece görüyorsanız, sahip olamıyor ve erişemiyorsanız %99'da, hem görüyor ve hem sizin için üretiliyorsa %1'desiniz... 
+
+Özetle; Profilimde gördüğünüz tüm eserler, bu fiyatlardan satıldı,  satılıyor...
+
+Tavsiyem; aynaya bakıp, ben neden %1'lik kesimde değilim sorusunu cevabını aramanızdır. Benim eserime sahip olmak ya da olmamak mesele değil. Mesele o %1'lik kesim ne yaşıyor ve ne hissediyor ve siz neden bu imkanlara sahip değilsiniz ve böyle hissedemiyorsunuz sorusunun cevabıdır, mesele...`,
+    matrixEnding: "Ne diyordu Matrix filminde, Wake Up Neo!",
   },
 ];
 
