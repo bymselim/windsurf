@@ -292,6 +292,32 @@ export default function ArtworksAdminPage() {
     );
   };
 
+  const copyArtworkToBulk = (artwork: ArtworkRow) => {
+    setBulkTitleTR(artwork.titleTR);
+    setBulkTitleEN(artwork.titleEN);
+    setBulkCategory(artwork.category);
+    setBulkEditPriceTRY(String(artwork.priceTRY || ""));
+    setBulkEditPriceUSD(String(artwork.priceUSD || ""));
+    setBulkDescTR(artwork.descriptionTR ?? "");
+    setBulkDescEN(artwork.descriptionEN ?? "");
+    setBulkPriceVariants(
+      (artwork.priceVariants ?? []).map((v) => ({
+        size: v.size,
+        priceTRY: v.priceTRY,
+        priceUSD: v.priceUSD,
+      }))
+    );
+    setApplyTitleTR(true);
+    setApplyTitleEN(true);
+    setApplyCategory(true);
+    setApplyPriceTRY(true);
+    setApplyPriceUSD(true);
+    setApplyDescTR(true);
+    setApplyDescEN(true);
+    setApplyPriceVariants((artwork.priceVariants ?? []).length > 0);
+    setBulkEditOpen(true);
+  };
+
   const dirtyIds = artworks.filter(isDirty).map((a) => a.id);
 
   const selectedIdList = Object.keys(selectedIds).filter((id) => selectedIds[id]);
@@ -1387,6 +1413,13 @@ export default function ArtworksAdminPage() {
                               className="w-full mt-1 px-2 py-1.5 text-xs bg-zinc-700 hover:bg-zinc-600 rounded text-zinc-200 transition"
                             >
                               + Yeni Varyant Ekle
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => copyArtworkToBulk(artwork)}
+                              className="w-full mt-2 px-2 py-1.5 text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded border border-amber-500/40 transition"
+                            >
+                              📋 Toplu işleme kopyala
                             </button>
                           </div>
                         )}
