@@ -180,6 +180,10 @@ export function FAQGate({ slug, item }: Props) {
   }
 
   return (
-    <FAQAnswerClient text={item.answer} matrixEnding={item.matrixEnding} />
+    <FAQAnswerClient
+      text={item.answer}
+      matrixEnding={item.matrixEnding}
+      slug={slug}
+    />
   );
 }

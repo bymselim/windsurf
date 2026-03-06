@@ -340,7 +340,7 @@ O yüzden Sanat herkese gösterilir. Ama herkes için üretilmez. Sadece görüy
 Özetle; Profilimde gördüğünüz tüm eserler, bu fiyatlardan satıldı,  satılıyor...
 
 Tavsiyem; aynaya bakıp, ben neden %1'lik kesimde değilim sorusunu cevabını aramanızdır. Benim eserime sahip olmak ya da olmamak mesele değil. Mesele o %1'lik kesim ne yaşıyor ve ne hissediyor ve siz neden bu imkanlara sahip değilsiniz ve böyle hissedemiyorsunuz sorusunun cevabıdır, mesele...`,
-    matrixEnding: "Ne diyordu Matrix filminde, Wake Up Neo!",
+    matrixEnding: "Mesele, %1 misiniz, %99 mu?",
   },
 ];
 

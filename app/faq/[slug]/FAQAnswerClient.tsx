@@ -7,9 +7,10 @@ import { MatrixEffect } from "@/components/MatrixEffect";
 type Props = {
   text: string;
   matrixEnding?: string;
+  slug?: string;
 };
 
-export function FAQAnswerClient({ text, matrixEnding }: Props) {
+export function FAQAnswerClient({ text, matrixEnding, slug }: Props) {
   const [showMatrix, setShowMatrix] = useState(false);
 
   const handleTypingComplete = () => {
@@ -20,10 +21,7 @@ export function FAQAnswerClient({ text, matrixEnding }: Props) {
     <>
       <FAQTypingText text={text} onComplete={handleTypingComplete} />
       {showMatrix && matrixEnding && (
-        <MatrixEffect
-          text={matrixEnding}
-          onComplete={() => setShowMatrix(false)}
-        />
+        <MatrixEffect text={matrixEnding} slug={slug} />
       )}
     </>
   );
