@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { getAdminAuthHeaders } from "@/lib/admin-auth-client";
 
 const PAGE_SIZE = 50;
 
@@ -90,7 +91,10 @@ export default function ArtworksAdminPage() {
   const router = useRouter();
 
   useEffect(() => {
-    fetch("/api/categories")
+    fetch("/api/admin/categories", {
+      credentials: "include",
+      headers: getAdminAuthHeaders(),
+    })
       .then((res) => res.json())
       .then((data) => {
         setCategoryOptions(
