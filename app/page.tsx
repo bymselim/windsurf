@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getUiSettings } from "@/lib/access-gate-settings";
+import { YetkilendirmeButton } from "@/components/YetkilendirmeButton";
 
 export default async function HomePage() {
   const ui = await getUiSettings();
@@ -33,6 +34,9 @@ export default async function HomePage() {
             <span aria-hidden>🌍</span>
             International Gallery
           </Link>
+        </div>
+        <div className="mt-6 pt-6 border-t border-zinc-700/50">
+          <YetkilendirmeButton />
         </div>
       </div>
     </div>

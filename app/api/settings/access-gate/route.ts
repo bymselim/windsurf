@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { getAccessGateConfig } from "@/lib/access-gate-settings";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Public endpoint: returns access gate form config (no password).
  * Used by the gate form to show/hide fields and KVKK text.
  */
 export async function GET() {
   const config = await getAccessGateConfig();
-  return NextResponse.json(config);
+  return NextResponse.json(config, {
+    headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+  });
 }

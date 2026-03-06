@@ -7,6 +7,7 @@ import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiLock, FiPhone, FiUser, FiCheck } from "react-icons/fi";
 import { KVKKModal } from "./KVKKModal";
+import { YetkilendirmeButton } from "./YetkilendirmeButton";
 
 const WELCOME_MESSAGES: { lang: string; text: string }[] = [
   { lang: "TR", text: "Melike Sevinç Artworks VIP Girişine Hoş Geldiniz." },
@@ -84,7 +85,7 @@ export function AuthGate({ gallery }: AuthGateProps = {}) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/settings/access-gate")
+    fetch("/api/settings/access-gate", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (!cancelled && data && typeof data === "object") {
@@ -138,6 +139,7 @@ export function AuthGate({ gallery }: AuthGateProps = {}) {
 
   const {
     register,
+    watch,
     handleSubmit,
     formState: { errors, isValid },
   } = useForm<FormData>({
@@ -355,6 +357,9 @@ export function AuthGate({ gallery }: AuthGateProps = {}) {
       </div>
 
       <footer className="mt-auto w-full max-w-md px-2 py-6 text-center">
+        <div className="mb-4 flex justify-center">
+          <YetkilendirmeButton phoneNumber={watch("phoneNumber")} compact />
+        </div>
         <p className="text-[11px] sm:text-xs text-zinc-500 leading-relaxed">
           Bu sayfa melikesevinc.com&apos;un VIP misafirlerine özeldir.
           <span className="block mt-0.5 text-zinc-600">This page is exclusive to VIP guests of melikesevinc.com.</span>
