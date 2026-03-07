@@ -34,6 +34,8 @@ export interface Artwork {
   title: string;
   category: ArtworkCategory;
   imageUrl: string;
+  /** Thumbnail for grid; use this instead of imageUrl in masonry for faster load. */
+  thumbnailUrl?: string;
   filename: string;
   mediaType?: MediaType;
   description: string | null;

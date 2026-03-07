@@ -185,7 +185,7 @@ export function ArtworkModal({
                   height={1000}
                   className="max-h-[70vh] w-auto object-contain"
                   style={{ maxHeight: "70vh" }}
-                  unoptimized={artwork.imageUrl.startsWith("http")}
+                  priority
                   onError={() => setImageError(true)}
                 />
               )}

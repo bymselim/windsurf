@@ -4,19 +4,10 @@ import {
   hasAccessedByIp,
 } from "@/lib/faq-access-log";
 import { getFAQBySlug } from "@/lib/faq-data";
+import { getClientIp } from "@/lib/get-client-ip";
 
 const COOKIE_NAME_PREFIX = "faq_";
 const COOKIE_MAX_AGE = 60 * 60 * 24; // 24 hours
-
-function getClientIp(request: NextRequest): string {
-  const forwardedFor = request.headers.get("x-forwarded-for") ?? "";
-  return (
-    forwardedFor.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    request.headers.get("x-vercel-forwarded-for") ||
-    ""
-  );
-}
 
 export async function GET(request: NextRequest) {
   const slug = request.nextUrl.searchParams.get("slug");

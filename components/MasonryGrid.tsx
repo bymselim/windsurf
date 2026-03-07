@@ -44,6 +44,8 @@ export function MasonryGrid({ artworks, category, onSelect }: MasonryGridProps) 
       >
         {filtered.map((artwork, index) => {
           const isBroken = brokenIds.has(artwork.id);
+          const gridImageUrl = artwork.thumbnailUrl || artwork.imageUrl;
+          const isPriority = index < 8;
           return (
           <motion.div
             key={artwork.id}
@@ -75,12 +77,13 @@ export function MasonryGrid({ artworks, category, onSelect }: MasonryGridProps) 
                   />
                 ) : (
                   <Image
-                    src={artwork.imageUrl}
+                    src={gridImageUrl}
                     alt={artwork.title}
                     fill
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                     className="object-cover transition duration-300 group-hover:scale-105"
-                    unoptimized={artwork.imageUrl.startsWith("http")}
+                    priority={isPriority}
+                    loading={isPriority ? "eager" : "lazy"}
                     onError={() => markBroken(artwork.id)}
                   />
                 )}

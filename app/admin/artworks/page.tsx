@@ -92,6 +92,9 @@ export default function ArtworksAdminPage() {
   const [imageModal, setImageModal] = useState<string | null>(null);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
   const [validateLoading, setValidateLoading] = useState(false);
+  const [backfillLoading, setBackfillLoading] = useState(false);
+  const [backfillStatus, setBackfillStatus] = useState<string | null>(null);
+  const [backfillNeeds, setBackfillNeeds] = useState<number | null>(null);
   const [validateResult, setValidateResult] = useState<{
     total: number;
     ok: number;
@@ -159,6 +162,47 @@ export default function ArtworksAdminPage() {
       setLoading(false);
     }
   }, []);
+
+  const fetchBackfillNeeds = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/artworks/backfill-thumbnails", { credentials: "include" });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data) setBackfillNeeds(data.needsThumbnail ?? 0);
+    } catch {
+      setBackfillNeeds(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!loading && artworks.length > 0) fetchBackfillNeeds();
+  }, [loading, artworks.length, fetchBackfillNeeds]);
+
+  const runBackfillThumbnails = useCallback(async () => {
+    setBackfillLoading(true);
+    setBackfillStatus(null);
+    try {
+      const res = await fetch("/api/admin/artworks/backfill-thumbnails", {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data) {
+        setBackfillStatus(
+          `${data.created} thumbnail oluşturuldu. ${data.failed > 0 ? `${data.failed} hata.` : ""}`
+        );
+        loadArtworks();
+        fetchBackfillNeeds();
+      } else {
+        setBackfillStatus(
+          (data?.error as string) || "İşlem başarısız."
+        );
+      }
+    } catch {
+      setBackfillStatus("İstek hatası.");
+    } finally {
+      setBackfillLoading(false);
+    }
+  }, [loadArtworks, fetchBackfillNeeds]);
 
   const clearAllArtworks = useCallback(async () => {
     if (clearAllConfirm !== "DELETE_ALL_ARTWORKS") {
@@ -802,7 +846,25 @@ export default function ArtworksAdminPage() {
             >
               {validateLoading ? "Kontrol ediliyor..." : "Resimleri kontrol et (ölü linkler)"}
             </button>
+
+            <button
+              type="button"
+              onClick={runBackfillThumbnails}
+              disabled={backfillLoading || (backfillNeeds !== null && backfillNeeds === 0)}
+              className="rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-zinc-950 px-4 py-3 text-sm font-semibold transition"
+              title="Thumbnail'ı olmayan eserler için 512px küçük resim oluşturur. Galeri hızı artar."
+            >
+              {backfillLoading
+                ? "Thumbnail oluşturuluyor..."
+                : backfillNeeds !== null && backfillNeeds > 0
+                  ? `Eski eserlere thumbnail oluştur (${backfillNeeds})`
+                  : "Thumbnail oluştur"}
+            </button>
           </div>
+
+          {backfillStatus ? (
+            <p className="mt-2 text-sm text-zinc-300">{backfillStatus}</p>
+          ) : null}
 
           {validateResult && (
             <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
