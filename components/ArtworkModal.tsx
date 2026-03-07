@@ -10,6 +10,18 @@ import { isVideoArtwork } from "@/lib/artwork-utils";
 import { OrderModal } from "./OrderModal";
 import { getGalleryUI, type GalleryLocale } from "@/lib/gallery-locale";
 
+/** Preload image into browser cache for instant display on navigation. */
+function PreloadImage({ src }: { src: string }) {
+  return (
+    <div
+      className="absolute -left-[9999px] w-px h-px overflow-hidden"
+      aria-hidden
+    >
+      <Image src={src} alt="" width={800} height={1000} loading="eager" />
+    </div>
+  );
+}
+
 type ArtworkModalProps = {
   artwork: Artwork;
   allInCategory: Artwork[];
@@ -41,11 +53,17 @@ export function ArtworkModal({
   const ui = getGalleryUI(locale);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
 
+  const prevArtwork = allInCategory[currentIndex - 1];
+  const nextArtwork = allInCategory[currentIndex + 1];
+  const hasThumbnail = Boolean(artwork.thumbnailUrl);
+
   useEffect(() => {
     setImageError(false);
+    setImageLoaded(false);
   }, [artwork.id]);
 
   const canGoPrev = currentIndex > 0;
@@ -163,6 +181,14 @@ export function ArtworkModal({
               transition={{ duration: 0.25 }}
               className="relative flex max-h-[70vh] w-full max-w-4xl items-center justify-center"
             >
+              {/* Preload adjacent images for instant navigation */}
+              {prevArtwork && !isVideoArtwork(prevArtwork) && (
+                <PreloadImage src={prevArtwork.imageUrl} />
+              )}
+              {nextArtwork && !isVideoArtwork(nextArtwork) && (
+                <PreloadImage src={nextArtwork.imageUrl} />
+              )}
+
               {imageError ? (
                 <div className="flex max-h-[70vh] w-full items-center justify-center rounded-lg bg-zinc-800 px-8 py-16 text-zinc-500">
                   {locale === "tr" ? "Görsel yüklenemedi" : "Image unavailable"}
@@ -178,16 +204,34 @@ export function ArtworkModal({
                   onError={() => setImageError(true)}
                 />
               ) : (
-                <Image
-                  src={artwork.imageUrl}
-                  alt={artwork.title}
-                  width={800}
-                  height={1000}
-                  className="max-h-[70vh] w-auto object-contain"
-                  style={{ maxHeight: "70vh" }}
-                  priority
-                  onError={() => setImageError(true)}
-                />
+                <div className="relative w-full flex items-center justify-center min-h-[200px]">
+                  {/* Placeholder: thumbnail (cached from grid) - shows instantly while full loads */}
+                  {hasThumbnail && (
+                    <Image
+                      src={artwork.thumbnailUrl!}
+                      alt=""
+                      width={512}
+                      height={640}
+                      className="absolute max-h-[70vh] w-auto object-contain blur-[3px] scale-105"
+                      aria-hidden
+                    />
+                  )}
+                  {/* Full image - fades in when loaded */}
+                  <Image
+                    src={artwork.imageUrl}
+                    alt={artwork.title}
+                    width={800}
+                    height={1000}
+                    className="relative max-h-[70vh] w-auto object-contain transition-opacity duration-150"
+                    style={{
+                      maxHeight: "70vh",
+                      opacity: imageLoaded ? 1 : hasThumbnail ? 0 : 1,
+                    }}
+                    priority
+                    onLoad={() => setImageLoaded(true)}
+                    onError={() => setImageError(true)}
+                  />
+                </div>
               )}
             </motion.div>
           </div>

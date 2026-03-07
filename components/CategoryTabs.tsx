@@ -104,7 +104,6 @@ function RotatingImage({
           src={prevSrc}
           alt=""
           fill
-          unoptimized
           className={`${className} transition-opacity`}
           style={{ opacity: phase === 0 ? 1 : 0, transitionDuration: `${fadeMs}ms` }}
           sizes={sizes}
@@ -117,7 +116,6 @@ function RotatingImage({
         src={currentSrc}
         alt=""
         fill
-        unoptimized
         className={`${className} transition-opacity`}
         style={{
           opacity: prevSrc ? (phase === 0 ? 0 : 1) : 1,
