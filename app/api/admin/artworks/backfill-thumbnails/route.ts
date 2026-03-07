@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import sharp from "sharp";
-import {
-  readArtworksFromFile,
-  writeArtworksToFile,
-  type ArtworkJson,
-} from "@/lib/artworks-io";
+import { readArtworksFromFile, writeArtworksToFile } from "@/lib/artworks-io";
 
 const COOKIE_NAME = "admin_session";
 const ARTWORKS_BASE = process.env.NEXT_PUBLIC_IMAGES_BASE ?? "/artworks";
