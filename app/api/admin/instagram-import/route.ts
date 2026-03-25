@@ -73,14 +73,20 @@ async function trySnapinstaMedia(
 ): Promise<{ sourceMediaUrl: string; mediaType: "image" | "video" } | null> {
   try {
     // snapinsta is a third-party downloader; behind the scenes it uses snapinst.app.
-    const mod: any = await import("snapinsta");
-    const snap = mod?.default ?? mod;
-    const links: any[] = await snap.getLinks(inputUrl);
-    if (!Array.isArray(links) || links.length === 0) return null;
+    const mod: unknown = await import("snapinsta");
+    const snap =
+      (mod as { default?: unknown } | null | undefined)?.default ?? mod;
+    const getLinks = (snap as { getLinks?: unknown } | null | undefined)?.getLinks;
+    if (typeof getLinks !== "function") return null;
 
-    const first = links[0];
-    const url = typeof first?.url === "string" ? first.url : "";
-    const mime = typeof first?.mime === "string" ? first.mime : "";
+    const linksUnknown: unknown = await (getLinks as (u: string) => Promise<unknown>)(inputUrl);
+    if (!Array.isArray(linksUnknown) || linksUnknown.length === 0) return null;
+
+    const first = linksUnknown[0] as unknown;
+    const firstRec = typeof first === "object" && first != null ? (first as Record<string, unknown>) : null;
+
+    const url = typeof firstRec?.url === "string" ? firstRec.url : "";
+    const mime = typeof firstRec?.mime === "string" ? firstRec.mime : "";
     if (!url) return null;
 
     const isVideo =
