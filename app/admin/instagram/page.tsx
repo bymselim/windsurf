@@ -117,23 +117,55 @@ export default function AdminInstagramImportPage() {
           {items.length === 0 ? (
             <p className="text-zinc-500">Henuz kayit yok.</p>
           ) : (
-            items.map((item) => (
+            items.map((item) => {
+              const mediaSrc = item.storedMediaUrl || item.sourceMediaUrl;
+              return (
               <div key={item.id} className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
                 <div className="text-xs text-zinc-500">{new Date(item.createdAt).toLocaleString("tr-TR")}</div>
                 <div className="mt-1 text-sm text-zinc-300">{item.mediaType.toUpperCase()}</div>
-                <p className="mt-2 text-zinc-200 whitespace-pre-wrap">{item.caption || "Acilama bulunamadi."}</p>
+                {mediaSrc ? (
+                  <div className="mt-3 rounded-lg overflow-hidden border border-zinc-700 bg-black max-w-md">
+                    {item.mediaType === "video" ? (
+                      <video
+                        src={mediaSrc}
+                        controls
+                        playsInline
+                        className="w-full max-h-80 object-contain"
+                        preload="metadata"
+                      />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={mediaSrc}
+                        alt=""
+                        className="w-full max-h-80 object-contain"
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-amber-500/90">
+                    Önizleme yok: Instagram CDN bazen sunucudan indirmeyi engelleyebilir. Aşağıdaki linklerle açmayı deneyin.
+                  </p>
+                )}
+                <p className="mt-2 text-zinc-200 whitespace-pre-wrap">{item.caption || "Açıklama bulunamadı."}</p>
                 <div className="mt-3 flex flex-wrap gap-3 text-sm">
                   <a className="text-amber-500 hover:text-amber-400" href={item.permalink || item.inputUrl} target="_blank" rel="noreferrer">
-                    Instagram
+                    Instagramda ac
                   </a>
                   {item.storedMediaUrl ? (
                     <a className="text-amber-500 hover:text-amber-400" href={item.storedMediaUrl} target="_blank" rel="noreferrer">
-                      Kaydedilen medya
+                      Blob’a kaydedilen medya
+                    </a>
+                  ) : null}
+                  {!item.storedMediaUrl && item.sourceMediaUrl ? (
+                    <a className="text-zinc-400 hover:text-amber-400" href={item.sourceMediaUrl} target="_blank" rel="noreferrer">
+                      Instagram medya URL’si (doğrudan)
                     </a>
                   ) : null}
                 </div>
               </div>
-            ))
+            );
+            })
           )}
         </div>
       </div>
