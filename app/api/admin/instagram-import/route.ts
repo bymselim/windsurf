@@ -69,7 +69,7 @@ function isInstagramUrl(value: string): boolean {
 }
 
 async function trySnapinstaMedia(
-  inputUrl: string
+  instaUrl: string
 ): Promise<
   | {
       sourceMediaUrl: string;
@@ -81,12 +81,12 @@ async function trySnapinstaMedia(
   try {
     // snapinsta is a third-party downloader; behind the scenes it uses snapinst.app.
     const mod: unknown = await import("snapinsta");
-    const snap =
+    const snapNamespace: unknown =
       (mod as { default?: unknown } | null | undefined)?.default ?? mod;
-    const getLinks = (snap as { getLinks?: unknown } | null | undefined)?.getLinks;
+    const getLinks: unknown = (snapNamespace as { getLinks?: unknown } | null | undefined)?.getLinks;
     if (typeof getLinks !== "function") return null;
 
-    const linksUnknown: unknown = await (getLinks as (u: string) => Promise<unknown>)(inputUrl);
+    const linksUnknown: unknown = await (getLinks as (u: string) => Promise<unknown>)(instaUrl);
     if (!Array.isArray(linksUnknown) || linksUnknown.length === 0) return null;
 
     const normalizedLinks: Array<{ url: string; mime: string; idx?: number }> = [];
@@ -115,9 +115,36 @@ async function trySnapinstaMedia(
       mediaType: isVideo ? "video" : "image",
       links: normalizedLinks,
     };
-  } catch {
-    return null;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(msg || "snapinsta_failed");
   }
+}
+
+function normalizeForSnapinsta(url: string): string[] {
+  const out: string[] = [];
+  try {
+    const u = new URL(url);
+    u.hash = "";
+    out.push(u.toString());
+
+    // Add utm_source if missing (snapinsta examples do this).
+    if (!u.searchParams.get("utm_source")) {
+      u.searchParams.set("utm_source", "ig_web_copy_link");
+      out.push(u.toString());
+    } else {
+      out.push(u.toString());
+    }
+
+    // Also try without query params.
+    const noQuery = new URL(u.toString());
+    noQuery.search = "";
+    out.push(noQuery.toString());
+  } catch {
+    out.push(url);
+  }
+  // de-dup
+  return Array.from(new Set(out)).slice(0, 4);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -196,18 +223,36 @@ export async function POST(request: NextRequest) {
   }
 
   const canonicalUrl = getCanonicalUrl(inputUrl);
-  const [htmlRes, snapMedia] = await Promise.all([
-    fetch(canonicalUrl, {
-      headers: {
-        "User-Agent": BROWSER_UA,
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
-      },
-      cache: "no-store",
-    }).catch(() => null),
-    trySnapinstaMedia(inputUrl),
-  ]);
+  const htmlPromise = fetch(canonicalUrl, {
+    headers: {
+      "User-Agent": BROWSER_UA,
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
+    },
+    cache: "no-store",
+  }).catch(() => null);
 
+  const snapVariantUrls = normalizeForSnapinsta(inputUrl);
+  const snapinstaAttempts: Array<{ url: string; ok: boolean; error?: string }> = [];
+  let snapMedia: Awaited<ReturnType<typeof trySnapinstaMedia>> | null = null;
+  let snapUrlUsed: string | null = null;
+
+  for (const variantUrl of snapVariantUrls) {
+    try {
+      const candidate = await trySnapinstaMedia(variantUrl);
+      if (candidate) {
+        snapMedia = candidate;
+        snapUrlUsed = variantUrl;
+        break;
+      }
+      snapinstaAttempts.push({ url: variantUrl, ok: false, error: "no_result" });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      snapinstaAttempts.push({ url: variantUrl, ok: false, error: msg || "error" });
+    }
+  }
+
+  const htmlRes = await htmlPromise;
   let html = "";
   if (htmlRes?.ok) {
     html = await htmlRes.text();
@@ -215,7 +260,10 @@ export async function POST(request: NextRequest) {
 
   if (!html && !snapMedia) {
     return NextResponse.json(
-      { error: "Instagram sayfası okunamadı ve snapinsta mediayı çıkaramadı." },
+      {
+        error: "Instagram sayfası okunamadı ve snapinsta mediayı çıkaramadı.",
+        debug: { snapinstaAttempts, snapUrlUsed },
+      },
       { status: 502 }
     );
   }
@@ -224,6 +272,7 @@ export async function POST(request: NextRequest) {
     decodeCaption(extractMeta(html, "description")) ||
     "";
   const permalink = extractMeta(html, "og:url") || canonicalUrl;
+  const ogDesc = extractMeta(html, "og:description") || extractMeta(html, "description");
   const videoSecure = extractMeta(html, "og:video:secure_url");
   const videoPlain = extractMeta(html, "og:video");
   const imageSecure = extractMeta(html, "og:image:secure_url");
@@ -309,6 +358,16 @@ export async function POST(request: NextRequest) {
     item: saved,
     debug: {
       snapLinks: snapMedia?.links ?? [],
+      ogPresence: {
+        ogDescPresent: Boolean(ogDesc),
+        ogDescLen: ogDesc.length,
+        hasImageSecure: Boolean(imageSecure),
+        hasImagePlain: Boolean(imagePlain),
+        hasVideoSecure: Boolean(videoSecure),
+        hasVideoPlain: Boolean(videoPlain),
+      },
+      snapinstaAttempts,
+      snapUrlUsed,
       mediaCandidates,
       downloadDebug,
       usedMediaType: finalMediaType,
