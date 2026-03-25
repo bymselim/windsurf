@@ -70,7 +70,14 @@ function isInstagramUrl(value: string): boolean {
 
 async function trySnapinstaMedia(
   inputUrl: string
-): Promise<{ sourceMediaUrl: string; mediaType: "image" | "video" } | null> {
+): Promise<
+  | {
+      sourceMediaUrl: string;
+      mediaType: "image" | "video";
+      links: Array<{ url: string; mime: string; idx?: number }>;
+    }
+  | null
+> {
   try {
     // snapinsta is a third-party downloader; behind the scenes it uses snapinst.app.
     const mod: unknown = await import("snapinsta");
@@ -82,16 +89,32 @@ async function trySnapinstaMedia(
     const linksUnknown: unknown = await (getLinks as (u: string) => Promise<unknown>)(inputUrl);
     if (!Array.isArray(linksUnknown) || linksUnknown.length === 0) return null;
 
-    const first = linksUnknown[0] as unknown;
-    const firstRec = typeof first === "object" && first != null ? (first as Record<string, unknown>) : null;
+    const normalizedLinks: Array<{ url: string; mime: string; idx?: number }> = [];
+    for (const l of linksUnknown) {
+      if (typeof l !== "object" || l == null) continue;
+      const rec = l as Record<string, unknown>;
+      const url = typeof rec.url === "string" ? rec.url : "";
+      const mime = typeof rec.mime === "string" ? rec.mime : "";
+      const idx = typeof rec.idx === "number" ? rec.idx : undefined;
+      if (!url) continue;
+      normalizedLinks.push({ url, mime, idx });
+    }
 
-    const url = typeof firstRec?.url === "string" ? firstRec.url : "";
-    const mime = typeof firstRec?.mime === "string" ? firstRec.mime : "";
+    if (normalizedLinks.length === 0) return null;
+
+    const firstRec = normalizedLinks[0];
+
+    const url = firstRec.url;
+    const mime = firstRec.mime;
     if (!url) return null;
 
     const isVideo =
       mime.startsWith("video/") || /\.(mp4|webm|mov|ogg)(\?|#|$)/i.test(url);
-    return { sourceMediaUrl: url, mediaType: isVideo ? "video" : "image" };
+    return {
+      sourceMediaUrl: url,
+      mediaType: isVideo ? "video" : "image",
+      links: normalizedLinks,
+    };
   } catch {
     return null;
   }
@@ -225,6 +248,8 @@ export async function POST(request: NextRequest) {
         : imageCandidates;
 
   let storedMediaUrl: string | undefined;
+  const downloadDebug: Array<{ candidate: string; ok: boolean; status?: number; error?: string }> = [];
+
   if (mediaCandidates.length > 0) {
     for (const candidate of mediaCandidates) {
       const mediaRes = await fetchWithRetry(
@@ -260,8 +285,10 @@ export async function POST(request: NextRequest) {
           contentType: inferred.blobContentType,
         });
         storedMediaUrl = uploaded.url;
+        downloadDebug.push({ candidate, ok: true });
         break;
       } catch {
+        downloadDebug.push({ candidate, ok: false, error: "blob_put_failed" });
         // keep trying other candidates
       }
     }
@@ -277,5 +304,14 @@ export async function POST(request: NextRequest) {
     storedMediaUrl,
   });
 
-  return NextResponse.json({ ok: true, item: saved });
+  return NextResponse.json({
+    ok: true,
+    item: saved,
+    debug: {
+      snapLinks: snapMedia?.links ?? [],
+      mediaCandidates,
+      downloadDebug,
+      usedMediaType: finalMediaType,
+    },
+  });
 }

@@ -24,6 +24,7 @@ export default function AdminInstagramImportPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>([]);
+  const [lastDebug, setLastDebug] = useState<unknown>(null);
 
   useEffect(() => {
     const saved = typeof window !== "undefined" && localStorage.getItem("admin-authenticated");
@@ -51,6 +52,7 @@ export default function AdminInstagramImportPage() {
     e.preventDefault();
     setMessage(null);
     setLoading(true);
+    setLastDebug(null);
     try {
       const res = await fetch("/api/admin/instagram-import", {
         method: "POST",
@@ -64,6 +66,7 @@ export default function AdminInstagramImportPage() {
         return;
       }
       setMessage("Kaydedildi.");
+      if (data?.debug) setLastDebug(data.debug);
       setUrl("");
       setItems((prev) => [data.item as Item, ...prev.filter((x) => x.id !== data.item.id)]);
     } catch {
@@ -137,6 +140,15 @@ export default function AdminInstagramImportPage() {
           {message ? <p className="text-sm text-zinc-300">{message}</p> : null}
         </form>
 
+        {lastDebug ? (
+          <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
+            <p className="text-sm text-zinc-400 mb-2">Son deneme debug</p>
+            <pre className="text-xs text-zinc-300 overflow-auto whitespace-pre-wrap">
+              {JSON.stringify(lastDebug, null, 2)}
+            </pre>
+          </div>
+        ) : null}
+
         <div className="mt-6 space-y-3">
           {items.length === 0 ? (
             <p className="text-zinc-500">Henuz kayit yok.</p>
@@ -156,6 +168,7 @@ export default function AdminInstagramImportPage() {
                         playsInline
                         className="w-full max-h-80 object-contain"
                         preload="metadata"
+                        referrerPolicy="origin"
                       />
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -163,6 +176,7 @@ export default function AdminInstagramImportPage() {
                         src={mediaSrc}
                         alt=""
                         className="w-full max-h-80 object-contain"
+                        referrerPolicy="origin"
                       />
                     )}
                   </div>
