@@ -168,7 +168,6 @@ export default function AdminInstagramImportPage() {
                         playsInline
                         className="w-full max-h-80 object-contain"
                         preload="metadata"
-                        referrerPolicy="origin"
                       />
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
