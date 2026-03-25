@@ -58,6 +58,7 @@ lib/data/gate-logs.json
 lib/data/blocked-phones.json
 lib/data/phone-credits.json
 lib/data/faq-access.json
+lib/data/instagram-imports.json
 
 # Misc
 *.log
