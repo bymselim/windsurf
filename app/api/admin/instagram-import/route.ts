@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { addInstagramImport, readInstagramImports } from "@/lib/instagram-imports";
+import { getAdminPassword } from "@/lib/admin-password";
 
 const COOKIE_NAME = "admin_session";
 
 export const dynamic = "force-dynamic";
 
-function requireAdmin(request: NextRequest): boolean {
-  return request.cookies.get(COOKIE_NAME)?.value === "1";
+async function requireAdmin(request: NextRequest): Promise<boolean> {
+  const cookieAuth = request.cookies.get(COOKIE_NAME)?.value === "1";
+  if (cookieAuth) return true;
+  const headerPassword = request.headers.get("x-admin-password") ?? "";
+  const storedPassword = await getAdminPassword();
+  return headerPassword === storedPassword;
 }
 
 function extractMeta(content: string, key: string): string {
@@ -55,7 +60,7 @@ function isInstagramUrl(value: string): boolean {
 }
 
 export async function GET(request: NextRequest) {
-  if (!requireAdmin(request)) {
+  if (!(await requireAdmin(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const items = await readInstagramImports();
@@ -63,7 +68,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!requireAdmin(request)) {
+  if (!(await requireAdmin(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

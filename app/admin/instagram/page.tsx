@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { getAdminAuthHeaders } from "@/lib/admin-auth-client";
 
 type Item = {
   id: string;
@@ -37,7 +38,10 @@ export default function AdminInstagramImportPage() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    fetch("/api/admin/instagram-import", { credentials: "include" })
+    fetch("/api/admin/instagram-import", {
+      credentials: "include",
+      headers: getAdminAuthHeaders(),
+    })
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => setItems(Array.isArray(data) ? data : []))
       .catch(() => setItems([]));
@@ -50,7 +54,7 @@ export default function AdminInstagramImportPage() {
     try {
       const res = await fetch("/api/admin/instagram-import", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAdminAuthHeaders() },
         credentials: "include",
         body: JSON.stringify({ url }),
       });
