@@ -63,6 +63,63 @@ function isInstagramUrl(value: string): boolean {
   }
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  attempts = 3,
+  delayMs = 800
+): Promise<Response | null> {
+  let last: unknown = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url, init);
+      if (res.ok) return res;
+      last = res.status;
+    } catch (e) {
+      last = e;
+    }
+    if (i < attempts - 1) await sleep(delayMs);
+  }
+  return null;
+}
+
+function inferMediaTypeAndExt(url: string, contentType?: string | null): {
+  kind: "video" | "image";
+  ext: string;
+  blobContentType: string;
+} {
+  const u = url.toLowerCase();
+  const ct = contentType ? contentType.toLowerCase() : "";
+  const isVideo =
+    u.includes(".mp4") ||
+    u.includes(".webm") ||
+    u.includes(".mov") ||
+    ct.startsWith("video/");
+
+  if (isVideo) {
+    if (u.includes(".webm") || ct.includes("webm")) {
+      return { kind: "video", ext: "webm", blobContentType: "video/webm" };
+    }
+    if (u.includes(".mov") || ct.includes("quicktime")) {
+      return { kind: "video", ext: "mov", blobContentType: "video/quicktime" };
+    }
+    return { kind: "video", ext: "mp4", blobContentType: "video/mp4" };
+  }
+
+  // image
+  if (u.includes(".png") || ct.includes("png")) {
+    return { kind: "image", ext: "png", blobContentType: "image/png" };
+  }
+  if (u.includes(".webp") || ct.includes("webp")) {
+    return { kind: "image", ext: "webp", blobContentType: "image/webp" };
+  }
+  return { kind: "image", ext: "jpg", blobContentType: "image/jpeg" };
+}
+
 export async function GET(request: NextRequest) {
   if (!(await requireAdmin(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -102,39 +159,59 @@ export async function POST(request: NextRequest) {
     decodeCaption(extractMeta(html, "description")) ||
     "";
   const permalink = extractMeta(html, "og:url") || canonicalUrl;
-  const videoUrl = extractMeta(html, "og:video:secure_url") || extractMeta(html, "og:video");
-  const imageUrl = extractMeta(html, "og:image:secure_url") || extractMeta(html, "og:image");
-  const sourceMediaUrl = videoUrl || imageUrl || "";
-  const mediaType: "image" | "video" | "unknown" = videoUrl
+  const videoSecure = extractMeta(html, "og:video:secure_url");
+  const videoPlain = extractMeta(html, "og:video");
+  const imageSecure = extractMeta(html, "og:image:secure_url");
+  const imagePlain = extractMeta(html, "og:image");
+
+  const videoCandidates = [videoSecure, videoPlain].filter(Boolean);
+  const imageCandidates = [imageSecure, imagePlain].filter(Boolean);
+
+  const mediaType: "image" | "video" | "unknown" = videoCandidates.length
     ? "video"
-    : imageUrl
+    : imageCandidates.length
       ? "image"
       : "unknown";
 
+  const sourceMediaUrl = videoCandidates[0] || imageCandidates[0] || "";
+
   let storedMediaUrl: string | undefined;
-  if (sourceMediaUrl) {
-    try {
-      const mediaRes = await fetch(sourceMediaUrl, {
-        headers: {
-          "User-Agent": BROWSER_UA,
-          Referer: "https://www.instagram.com/",
-          Accept: mediaType === "video" ? "video/*,*/*" : "image/*,*/*",
+  if (videoCandidates.length > 0 || imageCandidates.length > 0) {
+    const candidates = mediaType === "video" ? videoCandidates : imageCandidates;
+
+    for (const candidate of candidates) {
+      const mediaRes = await fetchWithRetry(
+        candidate,
+        {
+          headers: {
+            "User-Agent": BROWSER_UA,
+            Referer: "https://www.instagram.com/",
+            Accept: mediaType === "video" ? "video/*,*/*" : "image/*,*/*",
+          },
+          cache: "no-store",
         },
-        cache: "no-store",
-      });
-      if (mediaRes.ok) {
+        3,
+        900
+      );
+
+      if (!mediaRes) continue;
+      try {
         const buf = Buffer.from(await mediaRes.arrayBuffer());
-        const ext = mediaType === "video" ? "mp4" : "jpg";
-        const blobPath = `instagram-imports/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const ct = mediaRes.headers.get("content-type");
+        const inferred = inferMediaTypeAndExt(candidate, ct);
+        const blobPath = `instagram-imports/${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 8)}.${inferred.ext}`;
         const uploaded = await put(blobPath, buf, {
           access: "public",
           addRandomSuffix: false,
-          contentType: mediaType === "video" ? "video/mp4" : "image/jpeg",
+          contentType: inferred.blobContentType,
         });
         storedMediaUrl = uploaded.url;
+        break;
+      } catch {
+        // keep trying other candidates
       }
-    } catch {
-      // Keep metadata even if media upload fails.
     }
   }
 

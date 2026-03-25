@@ -73,6 +73,30 @@ export default function AdminInstagramImportPage() {
     }
   }
 
+  async function retryImport(item: Item) {
+    setMessage(null);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/instagram-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAdminAuthHeaders() },
+        credentials: "include",
+        body: JSON.stringify({ url: item.canonicalUrl || item.inputUrl }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage(data?.error || "İşlem başarısız.");
+        return;
+      }
+      setMessage("Tekrar denendi, kaydedildi.");
+      setItems((prev) => [data.item as Item, ...prev.filter((x) => x.id !== data.item.id)]);
+    } catch {
+      setMessage("İstek hatası.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   if (isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
@@ -148,6 +172,18 @@ export default function AdminInstagramImportPage() {
                   </p>
                 )}
                 <p className="mt-2 text-zinc-200 whitespace-pre-wrap">{item.caption || "Açıklama bulunamadı."}</p>
+                {!item.storedMediaUrl && item.sourceMediaUrl ? (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => retryImport(item)}
+                      className="px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-100 text-sm transition"
+                    >
+                      Blob’a tekrar indir
+                    </button>
+                  </div>
+                ) : null}
                 <div className="mt-3 flex flex-wrap gap-3 text-sm">
                   <a className="text-amber-500 hover:text-amber-400" href={item.permalink || item.inputUrl} target="_blank" rel="noreferrer">
                     Instagramda ac
