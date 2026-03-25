@@ -68,6 +68,29 @@ function isInstagramUrl(value: string): boolean {
   }
 }
 
+async function trySnapinstaMedia(
+  inputUrl: string
+): Promise<{ sourceMediaUrl: string; mediaType: "image" | "video" } | null> {
+  try {
+    // snapinsta is a third-party downloader; behind the scenes it uses snapinst.app.
+    const mod: any = await import("snapinsta");
+    const snap = mod?.default ?? mod;
+    const links: any[] = await snap.getLinks(inputUrl);
+    if (!Array.isArray(links) || links.length === 0) return null;
+
+    const first = links[0];
+    const url = typeof first?.url === "string" ? first.url : "";
+    const mime = typeof first?.mime === "string" ? first.mime : "";
+    if (!url) return null;
+
+    const isVideo =
+      mime.startsWith("video/") || /\.(mp4|webm|mov|ogg)(\?|#|$)/i.test(url);
+    return { sourceMediaUrl: url, mediaType: isVideo ? "video" : "image" };
+  } catch {
+    return null;
+  }
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -144,20 +167,29 @@ export async function POST(request: NextRequest) {
   }
 
   const canonicalUrl = getCanonicalUrl(inputUrl);
-  const htmlRes = await fetch(canonicalUrl, {
-    headers: {
-      "User-Agent": BROWSER_UA,
-      Accept: "text/html,application/xhtml+xml",
-      "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
-    },
-    cache: "no-store",
-  }).catch(() => null);
+  const [htmlRes, snapMedia] = await Promise.all([
+    fetch(canonicalUrl, {
+      headers: {
+        "User-Agent": BROWSER_UA,
+        Accept: "text/html,application/xhtml+xml",
+        "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
+      },
+      cache: "no-store",
+    }).catch(() => null),
+    trySnapinstaMedia(inputUrl),
+  ]);
 
-  if (!htmlRes || !htmlRes.ok) {
-    return NextResponse.json({ error: "Instagram sayfası okunamadı." }, { status: 502 });
+  let html = "";
+  if (htmlRes?.ok) {
+    html = await htmlRes.text();
   }
 
-  const html = await htmlRes.text();
+  if (!html && !snapMedia) {
+    return NextResponse.json(
+      { error: "Instagram sayfası okunamadı ve snapinsta mediayı çıkaramadı." },
+      { status: 502 }
+    );
+  }
   const caption =
     decodeCaption(extractMeta(html, "og:description")) ||
     decodeCaption(extractMeta(html, "description")) ||
@@ -171,26 +203,36 @@ export async function POST(request: NextRequest) {
   const videoCandidates = [videoSecure, videoPlain].filter(Boolean);
   const imageCandidates = [imageSecure, imagePlain].filter(Boolean);
 
-  const mediaType: "image" | "video" | "unknown" = videoCandidates.length
+  const mediaTypeFromOg: "image" | "video" | "unknown" = videoCandidates.length
     ? "video"
     : imageCandidates.length
       ? "image"
       : "unknown";
 
-  const sourceMediaUrl = videoCandidates[0] || imageCandidates[0] || "";
+  const finalMediaType: "image" | "video" | "unknown" = snapMedia?.mediaType ?? mediaTypeFromOg;
+
+  const mediaCandidates =
+    snapMedia?.sourceMediaUrl
+      ? [snapMedia.sourceMediaUrl]
+      : finalMediaType === "video"
+        ? videoCandidates
+        : imageCandidates;
 
   let storedMediaUrl: string | undefined;
-  if (videoCandidates.length > 0 || imageCandidates.length > 0) {
-    const candidates = mediaType === "video" ? videoCandidates : imageCandidates;
-
-    for (const candidate of candidates) {
+  if (mediaCandidates.length > 0) {
+    for (const candidate of mediaCandidates) {
       const mediaRes = await fetchWithRetry(
         candidate,
         {
           headers: {
             "User-Agent": BROWSER_UA,
             Referer: "https://www.instagram.com/",
-            Accept: mediaType === "video" ? "video/*,*/*" : "image/*,*/*",
+            Accept:
+              finalMediaType === "video"
+                ? "video/*,*/*"
+                : finalMediaType === "image"
+                  ? "image/*,*/*"
+                  : "*/*",
           },
           cache: "no-store",
         },
@@ -224,8 +266,8 @@ export async function POST(request: NextRequest) {
     canonicalUrl,
     permalink,
     caption,
-    mediaType,
-    sourceMediaUrl: sourceMediaUrl || undefined,
+    mediaType: finalMediaType,
+    sourceMediaUrl: snapMedia?.sourceMediaUrl || videoCandidates[0] || imageCandidates[0] || undefined,
     storedMediaUrl,
   });
 
