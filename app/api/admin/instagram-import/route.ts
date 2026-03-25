@@ -36,8 +36,13 @@ function extractMeta(content: string, key: string): string {
 
 function decodeCaption(raw: string): string {
   if (!raw) return "";
-  let s = decodeHtmlEntities(raw);
-  s = decodeHtmlEntities(s);
+  // Instagram sometimes double-encodes entities. Decode repeatedly until stable.
+  let s = raw;
+  for (let i = 0; i < 4; i++) {
+    const next = decodeHtmlEntities(s);
+    if (next === s) return s;
+    s = next;
+  }
   return s;
 }
 
