@@ -86,7 +86,12 @@ async function trySnapinstaMedia(
     const getLinks: unknown = (snapNamespace as { getLinks?: unknown } | null | undefined)?.getLinks;
     if (typeof getLinks !== "function") return null;
 
-    const linksUnknown: unknown = await (getLinks as (u: string) => Promise<unknown>)(instaUrl);
+    // snapinsta uses `this._getToken()` (static method relies on `this`).
+    // So we must call with the class context, not as a detached function.
+    const linksUnknown: unknown = await (getLinks as (u: string) => Promise<unknown>).call(
+      snapNamespace as unknown as object,
+      instaUrl
+    );
     if (!Array.isArray(linksUnknown) || linksUnknown.length === 0) return null;
 
     const normalizedLinks: Array<{ url: string; mime: string; idx?: number }> = [];
