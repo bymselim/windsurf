@@ -78,7 +78,7 @@ async function fetchWithRetry(
       const res = await fetch(url, init);
       if (res.ok) return res;
       // keep trying
-    } catch (e) {
+    } catch {
       // keep trying
     }
     if (i < attempts - 1) await sleep(delayMs);
