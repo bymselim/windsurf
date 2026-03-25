@@ -73,14 +73,13 @@ async function fetchWithRetry(
   attempts = 3,
   delayMs = 800
 ): Promise<Response | null> {
-  let last: unknown = null;
   for (let i = 0; i < attempts; i++) {
     try {
       const res = await fetch(url, init);
       if (res.ok) return res;
-      last = res.status;
+      // keep trying
     } catch (e) {
-      last = e;
+      // keep trying
     }
     if (i < attempts - 1) await sleep(delayMs);
   }
