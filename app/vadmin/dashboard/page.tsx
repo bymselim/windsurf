@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { CertificateRecord } from "@/lib/certificate-types";
+import type { CertificateRecord, VerifyChangeRequest } from "@/lib/certificate-types";
 import { clearVadminPasswordClient, getVadminAuthHeaders } from "@/lib/vadmin-auth-client";
 
 async function vadminFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
@@ -20,23 +20,37 @@ async function vadminFetch(input: RequestInfo, init?: RequestInit): Promise<Resp
 export default function VadminDashboardPage() {
   const router = useRouter();
   const [rows, setRows] = useState<CertificateRecord[] | null>(null);
+  const [requests, setRequests] = useState<VerifyChangeRequest[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [requestsError, setRequestsError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
-    const res = await vadminFetch("/api/vadmin/certificates");
-    if (res.status === 401) {
+    setRequestsError(null);
+    const [cRes, rRes] = await Promise.all([
+      vadminFetch("/api/vadmin/certificates"),
+      vadminFetch("/api/vadmin/change-requests"),
+    ]);
+
+    if (cRes.status === 401 || rRes.status === 401) {
       clearVadminPasswordClient();
       router.replace("/vadmin");
       return;
     }
-    if (!res.ok) {
-      setError("Liste yüklenemedi");
+
+    if (!cRes.ok) {
+      setError("Sertifika listesi yüklenemedi");
       setRows([]);
-      return;
+    } else {
+      setRows((await cRes.json()) as CertificateRecord[]);
     }
-    const data = (await res.json()) as CertificateRecord[];
-    setRows(data);
+
+    if (!rRes.ok) {
+      setRequestsError("Değişiklik talepleri yüklenemedi");
+      setRequests([]);
+    } else {
+      setRequests((await rRes.json()) as VerifyChangeRequest[]);
+    }
   }, [router]);
 
   useEffect(() => {
@@ -78,13 +92,33 @@ export default function VadminDashboardPage() {
     URL.revokeObjectURL(url);
   };
 
+  const exportChangeRequestsJson = async () => {
+    const res = await vadminFetch("/api/vadmin/change-requests/export");
+    if (res.status === 401) {
+      clearVadminPasswordClient();
+      router.replace("/vadmin");
+      return;
+    }
+    if (!res.ok) {
+      alert("Talepler dışa aktarılamadı");
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `verify-change-requests-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const logout = async () => {
     await fetch("/api/vadmin/logout", { method: "POST", credentials: "include" });
     clearVadminPasswordClient();
     router.replace("/vadmin");
   };
 
-  if (rows === null) {
+  if (rows === null || requests === null) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500 text-sm">
         Yükleniyor…
@@ -98,7 +132,7 @@ export default function VadminDashboardPage() {
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-bold text-amber-100/90">vadmin</h1>
-            <p className="text-sm text-zinc-500 mt-1">Sertifika kayıtları</p>
+            <p className="text-sm text-zinc-500 mt-1">Sertifika kayıtları ve doğrulama talepleri</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link
@@ -112,8 +146,21 @@ export default function VadminDashboardPage() {
               onClick={() => void exportJson()}
               className="rounded-lg border border-zinc-600 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
             >
-              JSON dışa aktar
+              Sertifikalar JSON
             </button>
+            <button
+              type="button"
+              onClick={() => void exportChangeRequestsJson()}
+              className="rounded-lg border border-zinc-600 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
+            >
+              Talepler JSON
+            </button>
+            <Link
+              href="/vadmin/verify-declaration"
+              className="rounded-lg border border-zinc-600 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
+            >
+              Sertifika metni
+            </Link>
             <Link
               href="/verify-your-art"
               target="_blank"
@@ -121,6 +168,13 @@ export default function VadminDashboardPage() {
             >
               Doğrulama sayfası
             </Link>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="rounded-lg border border-zinc-600 px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800"
+            >
+              Yenile
+            </button>
             <button
               type="button"
               onClick={() => void logout()}
@@ -133,7 +187,10 @@ export default function VadminDashboardPage() {
 
         {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
 
-        <div className="rounded-xl border border-zinc-800 overflow-hidden bg-zinc-900/30">
+        <div className="rounded-xl border border-zinc-800 overflow-hidden bg-zinc-900/30 mb-10">
+          <div className="border-b border-zinc-800 bg-zinc-900/60 px-4 py-3">
+            <h2 className="text-sm font-semibold text-zinc-300">Sertifika kayıtları</h2>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left min-w-[640px]">
               <thead className="bg-zinc-900/80 text-zinc-500 uppercase text-xs">
@@ -171,6 +228,46 @@ export default function VadminDashboardPage() {
                           Sil
                         </button>
                       </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-zinc-800 overflow-hidden bg-zinc-900/30">
+          <div className="border-b border-zinc-800 bg-zinc-900/60 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-zinc-300">Doğrulama sayfası — değişiklik talepleri</h2>
+            <p className="text-xs text-zinc-500">verify-your-art üzerinden gönderilenler</p>
+          </div>
+          {requestsError && <p className="px-4 py-2 text-sm text-red-400">{requestsError}</p>}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left min-w-[720px]">
+              <thead className="bg-zinc-900/80 text-zinc-500 uppercase text-xs">
+                <tr>
+                  <th className="px-4 py-3 whitespace-nowrap">Tarih (UTC)</th>
+                  <th className="px-4 py-3">Webpin</th>
+                  <th className="px-4 py-3">IP</th>
+                  <th className="px-4 py-3 min-w-[280px]">Mesaj</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800">
+                {requests.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-zinc-500">
+                      Henüz talep yok.
+                    </td>
+                  </tr>
+                ) : (
+                  requests.map((q) => (
+                    <tr key={q.id} className="hover:bg-zinc-800/40 align-top">
+                      <td className="px-4 py-3 text-zinc-500 whitespace-nowrap font-mono text-xs">
+                        {q.createdAt?.replace("T", " ").slice(0, 19) ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-amber-200/90">{q.webpin}</td>
+                      <td className="px-4 py-3 text-zinc-500 font-mono text-xs">{q.clientIp ?? "—"}</td>
+                      <td className="px-4 py-3 text-zinc-300 whitespace-pre-wrap break-words max-w-xl">{q.message}</td>
                     </tr>
                   ))
                 )}

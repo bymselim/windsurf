@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { VerifyCertificateWaves } from "./verify-certificate-waves";
+import { DEFAULT_VERIFY_DECLARATION, type VerifyDeclaration } from "@/lib/verify-declaration-io";
 
 type VerifyPayload = {
   webpin: string;
@@ -15,13 +16,6 @@ type VerifyPayload = {
 };
 
 type Lang = "tr" | "en";
-
-/** Sertifika metni — sabit (resmi metin). */
-const DECLARATION_EN =
-  "This certificate verifies that the artwork described herein is an original work, produced by the artist exclusively for its owner, and bears the authentic characteristics of the artist.";
-
-const DECLARATION_TR =
-  "Bu sertifika, bu belgede tanımlanan eserin, sanatçı tarafından sahibi için özel olarak üretilmiş özgün bir çalışma olduğunu ve sanatçının özgün niteliklerini taşıdığını onaylar.";
 
 const PURPLE = "#7D5BB2";
 const SLATE = "#5c5678";
@@ -165,6 +159,8 @@ export default function VerifyYourArtPage() {
   const [lang, setLang] = useState<Lang>("tr");
   const t = UI[lang];
 
+  const [declaration, setDeclaration] = useState<VerifyDeclaration>(() => ({ ...DEFAULT_VERIFY_DECLARATION }));
+
   const [pinInput, setPinInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -174,6 +170,23 @@ export default function VerifyYourArtPage() {
   const [changeSending, setChangeSending] = useState(false);
   const [changeDone, setChangeDone] = useState(false);
   const [changeErr, setChangeErr] = useState<string | null>(null);
+
+  /** Webpin sonrası güncel metin (vadmin kaydından sonra da tekrar doğrulayınca gelir). */
+  useEffect(() => {
+    if (!data) return;
+    void (async () => {
+      try {
+        const r = await fetch("/api/public/verify-declaration");
+        if (!r.ok) return;
+        const j = (await r.json()) as Partial<VerifyDeclaration>;
+        if (typeof j?.en === "string" && typeof j?.tr === "string") {
+          setDeclaration({ en: j.en, tr: j.tr });
+        }
+      } catch {
+        /* varsayılan */
+      }
+    })();
+  }, [data]);
 
   const lookup = useCallback(async () => {
     const q = pinInput.trim();
@@ -337,29 +350,6 @@ export default function VerifyYourArtPage() {
 
         {data && (
           <section className="space-y-8 animate-fade-in">
-            {/* Sertifika beyanı — yalnızca webpin doğrulandıktan sonra */}
-            <div
-              className="mx-auto w-full max-w-2xl rounded-2xl border border-neutral-200/90 bg-white/80 px-5 py-6 shadow-sm backdrop-blur-sm sm:px-8 sm:py-8"
-              aria-labelledby="declaration-heading"
-            >
-              <h2 id="declaration-heading" className="sr-only">
-                Certificate declaration
-              </h2>
-              <p
-                lang="en"
-                className="text-center text-[13px] leading-relaxed text-neutral-600 sm:text-sm md:text-[15px] md:leading-7"
-              >
-                {DECLARATION_EN}
-              </p>
-              <div className="my-5 h-px w-full bg-gradient-to-r from-transparent via-[#7D5BB2]/35 to-transparent" />
-              <p
-                lang="tr"
-                className="text-center text-[13px] leading-relaxed text-neutral-500 sm:text-sm md:text-[15px] md:leading-7"
-              >
-                {DECLARATION_TR}
-              </p>
-            </div>
-
             <div className="relative rounded-2xl border border-neutral-200 bg-white/95 p-6 shadow-lg sm:p-8">
               <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-neutral-100 pb-6">
                 <div>
@@ -527,6 +517,29 @@ export default function VerifyYourArtPage() {
                 </p>
               </div>
             )}
+
+            {/* Sertifika beyanı — tablonun / sonuç bloğunun altında (vadmin’den düzenlenir) */}
+            <div
+              className="mx-auto w-full max-w-2xl rounded-2xl border border-neutral-200/90 bg-white/80 px-5 py-6 shadow-sm backdrop-blur-sm sm:px-8 sm:py-8"
+              aria-labelledby="declaration-heading"
+            >
+              <h2 id="declaration-heading" className="sr-only">
+                Certificate declaration
+              </h2>
+              <p
+                lang="en"
+                className="text-center text-[13px] leading-relaxed text-neutral-600 sm:text-sm md:text-[15px] md:leading-7"
+              >
+                {declaration.en}
+              </p>
+              <div className="my-5 h-px w-full bg-gradient-to-r from-transparent via-[#7D5BB2]/35 to-transparent" />
+              <p
+                lang="tr"
+                className="text-center text-[13px] leading-relaxed text-neutral-500 sm:text-sm md:text-[15px] md:leading-7"
+              >
+                {declaration.tr}
+              </p>
+            </div>
           </section>
         )}
 

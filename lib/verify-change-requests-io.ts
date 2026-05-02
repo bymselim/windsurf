@@ -7,7 +7,7 @@ import { kvGetJson, kvSetJson, isKvAvailable } from "./kv-adapter";
 const DATA_PATH = path.join(process.cwd(), "lib", "data", "verify-change-requests.json");
 const KV_KEY = "luxury_gallery:verify_change_requests";
 
-async function readAll(): Promise<VerifyChangeRequest[]> {
+export async function readChangeRequests(): Promise<VerifyChangeRequest[]> {
   if (await isKvAvailable()) {
     const fromKv = await kvGetJson<VerifyChangeRequest[]>(KV_KEY);
     if (Array.isArray(fromKv)) return fromKv;
@@ -23,7 +23,7 @@ async function readAll(): Promise<VerifyChangeRequest[]> {
 }
 
 export async function appendChangeRequest(entry: Omit<VerifyChangeRequest, "id" | "createdAt">): Promise<void> {
-  const list = await readAll();
+  const list = await readChangeRequests();
   const row: VerifyChangeRequest = {
     ...entry,
     id: randomUUID(),
