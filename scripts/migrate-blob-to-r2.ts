@@ -100,7 +100,12 @@ function safeSegment(s: string): string {
 }
 
 function isVercelBlobUrl(url: string): boolean {
-  return /^https?:\/\//i.test(url) && /\.(blob\.vercel-storage\.com|public\.blob\.vercel-storage\.com)/i.test(url);
+  if (!/^https?:\/\//i.test(url)) return false;
+  try {
+    return new URL(url).hostname.includes("blob.vercel-storage.com");
+  } catch {
+    return false;
+  }
 }
 
 function isAlreadyR2(url: string): boolean {
@@ -217,18 +222,41 @@ async function main(): Promise<void> {
   const entries = await readArtworksFromFile();
 
   if (listCategories) {
+    const dataSource = process.env.REDIS_URL?.trim()
+      ? "KV/Redis (REDIS_URL tanımlı — canlı veri)"
+      : "Dosya veya boş KV (REDIS_URL yoksa genelde lib/data/artworks.json)";
+
+    let blobRows = 0;
     const set = new Set<string>();
     for (const e of entries) {
       const main = e.filename;
       const thumb = e.thumbnailFilename;
-      if (isVercelBlobUrl(main) || (thumb && isVercelBlobUrl(thumb))) {
+      const hasBlob =
+        isVercelBlobUrl(main) || (thumb !== undefined && isVercelBlobUrl(thumb));
+      if (hasBlob) {
+        blobRows++;
         set.add(e.category || "(boş)");
       }
     }
     const list = Array.from(set).sort();
+
+    console.log(`Okunan eser sayısı: ${entries.length}`);
+    console.log(`Veri kaynağı: ${dataSource}`);
+    console.log(`Blob URL içeren eser sayısı: ${blobRows}`);
+    console.log("");
     console.log("Blob URL içeren eserlerin kategorileri:");
     for (const c of list) console.log(`  - ${c}`);
     console.log(`\nToplam: ${list.length} kategori`);
+
+    if (entries.length === 0) {
+      console.log(
+        "\nNot: Hiç eser okunamadı. REDIS_URL canlı ortamdan kopyalı mı kontrol et; yoksa sadece yerel JSON kullanılıyor olabilir."
+      );
+    } else if (blobRows === 0) {
+      console.log(
+        "\nNot: Bu veri kümesinde Vercel Blob adresi yok (zaten R2 / göreli yol / sadece dosya adı olabilir). Taşıma gerekmiyor olabilir."
+      );
+    }
     return;
   }
 
