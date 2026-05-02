@@ -62,3 +62,6 @@ lib/data/faq-access.json
 # Misc
 *.log
 .turbo
+
+# Eski PHP prototipi (Next uygulaması ile kullanılmıyor)
+php-site/
