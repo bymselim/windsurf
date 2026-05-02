@@ -1,8 +1,10 @@
-/** İstemci + sunucu güvenli: `fs` yok — sadece tip ve varsayılan metinler. */
+/** Geriye dönük: sadece beyan tipi/varsayılanı (istemci güvenli). */
 
-export type VerifyDeclaration = { en: string; tr: string };
+import { DEFAULT_VERIFY_PAGE_COPY, type VerifyDeclaration } from "./verify-page-copy-constants";
+
+export type { VerifyDeclaration };
 
 export const DEFAULT_VERIFY_DECLARATION: VerifyDeclaration = {
-  en: "This certificate verifies that the artwork described herein is an original work, produced by the artist exclusively for its owner, and bears the authentic characteristics of the artist.",
-  tr: "Bu sertifika, bu belgede tanımlanan eserin, sanatçı tarafından sahibi için özel olarak üretilmiş özgün bir çalışma olduğunu ve sanatçının özgün niteliklerini taşıdığını onaylar.",
+  en: DEFAULT_VERIFY_PAGE_COPY.declaration.en,
+  tr: DEFAULT_VERIFY_PAGE_COPY.declaration.tr,
 };

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { VerifyCertificateWaves } from "./verify-certificate-waves";
-import { DEFAULT_VERIFY_DECLARATION, type VerifyDeclaration } from "@/lib/verify-declaration-constants";
+import { mergeVerifyPageCopy, type VerifyPageCopy } from "@/lib/verify-page-copy-constants";
 
 type VerifyPayload = {
   webpin: string;
@@ -36,130 +36,11 @@ function FieldLabel({ tr, en }: { tr: string; en: string }) {
   );
 }
 
-const UI: Record<
-  Lang,
-  {
-    intro: string;
-    webpinPlaceholder: string;
-    verify: string;
-    verifying: string;
-    errEmptyPin: string;
-    err404: string;
-    errGeneric: string;
-    errNetwork: string;
-    errChangeShort: string;
-    errChangeSend: string;
-    errChangeFail: string;
-    errChangeStorage: string;
-    send: string;
-    sending: string;
-    cancel: string;
-    changeRequest: string;
-    yourRequest: string;
-    changePlaceholder: string;
-    noContact: string;
-    dash: string;
-    footer: string;
-    authenticity: string;
-    titleMain: string;
-    coaLineEn: string;
-    coaLineTr: string;
-    successTr: string;
-    successEn: string;
-    artistUrl: string;
-    artistRole: string;
-  }
-> = {
-  tr: {
-    intro: "Sertifikanızda yer alan webpin numarasını girerek eser bilgilerinizi güvenle doğrulayın.",
-    webpinPlaceholder: "Örn. ABC12XY",
-    verify: "Doğrula",
-    verifying: "Sorgulanıyor…",
-    errEmptyPin: "Lütfen webpin numaranızı girin.",
-    err404: "Bu webpin ile eşleşen kayıt bulunamadı. Numarayı kontrol edin veya iletişime geçin.",
-    errGeneric: "Doğrulama şu an yapılamadı. Lütfen daha sonra tekrar deneyin.",
-    errNetwork: "Bağlantı hatası. Ağınızı kontrol edip tekrar deneyin.",
-    errChangeShort: "Lütfen talebinizi birkaç cümle ile açıklayın.",
-    errChangeSend: "Gönderilemedi.",
-    errChangeFail: "Gönderim başarısız.",
-    errChangeStorage:
-      "Talep sunucuya yazılamadı (bulut ortamı). Lütfen bir süre sonra tekrar deneyin veya melikesevinc.com üzerinden iletişime geçin.",
-    send: "Gönder",
-    sending: "Gönderiliyor…",
-    cancel: "Vazgeç",
-    changeRequest: "Değişiklik talep et",
-    yourRequest: "Talebiniz",
-    changePlaceholder: "Hangi bilginin güncellenmesini istediğinizi yazın…",
-    noContact: "Bu kayıt için iletişim bilgisi eklenmemiş.",
-    dash: "—",
-    footer: "Melike Sevinc · Eser doğrulama",
-    authenticity: "Authenticity · Otantiklik",
-    titleMain: "VERIFY YOUR ART",
-    coaLineEn: "Certificate of Authenticity",
-    coaLineTr: "Sahiplik sertifikası",
-    successTr:
-      "Talebiniz alındı. Size melikesevinc.com üzerinden ulaşılacak ve bilgilerinizin teyidi alınacaktır; onaylanması halinde düzenlemeler gerçekleşecektir.",
-    successEn:
-      "Your request has been received. You will be contacted via melikesevinc.com to confirm your details; if approved, the updates will be applied.",
-    artistUrl: "www.melikesevinc.com",
-    artistRole: "Artist · Sanatçı",
-  },
-  en: {
-    intro: "Enter the webpin from your certificate to verify your artwork details securely.",
-    webpinPlaceholder: "e.g. ABC12XY",
-    verify: "Verify",
-    verifying: "Checking…",
-    errEmptyPin: "Please enter your webpin.",
-    err404: "No record matches this webpin. Check the number or contact us.",
-    errGeneric: "Verification is unavailable right now. Please try again later.",
-    errNetwork: "Connection error. Check your network and try again.",
-    errChangeShort: "Please describe your request in a few sentences.",
-    errChangeSend: "Could not send.",
-    errChangeFail: "Send failed.",
-    errChangeStorage:
-      "Your request could not be saved. Please try again later or contact us via melikesevinc.com.",
-    send: "Send",
-    sending: "Sending…",
-    cancel: "Cancel",
-    changeRequest: "Request a change",
-    yourRequest: "Your request",
-    changePlaceholder: "Describe which information you would like updated…",
-    noContact: "No contact details have been added for this record.",
-    dash: "—",
-    footer: "Melike Sevinc · Artwork verification",
-    authenticity: "Authenticity · Otantiklik",
-    titleMain: "VERIFY YOUR ART",
-    coaLineEn: "Certificate of Authenticity",
-    coaLineTr: "Sahiplik sertifikası",
-    successTr:
-      "Talebiniz alındı. Size melikesevinc.com üzerinden ulaşılacak ve bilgilerinizin teyidi alınacaktır; onaylanması halinde düzenlemeler gerçekleşecektir.",
-    successEn:
-      "Your request has been received. You will be contacted via melikesevinc.com to confirm your details; if approved, the updates will be applied.",
-    artistUrl: "www.melikesevinc.com",
-    artistRole: "Artist · Sanatçı",
-  },
-};
-
-const FIELD = {
-  record: { tr: "Kayıt", en: "Record" },
-  serial: { tr: "Seri numarası", en: "Serial number" },
-  media: { tr: "Görsel / video", en: "Photo & video" },
-  title: { tr: "Eser adı", en: "Artwork title" },
-  date: { tr: "Tarih", en: "Date" },
-  ownerName: { tr: "Adı soyadı", en: "Name surname" },
-  ownerRole: { tr: "Sahip", en: "Owner" },
-  contact: { tr: "İletişim", en: "Contact" },
-  prev: { tr: "Önceki sahiplikler", en: "Previous ownership" },
-  prevNameCol: { tr: "Adı soyadı", en: "Name surname" },
-  prevDatesCol: { tr: "Tarihler", en: "Dates" },
-  webpin: { tr: "Webpin", en: "Webpin" },
-};
-
 export default function VerifyYourArtPage() {
   const [lang, setLang] = useState<Lang>("tr");
-  const t = UI[lang];
-
-  const [declaration, setDeclaration] = useState<VerifyDeclaration>(() => ({ ...DEFAULT_VERIFY_DECLARATION }));
+  const [copy, setCopy] = useState<VerifyPageCopy>(() => mergeVerifyPageCopy(null));
+  const t = copy[lang];
+  const FIELD = copy.fields;
 
   const [pinInput, setPinInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -171,26 +52,29 @@ export default function VerifyYourArtPage() {
   const [changeDone, setChangeDone] = useState(false);
   const [changeErr, setChangeErr] = useState<string | null>(null);
 
-  /** Webpin sonrası güncel metin (vadmin kaydından sonra da tekrar doğrulayınca gelir). */
+  const loadPageCopy = useCallback(async () => {
+    try {
+      const r = await fetch("/api/public/verify-page-copy");
+      if (!r.ok) return;
+      const j = (await r.json()) as unknown;
+      setCopy(mergeVerifyPageCopy(j));
+    } catch {
+      /* varsayılan */
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPageCopy();
+  }, [loadPageCopy]);
+
   useEffect(() => {
     if (!data) return;
-    void (async () => {
-      try {
-        const r = await fetch("/api/public/verify-declaration");
-        if (!r.ok) return;
-        const j = (await r.json()) as Partial<VerifyDeclaration>;
-        if (typeof j?.en === "string" && typeof j?.tr === "string") {
-          setDeclaration({ en: j.en, tr: j.tr });
-        }
-      } catch {
-        /* varsayılan */
-      }
-    })();
-  }, [data]);
+    void loadPageCopy();
+  }, [data, loadPageCopy]);
 
   const lookup = useCallback(async () => {
     const q = pinInput.trim();
-    const messages = UI[lang];
+    const messages = copy[lang];
     if (!q) {
       setError(messages.errEmptyPin);
       return;
@@ -219,11 +103,11 @@ export default function VerifyYourArtPage() {
     } finally {
       setLoading(false);
     }
-  }, [pinInput, lang]);
+  }, [pinInput, lang, copy]);
 
   const sendChangeRequest = async () => {
     if (!data?.webpin) return;
-    const messages = UI[lang];
+    const messages = copy[lang];
     const msg = changeText.trim();
     if (msg.length < 5) {
       setChangeErr(messages.errChangeShort);
@@ -269,7 +153,7 @@ export default function VerifyYourArtPage() {
             lang === "tr" ? "bg-[#7D5BB2] text-white shadow-sm" : "text-neutral-500 hover:text-[#7D5BB2]"
           }`}
         >
-          TR
+          {copy.langToggleTr}
         </button>
         <button
           type="button"
@@ -278,11 +162,11 @@ export default function VerifyYourArtPage() {
             lang === "en" ? "bg-[#7D5BB2] text-white shadow-sm" : "text-neutral-500 hover:text-[#7D5BB2]"
           }`}
         >
-          EN
+          {copy.langToggleEn}
         </button>
       </div>
     ),
-    [lang]
+    [lang, copy.langToggleTr, copy.langToggleEn]
   );
 
   return (
@@ -530,29 +414,33 @@ export default function VerifyYourArtPage() {
                 lang="en"
                 className="text-center text-[13px] leading-relaxed text-neutral-600 sm:text-sm md:text-[15px] md:leading-7"
               >
-                {declaration.en}
+                {copy.declaration.en}
               </p>
               <div className="my-5 h-px w-full bg-gradient-to-r from-transparent via-[#7D5BB2]/35 to-transparent" />
               <p
                 lang="tr"
                 className="text-center text-[13px] leading-relaxed text-neutral-500 sm:text-sm md:text-[15px] md:leading-7"
               >
-                {declaration.tr}
+                {copy.declaration.tr}
               </p>
             </div>
           </section>
         )}
 
         <div className="mx-auto mt-4 w-full max-w-md border-t border-neutral-200/80 pt-8 text-center">
-          <p className="text-sm font-bold uppercase tracking-[0.12em] text-[#7D5BB2]">Melike Sevinc</p>
-          <p className="mt-1 text-xs text-neutral-500">{t.artistRole}</p>
+          <p className="text-sm font-bold uppercase tracking-[0.12em] text-[#7D5BB2]">{copy.artistName}</p>
+          <p className="mt-1 text-xs text-neutral-500">{copy.artistRole}</p>
           <a
-            href="https://www.melikesevinc.com"
+            href={
+              copy.artistUrl.startsWith("http")
+                ? copy.artistUrl
+                : `https://${copy.artistUrl.replace(/^\/+/, "")}`
+            }
             target="_blank"
             rel="noopener noreferrer"
             className="mt-3 inline-block text-xs text-neutral-500 underline-offset-2 hover:text-[#7D5BB2] hover:underline"
           >
-            {t.artistUrl}
+            {copy.artistUrl}
           </a>
         </div>
 

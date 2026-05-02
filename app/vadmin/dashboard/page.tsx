@@ -156,10 +156,10 @@ export default function VadminDashboardPage() {
               Talepler JSON
             </button>
             <Link
-              href="/vadmin/verify-declaration"
+              href="/vadmin/verify-page"
               className="rounded-lg border border-zinc-600 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
             >
-              Sertifika metni
+              Doğrulama metinleri
             </Link>
             <Link
               href="/verify-your-art"
