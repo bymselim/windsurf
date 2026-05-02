@@ -7,7 +7,11 @@ const KV_KEY = "luxury_gallery:vadmin_password";
 
 const DEFAULT_PASSWORD = process.env.VADMIN_PASSWORD ?? "vadmin-change-me";
 
+/** VADMIN_PASSWORD (env) → KV → dosya → varsayılan. */
 export async function getVadminPassword(): Promise<string> {
+  const fromEnv = process.env.VADMIN_PASSWORD?.trim();
+  if (fromEnv) return fromEnv;
+
   const kvVal = await kvGetString(KV_KEY);
   if (typeof kvVal === "string" && kvVal.trim() !== "") return kvVal.trim();
   try {

@@ -86,7 +86,7 @@ npm start
 
 ## Admin Panel
 
-Access the admin panel at `/admin`. Default password: `selim123`
+Access the admin panel at `/admin`. Default password: `selim123` (only if Redis/KV and `lib/data/admin-password.txt` do not define another password). Set **`ADMIN_PASSWORD`** in `.env.local` or Vercel to force the panel password; it overrides Redis/KV.
 
 Features:
 - **Artworks**: Edit titles, descriptions, prices (TR/EN)

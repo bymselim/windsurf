@@ -9,9 +9,13 @@ const DEFAULT_PASSWORD =
   process.env.ADMIN_PASSWORD ?? "selim123";
 
 /**
- * Returns the current admin password (from file or env/default).
+ * Şifre önceliği: **ADMIN_PASSWORD** (env) → KV/Redis → dosya → kod varsayılanı.
+ * Böylece yerelde REDIS_URL canlı DB’ye işaret etse bile `.env.local` ile panel şifresini net seçebilirsiniz.
  */
 export async function getAdminPassword(): Promise<string> {
+  const fromEnv = process.env.ADMIN_PASSWORD?.trim();
+  if (fromEnv) return fromEnv;
+
   const kvVal = await kvGetString(KV_KEY);
   if (typeof kvVal === "string" && kvVal.trim() !== "") return kvVal.trim();
   try {
