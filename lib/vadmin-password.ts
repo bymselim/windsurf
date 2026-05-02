@@ -7,10 +7,17 @@ const KV_KEY = "luxury_gallery:vadmin_password";
 
 const DEFAULT_PASSWORD = process.env.VADMIN_PASSWORD ?? "vadmin-change-me";
 
-/** VADMIN_PASSWORD (env) → KV → dosya → varsayılan. */
+/**
+ * VADMIN_PASSWORD → (yoksa) ADMIN_PASSWORD → KV → dosya → varsayılan.
+ * Tek şifre kullanan kurulumlarda `.env.local`e sadece ADMIN_PASSWORD yazmak yeterli;
+ * Redis’te eski `luxury_gallery:vadmin_password` olsa bile env önce okunur.
+ */
 export async function getVadminPassword(): Promise<string> {
-  const fromEnv = process.env.VADMIN_PASSWORD?.trim();
-  if (fromEnv) return fromEnv;
+  const fromVadminEnv = process.env.VADMIN_PASSWORD?.trim();
+  if (fromVadminEnv) return fromVadminEnv;
+
+  const fromAdminEnv = process.env.ADMIN_PASSWORD?.trim();
+  if (fromAdminEnv) return fromAdminEnv;
 
   const kvVal = await kvGetString(KV_KEY);
   if (typeof kvVal === "string" && kvVal.trim() !== "") return kvVal.trim();

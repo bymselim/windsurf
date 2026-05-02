@@ -90,9 +90,10 @@ export default function VadminLoginPage() {
             {busy ? "…" : "Giriş"}
           </button>
         </form>
-        <p className="mt-6 text-xs text-zinc-600">
-          Ortam değişkeni: <code className="text-zinc-500">VADMIN_PASSWORD</code> veya{" "}
-          <code className="text-zinc-500">lib/data/vadmin-password.txt</code>
+        <p className="mt-6 text-xs text-zinc-600 leading-relaxed">
+          Şifre sırası: <code className="text-zinc-500">VADMIN_PASSWORD</code> →{" "}
+          <code className="text-zinc-500">ADMIN_PASSWORD</code> (ikisi de yoksa Redis/KV) → dosya{" "}
+          <code className="text-zinc-500">lib/data/vadmin-password.txt</code>.
         </p>
       </div>
     </div>
