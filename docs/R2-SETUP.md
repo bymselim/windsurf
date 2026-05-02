@@ -40,6 +40,29 @@ npm run upload:r2
 
 (`R2_*` dolu olmalı; çıktı: `scripts/blob-mapping.json`)
 
-## 4) Maliyet
+## 4) Vercel Blob → R2 toplu taşıma (kategori kategori)
+
+Üretim verisini güncellemek için makinede proje kökünde, `.env.local` içinde **R2_*** ve **REDIS_URL** (KV kullanıyorsanız) tanımlı olsun.
+
+```bash
+# Blob URL’si olan kategorileri listele
+npm run migrate:blob-to-r2 -- --list-categories
+
+# Önce kuru deneme (kayıt yazılmaz)
+npm run migrate:blob-to-r2 -- --category=Stone --dry-run
+
+# Tek kategori
+npm run migrate:blob-to-r2 -- --category=Stone
+
+# İlk 10 eser (test)
+npm run migrate:blob-to-r2 -- --category=Stone --limit=10
+
+# Tüm kategoriler (dikkat: uzun sürer)
+npm run migrate:blob-to-r2 -- --all
+```
+
+Dosyalar R2’de `migrated/artworks/{Kategori}/` altına konur; aynı Blob URL tekrar görülürse yeniden indirilmez (önbellek).
+
+## 5) Maliyet
 
 Güncel tablo: [Cloudflare R2 Pricing](https://developers.cloudflare.com/r2/pricing/)

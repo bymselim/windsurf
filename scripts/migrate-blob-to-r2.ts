@@ -1,0 +1,260 @@
+/**
+ * Vercel Blob URL'lerini indirip R2'ye yükler; eser kayıtlarındaki URL'leri günceller.
+ *
+ * Gereksinim: .env.local veya ortamda R2_* değişkenleri + üretim verisi için REDIS_URL (KV).
+ *
+ * Kullanım:
+ *   npx tsx scripts/migrate-blob-to-r2.ts --list-categories
+ *   npx tsx scripts/migrate-blob-to-r2.ts --category=Stone --dry-run
+ *   npx tsx scripts/migrate-blob-to-r2.ts --category=Stone
+ *   npx tsx scripts/migrate-blob-to-r2.ts --all --limit=20
+ *
+ * Not: Aynı Blob URL birden fazla eserde geçerse tek indirme / tek R2 nesnesi (idempotent).
+ */
+
+import { createHash } from "crypto";
+import { existsSync, readFileSync } from "fs";
+import path from "path";
+import { isR2Configured, uploadPublicExactKey } from "../lib/object-storage";
+import {
+  readArtworksFromFile,
+  writeArtworksToFile,
+  type ArtworkJson,
+} from "../lib/artworks-io";
+
+function loadEnvLocal(): void {
+  const p = path.join(process.cwd(), ".env.local");
+  if (!existsSync(p)) return;
+  for (const line of readFileSync(p, "utf-8").split("\n")) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    const eq = t.indexOf("=");
+    if (eq <= 0) continue;
+    const k = t.slice(0, eq).trim();
+    let v = t.slice(eq + 1).trim();
+    if (
+      (v.startsWith('"') && v.endsWith('"')) ||
+      (v.startsWith("'") && v.endsWith("'"))
+    ) {
+      v = v.slice(1, -1);
+    }
+    if (process.env[k] === undefined) process.env[k] = v;
+  }
+}
+
+function safeSegment(s: string): string {
+  return s
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-zA-Z0-9._\-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^\.+/, "")
+    .slice(0, 80) || "other";
+}
+
+function isVercelBlobUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url) && /\.(blob\.vercel-storage\.com|public\.blob\.vercel-storage\.com)/i.test(url);
+}
+
+function isAlreadyR2(url: string): boolean {
+  const base = process.env.R2_PUBLIC_BASE_URL?.replace(/\/$/, "");
+  return Boolean(base && url.startsWith(base + "/"));
+}
+
+function extFromUrlOrType(url: string, contentType: string | null): string {
+  const lower = url.toLowerCase();
+  const fromPath = lower.match(/\.(jpg|jpeg|png|webp|gif|mp4|webm|mov|ogg)(\?|$)/i);
+  if (fromPath) return "." + fromPath[1].toLowerCase().replace("jpeg", "jpg");
+  if (!contentType) return ".bin";
+  if (contentType.includes("jpeg")) return ".jpg";
+  if (contentType.includes("png")) return ".png";
+  if (contentType.includes("webp")) return ".webp";
+  if (contentType.includes("gif")) return ".gif";
+  if (contentType.includes("mp4")) return ".mp4";
+  if (contentType.includes("webm")) return ".webm";
+  if (contentType.includes("quicktime")) return ".mov";
+  return ".bin";
+}
+
+async function fetchBlob(url: string): Promise<{ buffer: Buffer; contentType: string | null }> {
+  const res = await fetch(url, {
+    headers: { "User-Agent": "BlobToR2Migration/1.0" },
+    redirect: "follow",
+  });
+  if (!res.ok) {
+    throw new Error(`GET ${url} -> ${res.status}`);
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  const ct = res.headers.get("content-type");
+  return { buffer: buf, contentType: ct };
+}
+
+/** Aynı kaynak URL → aynı R2 key (tekrar çalıştırmada güvenli). */
+const migratedCache = new Map<string, string>();
+
+async function migrateOneUrl(
+  oldUrl: string,
+  category: string,
+  dryRun: boolean
+): Promise<string> {
+  if (!isVercelBlobUrl(oldUrl)) return oldUrl;
+  if (isAlreadyR2(oldUrl)) return oldUrl;
+
+  if (migratedCache.has(oldUrl)) {
+    return migratedCache.get(oldUrl)!;
+  }
+
+  const catSeg = safeSegment(category);
+  const hash16 = createHash("sha256").update(oldUrl).digest("hex").slice(0, 16);
+
+  if (dryRun) {
+    const previewKey = `migrated/artworks/${catSeg}/${hash16}<ext>`;
+    console.log(`  [dry-run] would migrate: ${oldUrl.slice(0, 72)}... -> ${previewKey}`);
+    return oldUrl;
+  }
+
+  const { buffer, contentType } = await fetchBlob(oldUrl);
+  const ext = extFromUrlOrType(oldUrl, contentType);
+  const objectKey = `migrated/artworks/${catSeg}/${hash16}${ext}`;
+
+  const { url: newUrl } = await uploadPublicExactKey(objectKey, buffer, contentType ?? undefined);
+  migratedCache.set(oldUrl, newUrl);
+  console.log(`  OK ${hash16}${ext} (${(buffer.length / 1024).toFixed(1)} KB)`);
+  return newUrl;
+}
+
+function parseArgs(): {
+  category: string | null;
+  all: boolean;
+  dryRun: boolean;
+  limit: number | null;
+  listCategories: boolean;
+} {
+  const argv = process.argv.slice(2);
+  let category: string | null = null;
+  let all = false;
+  let dryRun = false;
+  let limit: number | null = null;
+  let listCategories = false;
+
+  for (const a of argv) {
+    if (a === "--all") all = true;
+    else if (a === "--dry-run") dryRun = true;
+    else if (a === "--list-categories") listCategories = true;
+    else if (a.startsWith("--category=")) category = a.slice("--category=".length).trim() || null;
+    else if (a.startsWith("--limit=")) {
+      const n = parseInt(a.slice("--limit=".length), 10);
+      if (!Number.isNaN(n) && n > 0) limit = n;
+    }
+  }
+
+  return { category, all, dryRun, limit, listCategories };
+}
+
+async function main(): Promise<void> {
+  loadEnvLocal();
+
+  if (!isR2Configured()) {
+    console.error("R2 ortam değişkenleri eksik (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_BASE_URL).");
+    process.exit(1);
+  }
+
+  const { category, all, dryRun, limit, listCategories } = parseArgs();
+
+  const entries = await readArtworksFromFile();
+
+  if (listCategories) {
+    const set = new Set<string>();
+    for (const e of entries) {
+      const main = e.filename;
+      const thumb = e.thumbnailFilename;
+      if (isVercelBlobUrl(main) || (thumb && isVercelBlobUrl(thumb))) {
+        set.add(e.category || "(boş)");
+      }
+    }
+    const list = Array.from(set).sort();
+    console.log("Blob URL içeren eserlerin kategorileri:");
+    for (const c of list) console.log(`  - ${c}`);
+    console.log(`\nToplam: ${list.length} kategori`);
+    return;
+  }
+
+  if (!all && !category) {
+    console.error("Bir kategori seçin: --category=Stone veya --all");
+    console.error("Önce: npx tsx scripts/migrate-blob-to-r2.ts --list-categories");
+    process.exit(1);
+  }
+
+  if (all && category) {
+    console.error("--all ile --category birlikte kullanılamaz.");
+    process.exit(1);
+  }
+
+  const filtered = entries.filter((e) => {
+    if (all) return true;
+    return (e.category || "").trim() === (category ?? "").trim();
+  });
+
+  const workList: ArtworkJson[] = [];
+  for (const e of filtered) {
+    const needs =
+      isVercelBlobUrl(e.filename) ||
+      (e.thumbnailFilename && isVercelBlobUrl(e.thumbnailFilename));
+    if (needs) workList.push(e);
+  }
+
+  const capped = limit != null ? workList.slice(0, limit) : workList;
+
+  console.log(
+    `Hedef: ${all ? "TÜM kategoriler" : `kategori "${category}"`} | Blob taşıması gereken eser: ${workList.length} (bu koşuda işlenecek: ${capped.length})${dryRun ? " [DRY-RUN]" : ""}`
+  );
+
+  if (capped.length === 0) {
+    console.log("Taşınacak Blob URL yok.");
+    return;
+  }
+
+  let data = [...entries];
+
+  let updated = 0;
+  for (const item of capped) {
+    console.log(`\n→ ${item.id} | ${item.category} | ${item.titleTR?.slice(0, 40) ?? ""}`);
+
+    const idx = data.findIndex((x) => x.id === item.id);
+    if (idx < 0) continue;
+    const cur = data[idx];
+
+    let nextFilename = cur.filename;
+    let nextThumb = cur.thumbnailFilename;
+
+    try {
+      nextFilename = await migrateOneUrl(cur.filename, cur.category, dryRun);
+      if (cur.thumbnailFilename) {
+        nextThumb = await migrateOneUrl(cur.thumbnailFilename, cur.category, dryRun);
+      }
+
+      if (
+        !dryRun &&
+        (nextFilename !== cur.filename || nextThumb !== cur.thumbnailFilename)
+      ) {
+        data[idx] = {
+          ...cur,
+          filename: nextFilename,
+          thumbnailFilename: nextThumb,
+        };
+        await writeArtworksToFile(data);
+        updated++;
+        console.log(`  Kayıt güncellendi (${updated}).`);
+      }
+    } catch (err) {
+      console.error(`  HATA: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  console.log(`\nBitti. Güncellenen eser: ${dryRun ? 0 : updated}`);
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
