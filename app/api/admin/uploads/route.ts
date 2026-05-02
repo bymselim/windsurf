@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 import { createHash, randomUUID } from "crypto";
 import sharp from "sharp";
+import { uploadPublicMedia } from "@/lib/object-storage";
 import { readArtworksFromFile, writeArtworksToFile } from "@/lib/artworks-io";
 import { readCategoriesFromFile, writeCategoriesToFile } from "@/lib/categories-io";
 import { dimensionsCMToIN } from "@/lib/dimensions";
@@ -114,12 +114,8 @@ export async function POST(request: NextRequest) {
       }
       existingHashesInCategory.add(contentHash);
 
-      const blobPath = folder ? `${prefix}/${folder}/${filename}` : `${prefix}/${filename}`;
-      const res = await put(blobPath, buf, {
-        access: "public",
-        addRandomSuffix: true,
-        contentType: file.type || undefined,
-      });
+      const keyPrefix = folder ? `${prefix}/${folder}` : prefix;
+      const res = await uploadPublicMedia(keyPrefix, filename, buf, file.type || undefined);
 
       let thumbUrl: string | undefined;
       if ((file.type || "").startsWith("image/")) {
@@ -130,14 +126,9 @@ export async function POST(request: NextRequest) {
             .jpeg({ quality: 82, mozjpeg: true })
             .toBuffer();
           const base = filename.replace(/\.[^.]+$/, "") || "thumb";
-          const thumbPath = folder
-            ? `${prefix}/${folder}/thumb-${safePathSegment(base)}.jpg`
-            : `${prefix}/thumb-${safePathSegment(base)}.jpg`;
-          const thumbRes = await put(thumbPath, thumb, {
-            access: "public",
-            addRandomSuffix: true,
-            contentType: "image/jpeg",
-          });
+          const thumbName = `thumb-${safePathSegment(base)}.jpg`;
+          const thumbPrefix = folder ? `${prefix}/${folder}` : prefix;
+          const thumbRes = await uploadPublicMedia(thumbPrefix, thumbName, thumb, "image/jpeg");
           thumbUrl = thumbRes.url;
         } catch {
           // ignore thumbnail failures
@@ -214,7 +205,7 @@ export async function POST(request: NextRequest) {
   } catch (e) {
     return NextResponse.json(
       {
-        error: "Uploaded to Blob but failed to create artworks",
+        error: "Dosyalar yüklendi ancak eser kaydı oluşturulamadı",
         details: e instanceof Error ? e.message : String(e),
         files: uploads,
       },

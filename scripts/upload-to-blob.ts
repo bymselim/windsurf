@@ -1,7 +1,7 @@
-import { put } from "@vercel/blob";
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
+import { isR2Configured, uploadPublicExactKey } from "../lib/object-storage";
 
 type MappingEntry = {
   localPath: string;
@@ -42,18 +42,16 @@ async function collectFiles(dir: string): Promise<string[]> {
   return out;
 }
 
-function requireEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) {
-    throw new Error(
-      `Missing ${name}. Add it to your environment (e.g. export ${name}=...) and re-run.`
-    );
-  }
-  return v;
+function requireBlobOrR2(): void {
+  if (isR2Configured()) return;
+  if (process.env.BLOB_READ_WRITE_TOKEN) return;
+  throw new Error(
+    "R2 (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_BASE_URL) veya BLOB_READ_WRITE_TOKEN gerekli."
+  );
 }
 
 async function main() {
-  requireEnv("BLOB_READ_WRITE_TOKEN");
+  requireBlobOrR2();
 
   const root = process.cwd();
   const artworksDir = path.join(root, "public", "artworks");
@@ -83,20 +81,16 @@ async function main() {
         .split(path.sep)
         .join("/");
 
-      const blobPath = `${prefix}/${rel}`;
+      const objectKey = `${prefix}/${rel}`;
       const stat = await fs.stat(filePath);
       const sha1 = await fileSha1(filePath);
       const buf = await fs.readFile(filePath);
 
-      const res = await put(blobPath, buf, {
-        access: "public",
-        addRandomSuffix: false,
-        contentType: undefined,
-      });
+      const res = await uploadPublicExactKey(objectKey, buf, undefined);
 
       mapping.push({
         localPath: filePath,
-        blobPath,
+        blobPath: objectKey,
         url: res.url,
         size: stat.size,
         sha1,

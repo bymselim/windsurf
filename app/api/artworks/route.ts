@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { del } from "@vercel/blob";
+import { deleteStoredMediaByUrl } from "@/lib/object-storage";
 import {
   readArtworksFromFile,
   writeArtworksToFile,
@@ -214,7 +214,7 @@ export async function DELETE(request: NextRequest) {
   // Ignore failures so we don't block record deletion.
   if (removed?.filename && typeof removed.filename === "string" && isAbsoluteUrl(removed.filename)) {
     try {
-      await del(removed.filename);
+      await deleteStoredMediaByUrl(removed.filename);
     } catch {
       // ignore
     }

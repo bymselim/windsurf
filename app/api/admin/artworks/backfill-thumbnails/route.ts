@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 import sharp from "sharp";
+import { uploadPublicMedia } from "@/lib/object-storage";
 import { readArtworksFromFile, writeArtworksToFile } from "@/lib/artworks-io";
 
 const COOKIE_NAME = "admin_session";
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       const buf = Buffer.from(await res.arrayBuffer());
       const folder = safePathSegment(item.category) || "other";
       const base = item.filename.replace(/\.[^.]+$/, "").replace(/^.*\//, "") || item.id.slice(0, 8);
-      const thumbPath = `${prefix}/${folder}/thumb-backfill-${safePathSegment(base)}.jpg`;
+      const thumbName = `thumb-backfill-${safePathSegment(base)}.jpg`;
 
       const thumb = await sharp(buf)
         .rotate()
@@ -89,11 +89,8 @@ export async function POST(request: NextRequest) {
         .jpeg({ quality: 82, mozjpeg: true })
         .toBuffer();
 
-      const thumbRes = await put(thumbPath, thumb, {
-        access: "public",
-        addRandomSuffix: true,
-        contentType: "image/jpeg",
-      });
+      const thumbPrefix = `${prefix}/${folder}`;
+      const thumbRes = await uploadPublicMedia(thumbPrefix, thumbName, thumb, "image/jpeg");
 
       const index = entries.findIndex((e) => e.id === item.id);
       if (index >= 0) {

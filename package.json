@@ -10,9 +10,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "upload:blob": "tsx scripts/upload-to-blob.ts"
+    "upload:blob": "tsx scripts/upload-to-blob.ts",
+    "upload:r2": "tsx scripts/upload-to-blob.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.750.0",
     "@hookform/resolvers": "^3.9.1",
     "@vercel/blob": "^0.27.0",
     "@vercel/kv": "^1.0.1",
