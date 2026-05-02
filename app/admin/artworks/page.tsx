@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getAdminAuthHeaders } from "@/lib/admin-auth-client";
+import { InfoTip } from "@/components/admin/InfoTip";
 
 const PAGE_SIZE = 50;
 
@@ -111,6 +112,9 @@ export default function ArtworksAdminPage() {
   const [expandedPriceVariants, setExpandedPriceVariants] = useState<Record<string, boolean>>({});
   const [translateLoading, setTranslateLoading] = useState(false);
   const [translateStatus, setTranslateStatus] = useState("");
+  const [percentAdjust, setPercentAdjust] = useState("");
+  const [percentAdjustLoading, setPercentAdjustLoading] = useState(false);
+  const [percentAdjustMessage, setPercentAdjustMessage] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -522,6 +526,51 @@ export default function ArtworksAdminPage() {
     );
   };
 
+  const runPercentAdjustOnIds = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) {
+        setPercentAdjustMessage("Önce eser seçin veya filtre sonucuna uygulayın.");
+        return;
+      }
+      const p = Number(String(percentAdjust).replace(",", "."));
+      if (!Number.isFinite(p)) {
+        setPercentAdjustMessage("Geçerli bir yüzde girin (örn. 5 veya -10 indirim).");
+        return;
+      }
+      if (ids.length > 400) {
+        const ok = window.confirm(
+          `${ids.length} eserin kayıtlı fiyatı güncellenecek ve doğrudan kaydedilecek. Devam edilsin mi?`
+        );
+        if (!ok) return;
+      }
+      setPercentAdjustLoading(true);
+      setPercentAdjustMessage("");
+      try {
+        const res = await fetch("/api/admin/artworks/apply-price-percent", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids, percent: p }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setPercentAdjustMessage(typeof data?.error === "string" ? data.error : "İstek başarısız.");
+          return;
+        }
+        const n = typeof data.updated === "number" ? data.updated : 0;
+        setPercentAdjustMessage(
+          `${n} eser güncellendi (kaydedildi). Not: kategori fiyat listesi kullanan ve kendi varyantı olmayan eserlerde galeri fiyatı Kategoriler’den gelir.`
+        );
+        await loadArtworks();
+      } catch {
+        setPercentAdjustMessage("İstek hatası.");
+      } finally {
+        setPercentAdjustLoading(false);
+      }
+    },
+    [percentAdjust, loadArtworks]
+  );
+
   const filtered = artworks.filter((art) => {
     const searchLower = search.toLowerCase();
     const matchSearch =
@@ -720,42 +769,62 @@ export default function ArtworksAdminPage() {
           </Link>
         </div>
 
-        <div className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold">Artworks Editor (TR / EN)</h1>
-          <p className="text-zinc-400 mt-1">
-            {artworks.length} total • Edit Turkish & English fields side-by-side
-          </p>
+        <div className="mb-8 space-y-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold">Artworks Editor (TR / EN)</h1>
+            <p className="text-zinc-400 mt-1">
+              {artworks.length} kayıt • Tabloda düzenleyin; turuncu «Toplu Kaydet» ile kaydedilmemiş satırları
+              diske yazın.
+            </p>
+          </div>
 
-          <div className="mt-4 flex flex-wrap gap-3">
-            <input
-              type="text"
-              placeholder="Search by title (TR/EN) or category..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full md:w-80 p-3 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
-            />
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 focus:border-amber-500/50"
-            >
-              <option value="">All categories</option>
-              {categoryList.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-            <select
-              value={featuredFilter}
-              onChange={(e) => setFeaturedFilter(e.target.value)}
-              className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 focus:border-amber-500/50"
-            >
-              <option value="">Featured: all</option>
-              <option value="yes">Featured only</option>
-              <option value="no">Not featured</option>
-            </select>
-            <div className="flex flex-wrap gap-2 items-center rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
+          {/* 1 — Liste */}
+          <section className="rounded-xl border border-zinc-800 bg-zinc-900/35 p-4">
+            <h2 className="mb-3 flex flex-wrap items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-300">
+              <span className="text-amber-500/90">1</span> Filtre ve sıralama
+              <InfoTip text="Listeyi daraltır. «Fiyat yok» vb. ile eksik verileri bulun. Sıralama sadece görünümü değiştirir." />
+            </h2>
+            <div className="flex flex-wrap gap-3">
+              <input
+                type="text"
+                placeholder="Başlık (TR/EN) veya kategori ara…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full min-w-[200px] flex-1 md:max-w-md p-3 bg-zinc-950 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+              />
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="p-3 bg-zinc-950 border border-zinc-700 rounded-lg text-zinc-100 focus:border-amber-500/50"
+              >
+                <option value="">Tüm kategoriler</option>
+                {categoryList.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={featuredFilter}
+                onChange={(e) => setFeaturedFilter(e.target.value)}
+                className="p-3 bg-zinc-950 border border-zinc-700 rounded-lg text-zinc-100 focus:border-amber-500/50"
+              >
+                <option value="">Öne çıkan: hepsi</option>
+                <option value="yes">Sadece öne çıkan</option>
+                <option value="no">Öne çıkan değil</option>
+              </select>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as "title" | "price" | "category")}
+                className="p-3 bg-zinc-950 border border-zinc-700 rounded-lg text-zinc-100 focus:border-amber-500/50"
+              >
+                <option value="title">Sıra: başlık (TR)</option>
+                <option value="price">Sıra: fiyat (TRY)</option>
+                <option value="category">Sıra: kategori</option>
+              </select>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-3 rounded-lg border border-zinc-800/80 bg-zinc-950/50 p-3">
+              <span className="w-full text-xs text-zinc-500 md:w-auto md:mr-2">Hızlı filtre</span>
               <label className="flex items-center gap-2 text-sm text-zinc-300 select-none">
                 <input
                   type="checkbox"
@@ -784,102 +853,156 @@ export default function ArtworksAdminPage() {
                 Fiyat yok
               </label>
             </div>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as "title" | "price" | "category")}
-              className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 focus:border-amber-500/50"
-            >
-              <option value="title">Sort by title (TR)</option>
-              <option value="price">Sort by price (TRY)</option>
-              <option value="category">Sort by category</option>
-            </select>
+          </section>
 
-            <div className="flex flex-wrap gap-2 items-center rounded-lg border border-zinc-800 bg-zinc-900/40 p-2">
-              <select
-                value={bulkPriceCategory}
-                onChange={(e) => setBulkPriceCategory(e.target.value)}
-                className="p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 focus:border-amber-500/50"
-              >
-                <option value="">Kategori fiyatını değiştir...</option>
-                {categoryList.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={bulkPriceTRY}
-                onChange={(e) => setBulkPriceTRY(e.target.value)}
-                inputMode="decimal"
-                placeholder="TRY"
-                className="w-24 p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50"
-              />
-              <input
-                value={bulkPriceUSD}
-                onChange={(e) => setBulkPriceUSD(e.target.value)}
-                inputMode="decimal"
-                placeholder="USD"
-                className="w-24 p-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50"
-              />
+          {/* 2 — Fiyat araçları */}
+          <section className="rounded-xl border border-zinc-800 bg-zinc-900/35 p-4">
+            <h2 className="mb-3 flex flex-wrap items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-300">
+              <span className="text-amber-500/90">2</span> Toplu fiyat
+              <InfoTip text="Soldaki kutu: aynı kategorideki tüm eserlere sabit TRY/USD yazar (tabloda; kaydetmeyi unutmayın). Sağdaki: yüzde zam veya indirim sunucuya hemen yazar." />
+            </h2>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3">
+                <div className="mb-2 flex items-center gap-1 text-xs font-medium text-zinc-400">
+                  Kategoriye sabit ana fiyat
+                  <InfoTip text="Seçilen kategorideki her eserin priceTRY / priceUSD alanını doldurur. Varyant satırlarını değiştirmez. Değişiklikleri kaydetmek için alttaki Toplu Kaydet gerekir." />
+                </div>
+                <div className="flex flex-wrap gap-2 items-end">
+                  <select
+                    value={bulkPriceCategory}
+                    onChange={(e) => setBulkPriceCategory(e.target.value)}
+                    className="min-w-[10rem] flex-1 p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-100 text-sm"
+                  >
+                    <option value="">Kategori seç…</option>
+                    {categoryList.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    value={bulkPriceTRY}
+                    onChange={(e) => setBulkPriceTRY(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="TRY"
+                    className="w-24 p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-100 text-sm"
+                  />
+                  <input
+                    value={bulkPriceUSD}
+                    onChange={(e) => setBulkPriceUSD(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="USD"
+                    className="w-24 p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-100 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={applyBulkPrice}
+                    disabled={!bulkPriceCategory.trim()}
+                    className="rounded-lg bg-zinc-700 hover:bg-zinc-600 px-3 py-2 text-sm font-medium transition disabled:opacity-50"
+                  >
+                    Tabloya uygula
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3">
+                <div className="mb-2 flex items-center gap-1 text-xs font-medium text-amber-200/90">
+                  % ile zam veya indirim (anında kayıt)
+                  <InfoTip text="Pozitif: zam (örn. 5). Negatif: indirim (örn. -10). Her eserde varyant satırı varsa hepsine uygulanır; yoksa ana TRY/USD’ye uygulanır. TL en yakın 1000’e, USD en yakın 100’e yuvarlanır. Kategori fiyat listesi kullanan ve kendi varyantı olmayan eserlerde galeri fiyatı kategoriden gelir — onlar için Kategoriler sayfasındaki varsayılan listeyi güncelleyin." />
+                </div>
+                <div className="flex flex-wrap gap-2 items-end">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={percentAdjust}
+                    onChange={(e) => setPercentAdjust(e.target.value)}
+                    placeholder="örn. 5 veya -10"
+                    className="w-32 p-2 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-100 text-sm"
+                  />
+                  <button
+                    type="button"
+                    disabled={percentAdjustLoading || selectedIdList.length === 0}
+                    onClick={() => void runPercentAdjustOnIds(selectedIdList)}
+                    className="rounded-lg bg-amber-500 hover:bg-amber-600 px-3 py-2 text-sm font-semibold text-zinc-950 transition disabled:opacity-50"
+                  >
+                    {percentAdjustLoading ? "…" : "Seçilenlere uygula"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={percentAdjustLoading || filtered.length === 0}
+                    onClick={() => void runPercentAdjustOnIds(filtered.map((a) => a.id))}
+                    className="rounded-lg border border-zinc-600 bg-zinc-800 hover:bg-zinc-700 px-3 py-2 text-sm transition disabled:opacity-50"
+                  >
+                    Filtreye uygula
+                  </button>
+                </div>
+                {percentAdjustMessage ? (
+                  <p className="mt-2 text-xs leading-relaxed text-zinc-400">{percentAdjustMessage}</p>
+                ) : null}
+              </div>
+            </div>
+          </section>
+
+          {/* 3 — Kayıt / seçim */}
+          <section className="rounded-xl border border-zinc-800 bg-zinc-900/35 p-4">
+            <h2 className="mb-3 flex flex-wrap items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-300">
+              <span className="text-amber-500/90">3</span> Kayıt ve seçim
+              <InfoTip text="Tabloda değiştirdiğiniz satırlar turuncu «Toplu Kaydet» ile veritabanına yazılır. Checkbox ile seçim, aşağıdaki toplu işlemler ve % fiyat için kullanılır." />
+            </h2>
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={applyBulkPrice}
-                disabled={!bulkPriceCategory.trim()}
-                className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-3 py-2 text-sm font-medium transition disabled:opacity-50"
+                onClick={saveAllChanges}
+                disabled={bulkSaving || savingId != null || dirtyIds.length === 0}
+                className="rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 px-4 py-3 text-sm font-semibold transition disabled:opacity-50"
               >
-                Uygula
+                {bulkSaving ? "Kaydediliyor…" : `Toplu Kaydet (${dirtyIds.length})`}
+              </button>
+              {bulkStatus ? <span className="text-sm text-zinc-400">{bulkStatus}</span> : null}
+              <button
+                type="button"
+                onClick={selectAllFiltered}
+                disabled={filtered.length === 0}
+                className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-4 py-2 text-sm font-medium transition disabled:opacity-50"
+              >
+                Filtredekilerin tümünü seç
               </button>
             </div>
+          </section>
 
-            <button
-              type="button"
-              onClick={saveAllChanges}
-              disabled={bulkSaving || savingId != null || dirtyIds.length === 0}
-              className="rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 px-4 py-3 text-sm font-semibold transition disabled:opacity-50"
-            >
-              {bulkSaving ? "Saving..." : `Toplu Kaydet (${dirtyIds.length})`}
-            </button>
-            {bulkStatus ? <span className="text-sm text-zinc-400 self-center">{bulkStatus}</span> : null}
-
-            <button
-              type="button"
-              onClick={selectAllFiltered}
-              disabled={filtered.length === 0}
-              className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-4 py-3 text-sm font-semibold transition disabled:opacity-50"
-            >
-              Toplu Seç (Filtre)
-            </button>
-
-            <button
-              type="button"
-              onClick={validateImageUrls}
-              disabled={validateLoading}
-              className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-4 py-3 text-sm font-semibold transition disabled:opacity-50"
-            >
-              {validateLoading ? "Kontrol ediliyor..." : "Resimleri kontrol et (ölü linkler)"}
-            </button>
-
-            <button
-              type="button"
-              onClick={runBackfillThumbnails}
-              disabled={backfillLoading || (backfillNeeds !== null && backfillNeeds === 0)}
-              className="rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-zinc-950 px-4 py-3 text-sm font-semibold transition"
-              title="Thumbnail'ı olmayan eserler için 512px küçük resim oluşturur. Galeri hızı artar."
-            >
-              {backfillLoading
-                ? "Thumbnail oluşturuluyor..."
-                : backfillNeeds !== null && backfillNeeds > 0
-                  ? `Eski eserlere thumbnail oluştur (${backfillNeeds})`
-                  : "Thumbnail oluştur"}
-            </button>
-          </div>
-
-          {backfillStatus ? (
-            <p className="mt-2 text-sm text-zinc-300">{backfillStatus}</p>
-          ) : null}
+          {/* 4 — Bakım */}
+          <section className="rounded-xl border border-zinc-800 bg-zinc-900/35 p-4">
+            <h2 className="mb-3 flex flex-wrap items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-300">
+              <span className="text-amber-500/90">4</span> Bakım
+              <InfoTip text="Ölü link: görsel URL’sine erişilemiyor mu kontrol eder. Thumbnail: grid için küçük önizleme üretir; sayfa hızını artırır." />
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={validateImageUrls}
+                disabled={validateLoading}
+                className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 px-4 py-2 text-sm font-medium transition disabled:opacity-50"
+              >
+                {validateLoading ? "Kontrol…" : "Resim linklerini kontrol et"}
+              </button>
+              <button
+                type="button"
+                onClick={runBackfillThumbnails}
+                disabled={backfillLoading || (backfillNeeds !== null && backfillNeeds === 0)}
+                className="rounded-lg bg-zinc-800 hover:bg-zinc-700 px-4 py-2 text-sm font-medium transition disabled:opacity-50"
+              >
+                {backfillLoading
+                  ? "Thumbnail…"
+                  : backfillNeeds !== null && backfillNeeds > 0
+                    ? `Thumbnail oluştur (${backfillNeeds})`
+                    : "Thumbnail oluştur"}
+              </button>
+            </div>
+            {backfillStatus ? <p className="mt-2 text-sm text-zinc-400">{backfillStatus}</p> : null}
+          </section>
 
           {validateResult && (
-            <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
               <div className="text-sm text-zinc-300">
                 Toplam: <span className="font-semibold text-zinc-100">{validateResult.total}</span>
                 {" · "}
@@ -893,7 +1016,12 @@ export default function ArtworksAdminPage() {
                     <li key={d.id} className="flex flex-wrap items-center gap-2 rounded bg-zinc-800/50 p-2">
                       <span className="font-mono text-amber-400">{d.id}</span>
                       <span className="text-zinc-400 truncate max-w-[200px]">{d.titleTR || "—"}</span>
-                      <a href={d.imageUrl} target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-amber-500 truncate max-w-[280px]">
+                      <a
+                        href={d.imageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-zinc-500 hover:text-amber-500 truncate max-w-[280px]"
+                      >
                         {d.imageUrl}
                       </a>
                       {d.reason ? <span className="text-red-400/80 text-xs">{d.reason}</span> : null}
@@ -905,22 +1033,26 @@ export default function ArtworksAdminPage() {
           )}
 
           {!loading && artworks.length > 0 ? (
-            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
-              <button
-                type="button"
-                onClick={translateDescriptionsTRtoEN}
-                disabled={translateLoading}
-                className="rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-zinc-950 px-4 py-2 text-sm font-medium transition"
-              >
-                {translateLoading ? "Çevriliyor..." : "TR açıklamalarını EN’ye çevir"}
-              </button>
-              <span className="text-sm text-zinc-400">
-                {selectedIdList.length > 0 ? "Seçili eserler" : "TR açıklaması olan tüm eserler"} çevrilir.
-              </span>
-              {translateStatus ? (
-                <span className="text-sm text-zinc-300">{translateStatus}</span>
-              ) : null}
-            </div>
+            <section className="rounded-xl border border-zinc-800 bg-zinc-900/35 p-4">
+              <h2 className="mb-3 flex flex-wrap items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-300">
+                <span className="text-amber-500/90">5</span> TR → EN çeviri
+                <InfoTip text="Seçili eser varsa sadece onların TR açıklaması çevrilir; yoksa TR açıklaması olan tüm eserler. Sonuç tabloda kalır — gerekirse Toplu Kaydet ile kaydedin." />
+              </h2>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={translateDescriptionsTRtoEN}
+                  disabled={translateLoading}
+                  className="rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-zinc-950 px-4 py-2 text-sm font-medium transition"
+                >
+                  {translateLoading ? "Çevriliyor…" : "TR açıklamalarını EN’ye çevir"}
+                </button>
+                <span className="text-sm text-zinc-400">
+                  {selectedIdList.length > 0 ? "Yalnız seçili eserler" : "TR açıklaması olan tüm liste"}
+                </span>
+                {translateStatus ? <span className="text-sm text-zinc-300">{translateStatus}</span> : null}
+              </div>
+            </section>
           ) : null}
 
           <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/30">
@@ -929,9 +1061,14 @@ export default function ArtworksAdminPage() {
               onClick={() => setBulkEditOpen((v) => !v)}
               className="w-full px-4 py-3 flex items-center justify-between gap-3"
             >
-              <div className="text-left">
-                <div className="text-sm font-semibold text-zinc-100">Toplu İşlemler</div>
-                <div className="text-xs text-zinc-400">Seçili: {selectedIdList.length}</div>
+              <div className="text-left flex items-start gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-zinc-100 flex items-center gap-1">
+                    Toplu alan güncelleme
+                    <InfoTip text="Checkbox ile hangi alanların değişeceğini seçin; seçili eserlere tek istekte uygular. Fiyat varyantları tamamen aşağıdaki tablo ile değiştirilir. Kayıt sunucuya hemen yazılır (Toplu Kaydet gerekmez)." />
+                  </div>
+                  <div className="text-xs text-zinc-400">Seçili: {selectedIdList.length}</div>
+                </div>
               </div>
               <div className="text-zinc-400 text-sm">{bulkEditOpen ? "▲" : "▼"}</div>
             </button>

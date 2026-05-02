@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CategoryTabs, type CategoryItem } from "@/components/CategoryTabs";
 import { MasonryGrid } from "@/components/MasonryGrid";
@@ -14,14 +14,23 @@ import {
   recordOrderClicked,
   flushSessionLog,
 } from "@/lib/session-log-client";
+import { useGalleryCategoryNavigation } from "@/hooks/useGalleryCategoryNavigation";
 
 const UI = getGalleryUI("en");
 
-export default function InternationalGalleryPage() {
+function InternationalGalleryPageContent() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [category, setCategory] = useState<string>("All");
   const [categoryShuffleToken, setCategoryShuffleToken] = useState(0);
+
+  const { goToCategory, goToAll } = useGalleryCategoryNavigation(
+    categories,
+    category,
+    setCategory,
+    setCategoryShuffleToken
+  );
+
   const [ui, setUi] = useState<{
     categoryPreviewRotateMs: number;
     categoryPreviewFadeMs: number;
@@ -143,12 +152,12 @@ export default function InternationalGalleryPage() {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-        setCategory("All");
+        goToAll();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [category, selected]);
+  }, [category, selected, goToAll]);
 
   useEffect(() => {
     if (category === "All" || selected) return;
@@ -169,7 +178,7 @@ export default function InternationalGalleryPage() {
       const dx = t.clientX - startX;
       const dy = t.clientY - startY;
       if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return;
-      setCategory("All");
+      goToAll();
     };
 
     el.addEventListener("touchstart", onTouchStart, { passive: true });
@@ -178,7 +187,7 @@ export default function InternationalGalleryPage() {
       el.removeEventListener("touchstart", onTouchStart);
       el.removeEventListener("touchend", onTouchEnd);
     };
-  }, [category, selected]);
+  }, [category, selected, goToAll]);
 
   useEffect(() => {
     if (category === "All") {
@@ -395,7 +404,7 @@ export default function InternationalGalleryPage() {
         {category !== "All" ? (
           <button
             type="button"
-            onClick={() => setCategory("All")}
+            onClick={() => goToAll()}
             className="fixed bottom-4 left-4 z-40 h-12 w-24 rounded-xl border border-zinc-700 bg-zinc-900 px-2 py-2 text-[11px] text-zinc-100 hover:bg-zinc-800 transition"
             aria-label="Katalog'a geri dön"
           >
@@ -416,10 +425,7 @@ export default function InternationalGalleryPage() {
         <CategoryTabs
           categories={categories}
           active={category}
-          onSelect={(value) => {
-            setCategory(value);
-            if (value !== "All") setCategoryShuffleToken((t) => t + 1);
-          }}
+          onSelect={goToCategory}
           allLabel={UI.all}
           allPreviewImageUrl={process.env.NEXT_PUBLIC_ALL_PREVIEW_IMAGE_URL}
           hideAllTab
@@ -484,5 +490,19 @@ export default function InternationalGalleryPage() {
         ) : null}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function InternationalGalleryPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-400 text-sm">
+          {UI.loading}
+        </div>
+      }
+    >
+      <InternationalGalleryPageContent />
+    </Suspense>
   );
 }

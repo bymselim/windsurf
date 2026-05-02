@@ -55,11 +55,6 @@ export default function AdminCategoriesPage() {
   const [editDescEN, setEditDescEN] = useState("");
   const [editError, setEditError] = useState("");
 
-  const [inflationPercent, setInflationPercent] = useState("");
-  const [inflationCategory, setInflationCategory] = useState("");
-  const [inflationLoading, setInflationLoading] = useState(false);
-  const [inflationMessage, setInflationMessage] = useState("");
-
   // Delete
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [reassignTo, setReassignTo] = useState("");
@@ -283,41 +278,6 @@ export default function AdminCategoriesPage() {
     }
   };
 
-  const applyInflation = async () => {
-    const p = Number(String(inflationPercent).replace(",", "."));
-    if (!Number.isFinite(p)) {
-      setInflationMessage("Geçerli bir yüzde girin.");
-      return;
-    }
-    setInflationLoading(true);
-    setInflationMessage("");
-    try {
-      const res = await fetch("/api/admin/categories/apply-price-percent", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          percent: p,
-          categoryName: inflationCategory.trim() || undefined,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setInflationMessage(typeof data?.error === "string" ? data.error : "İşlem başarısız");
-        return;
-      }
-      const names = Array.isArray(data.updatedCategories) ? (data.updatedCategories as string[]).join(", ") : "";
-      setInflationMessage(
-        names ? `Güncellenen kategoriler: ${names}` : "Seçimde güncellenecek fiyat listesi yoktu."
-      );
-      await loadCategories();
-    } catch {
-      setInflationMessage("İşlem başarısız.");
-    } finally {
-      setInflationLoading(false);
-    }
-  };
-
   if (isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
@@ -343,53 +303,12 @@ export default function AdminCategoriesPage() {
         <h1 className="text-2xl md:text-3xl font-bold mb-2">Categories</h1>
         <p className="text-zinc-400 mb-8">
           Manage categories. Artworks use these for filtering. Varsayılan ölçü/fiyat satırları ve kategori
-          açıklamaları galeri modalında birleştirilir; % zamda TL binlik, USD yüzlük yuvarlanır.
+          açıklamaları galeri modalında birleştirilir. Yüzde ile zam veya indirim için{" "}
+          <Link href="/admin/artworks" className="text-amber-500 hover:text-amber-400">
+            Eserler
+          </Link>{" "}
+          sayfasındaki «% ile fiyat güncelle» aracını kullanın.
         </p>
-
-        <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/50 mb-8">
-          <h2 className="text-lg font-semibold mb-2">Kategori fiyat listesine % zam</h2>
-          <p className="text-sm text-zinc-500 mb-4">
-            Sadece kayıtlı varsayılan varyant fiyatlarına uygulanır (her satırda TRY/USD çarpılır; TL → en yakın
-            1000, USD → en yakın 100).
-          </p>
-          <div className="flex flex-wrap gap-3 items-end">
-            <div>
-              <label className="block text-zinc-400 text-sm mb-1">Yüzde (örn. 5)</label>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={inflationPercent}
-                onChange={(e) => setInflationPercent(e.target.value)}
-                placeholder="5"
-                className="w-24 p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100"
-              />
-            </div>
-            <div>
-              <label className="block text-zinc-400 text-sm mb-1">Kategori (boş = tümü)</label>
-              <select
-                value={inflationCategory}
-                onChange={(e) => setInflationCategory(e.target.value)}
-                className="min-w-[180px] p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100"
-              >
-                <option value="">Tüm kategoriler</option>
-                {categories.map((c) => (
-                  <option key={c.name} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="button"
-              disabled={inflationLoading}
-              onClick={() => void applyInflation()}
-              className="px-5 py-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-semibold transition disabled:opacity-50"
-            >
-              {inflationLoading ? "Uygulanıyor…" : "Zam uygula"}
-            </button>
-          </div>
-          {inflationMessage ? <p className="mt-3 text-sm text-zinc-400">{inflationMessage}</p> : null}
-        </div>
 
         {/* Add category form */}
         <form

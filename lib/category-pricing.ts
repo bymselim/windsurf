@@ -11,7 +11,7 @@ export function roundUsdToHundreds(n: number): number {
   return Math.round(n / 100) * 100;
 }
 
-/** After % increase: TRY → nearest 1,000; USD → nearest 100. */
+/** After % change (zam or indirim): TRY → nearest 1,000; USD → nearest 100. */
 export function applyPercentWithRoundingTry(price: number, percent: number): number {
   return roundTryToThousands(price * (1 + percent / 100));
 }
@@ -38,6 +38,33 @@ export function bumpPriceVariants(variants: PriceVariant[] | undefined, percent:
       priceUSD: nextUsd,
     };
   });
+}
+
+/**
+ * Applies percent to stored artwork prices: all `priceVariants` rows if any,
+ * otherwise base `priceTRY` / `priceUSD`. Primary prices sync to cheapest TRY variant when variants exist.
+ */
+export function bumpArtworkStoredPrices(
+  item: ArtworkJson,
+  percent: number
+): Pick<ArtworkJson, "priceTRY" | "priceUSD" | "priceVariants"> {
+  const hasVariants = Array.isArray(item.priceVariants) && item.priceVariants.length > 0;
+  if (hasVariants) {
+    const nextVariants = bumpPriceVariants(item.priceVariants, percent);
+    const primary = derivePrimaryFromVariants(nextVariants, {
+      try: item.priceTRY,
+      usd: item.priceUSD,
+    });
+    return {
+      priceVariants: nextVariants,
+      priceTRY: primary.try,
+      priceUSD: primary.usd,
+    };
+  }
+  return {
+    priceTRY: applyPercentWithRoundingTry(Number(item.priceTRY) || 0, percent),
+    priceUSD: applyPercentWithRoundingUsd(Number(item.priceUSD) || 0, percent),
+  };
 }
 
 export function derivePrimaryFromVariants(
