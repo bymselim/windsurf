@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { VerifyCertificateWaves } from "./verify-certificate-waves";
-import { DEFAULT_VERIFY_DECLARATION, type VerifyDeclaration } from "@/lib/verify-declaration-io";
+import { DEFAULT_VERIFY_DECLARATION, type VerifyDeclaration } from "@/lib/verify-declaration-constants";
 
 type VerifyPayload = {
   webpin: string;

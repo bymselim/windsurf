@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { DEFAULT_VERIFY_DECLARATION, type VerifyDeclaration } from "@/lib/verify-declaration-io";
+import { DEFAULT_VERIFY_DECLARATION, type VerifyDeclaration } from "@/lib/verify-declaration-constants";
 import { clearVadminPasswordClient, getVadminAuthHeaders } from "@/lib/vadmin-auth-client";
 
 async function vadminFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
