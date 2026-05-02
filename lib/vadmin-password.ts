@@ -2,16 +2,12 @@ import { promises as fs } from "fs";
 import path from "path";
 import { kvGetString, kvSetString, isKvAvailable } from "./kv-adapter";
 
-const PASSWORD_FILE = path.join(process.cwd(), "lib", "data", "admin-password.txt");
-const KV_KEY = "luxury_gallery:admin_password";
+const PASSWORD_FILE = path.join(process.cwd(), "lib", "data", "vadmin-password.txt");
+const KV_KEY = "luxury_gallery:vadmin_password";
 
-const DEFAULT_PASSWORD =
-  process.env.ADMIN_PASSWORD ?? "selim123";
+const DEFAULT_PASSWORD = process.env.VADMIN_PASSWORD ?? "vadmin-change-me";
 
-/**
- * Returns the current admin password (from file or env/default).
- */
-export async function getAdminPassword(): Promise<string> {
+export async function getVadminPassword(): Promise<string> {
   const kvVal = await kvGetString(KV_KEY);
   if (typeof kvVal === "string" && kvVal.trim() !== "") return kvVal.trim();
   try {
@@ -22,10 +18,7 @@ export async function getAdminPassword(): Promise<string> {
   }
 }
 
-/**
- * Saves the new admin password to file. Creates lib/data if needed.
- */
-export async function setAdminPassword(password: string): Promise<void> {
+export async function setVadminPassword(password: string): Promise<void> {
   if (await isKvAvailable()) {
     await kvSetString(KV_KEY, password.trim());
     return;

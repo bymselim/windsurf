@@ -60,7 +60,7 @@ Open [http://localhost:3000](http://localhost:3000)
 |----------|----------|-------------|
 | `JWT_SECRET` | **Yes** (production) | Secret for signing session tokens |
 | `NEXT_PUBLIC_ACCESS_PASSWORD` | No | Default gallery password |
-| `ADMIN_PASSWORD` | No | Admin panel password (default: admin123) |
+| `ADMIN_PASSWORD` | No | Admin panel password (default: selim123) |
 | `NEXT_PUBLIC_WHATSAPP_NUMBER` | No | WhatsApp number for orders |
 | `NEXT_PUBLIC_CONTACT_EMAIL` | No | Email for order inquiries |
 | `NEXT_PUBLIC_INSTAGRAM_USERNAME` | No | Instagram handle for DMs |
@@ -86,7 +86,7 @@ npm start
 
 ## Admin Panel
 
-Access the admin panel at `/admin`. Default password: `admin123`
+Access the admin panel at `/admin`. Default password: `selim123`
 
 Features:
 - **Artworks**: Edit titles, descriptions, prices (TR/EN)
