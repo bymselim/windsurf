@@ -332,7 +332,19 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log(`\nBitti. Güncellenen eser: ${dryRun ? 0 : updated}`);
+  console.log("");
+  if (dryRun) {
+    console.log("Bitti. DRY-RUN: hiçbir kayıt veritabanına yazılmadı (normal).");
+    console.log("Gerçek taşıma için aynı komutu --dry-run OLMADAN tekrar çalıştır.");
+  } else {
+    console.log(`Bitti. Güncellenen eser: ${updated}`);
+    if (updated === 0 && capped.length > 0) {
+      console.log("");
+      console.log(
+        "Uyarı: İşlenecek eser vardı ama güncelleme 0. Yukarıda her satırda HATA mesajı var mı bakın (ağ, R2 kota, Blob okuma)."
+      );
+    }
+  }
 }
 
 main().catch((e) => {
