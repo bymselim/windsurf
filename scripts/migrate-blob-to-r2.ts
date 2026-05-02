@@ -22,15 +22,37 @@ import {
   type ArtworkJson,
 } from "../lib/artworks-io";
 
+const R2_KEYS = [
+  "R2_ACCOUNT_ID",
+  "R2_ACCESS_KEY_ID",
+  "R2_SECRET_ACCESS_KEY",
+  "R2_BUCKET_NAME",
+  "R2_PUBLIC_BASE_URL",
+] as const;
+
+/** cwd veya üst klasörlerde .env.local ara (yanlış klasörden çalışmayı tolere eder). */
+function findEnvLocalPath(): string | null {
+  let dir = process.cwd();
+  for (let i = 0; i < 6; i++) {
+    const p = path.join(dir, ".env.local");
+    if (existsSync(p)) return p;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+
 function loadEnvLocal(): void {
-  const p = path.join(process.cwd(), ".env.local");
-  if (!existsSync(p)) return;
-  for (const line of readFileSync(p, "utf-8").split("\n")) {
+  const envPath = findEnvLocalPath();
+  if (!envPath) return;
+  for (const line of readFileSync(envPath, "utf-8").split(/\r?\n/)) {
     const t = line.trim();
     if (!t || t.startsWith("#")) continue;
     const eq = t.indexOf("=");
     if (eq <= 0) continue;
     const k = t.slice(0, eq).trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) continue;
     let v = t.slice(eq + 1).trim();
     if (
       (v.startsWith('"') && v.endsWith('"')) ||
@@ -38,9 +60,34 @@ function loadEnvLocal(): void {
     ) {
       v = v.slice(1, -1);
     }
-    if (process.env[k] === undefined) process.env[k] = v;
+    const isR2Key = (R2_KEYS as readonly string[]).includes(k);
+    const existing = process.env[k];
+    const existingEmpty = existing === undefined || String(existing).trim() === "";
+    if (process.env[k] === undefined || (isR2Key && existingEmpty)) {
+      process.env[k] = v;
+    }
+  }
+  if (process.env.MIGRATE_DEBUG === "1") {
+    console.error(`[migrate] .env.local yüklendi: ${envPath}`);
   }
 }
+
+function printMissingR2Keys(): void {
+  console.error("Şu anki çalışma klasörü (cwd):", process.cwd());
+  console.error(
+    ".env.local:",
+    findEnvLocalPath() ?? "bulunamadı (package.json ile aynı klasörde olmalı)"
+  );
+  console.error("Eksik veya boş olan R2 değişkenleri:");
+  for (const k of R2_KEYS) {
+    const v = process.env[k];
+    const ok = Boolean(v && String(v).trim() !== "");
+    console.error(`  ${k}: ${ok ? "tamam" : "YOK veya boş"}`);
+  }
+}
+
+/** Import’lardan hemen sonra çalışsın: main() öncesi env hazır olsun. */
+loadEnvLocal();
 
 function safeSegment(s: string): string {
   return s
@@ -152,10 +199,16 @@ function parseArgs(): {
 }
 
 async function main(): Promise<void> {
-  loadEnvLocal();
-
   if (!isR2Configured()) {
-    console.error("R2 ortam değişkenleri eksik (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_BASE_URL).");
+    console.error(
+      "R2 ortam değişkenleri eksik veya boş (5 adet: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_BASE_URL)."
+    );
+    console.error("");
+    printMissingR2Keys();
+    console.error("");
+    console.error(
+      "Çözüm: Terminalde proje köküne gir: cd /Users/selim/yenisistem  (içinde package.json ve .env.local olmalı), sonra komutu tekrar çalıştır."
+    );
     process.exit(1);
   }
 
