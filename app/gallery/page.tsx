@@ -8,6 +8,11 @@ import { ArtworkModal } from "@/components/ArtworkModal";
 import type { Artwork } from "@/lib/types";
 import type { ArtworkFull } from "@/lib/types";
 import { mapFullToArtwork } from "@/lib/gallery-locale";
+import {
+  recordPage,
+  recordArtworkViewed,
+  flushSessionLog,
+} from "@/lib/session-log-client";
 
 export default function GalleryPage() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
@@ -43,6 +48,23 @@ export default function GalleryPage() {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const PAGE_LIMIT = 24;
+
+  const onArtworkViewed = useCallback((id: string) => recordArtworkViewed(id), []);
+
+  useEffect(() => {
+    recordPage(
+      typeof window !== "undefined" ? window.location.pathname + window.location.search : "/gallery"
+    );
+    const onUnload = () => flushSessionLog();
+    window.addEventListener("beforeunload", onUnload);
+    return () => window.removeEventListener("beforeunload", onUnload);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      recordPage("/gallery" + (category !== "All" ? `?cat=${encodeURIComponent(category)}` : ""));
+    }
+  }, [category]);
 
   const ensureSeed = useCallback(() => {
     if (seedRef.current) return seedRef.current;
@@ -451,6 +473,7 @@ export default function GalleryPage() {
             onPrev={goPrev}
             onNext={goNext}
             locale="tr"
+            onArtworkViewed={onArtworkViewed}
           />
         ) : null}
       </AnimatePresence>

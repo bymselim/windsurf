@@ -14,6 +14,7 @@ type BulkPatch = {
   descriptionTR?: string;
   descriptionEN?: string;
   priceVariants?: PriceVariant[];
+  useCategoryPricing?: boolean | null;
 };
 
 export async function PUT(request: NextRequest) {
@@ -48,6 +49,11 @@ export async function PUT(request: NextRequest) {
       typeof patch.dimensionsCM === "string" ? patch.dimensionsCM : current.dimensionsCM;
     const dimensionsIN = dimensionsCMToIN(dimensionsCM);
 
+    let useCategoryPricing: boolean | undefined = current.useCategoryPricing;
+    if (patch.useCategoryPricing === true) useCategoryPricing = true;
+    else if (patch.useCategoryPricing === false) useCategoryPricing = false;
+    else if (patch.useCategoryPricing === null) useCategoryPricing = undefined;
+
     entries[i] = {
       ...current,
       category: typeof patch.category === "string" ? patch.category : current.category,
@@ -69,15 +75,21 @@ export async function PUT(request: NextRequest) {
       priceUSD: typeof patch.priceUSD === "number" ? patch.priceUSD : current.priceUSD,
       dimensionsCM,
       dimensionsIN,
+      useCategoryPricing,
       priceVariants:
         Array.isArray(patch.priceVariants) && patch.priceVariants.length > 0
-          ? patch.priceVariants.filter(
-              (v): v is PriceVariant =>
-                typeof v === "object" &&
-                v !== null &&
-                typeof (v as { size?: unknown }).size === "string" &&
-                typeof (v as { priceTRY?: unknown }).priceTRY === "number"
-            )
+          ? patch.priceVariants
+              .filter(
+                (v): v is PriceVariant =>
+                  typeof v === "object" &&
+                  v !== null &&
+                  typeof (v as { size?: unknown }).size === "string" &&
+                  typeof (v as { priceTRY?: unknown }).priceTRY === "number"
+              )
+              .map((v) => ({
+                ...v,
+                sizeEN: typeof (v as { sizeEN?: unknown }).sizeEN === "string" ? (v as { sizeEN: string }).sizeEN : undefined,
+              }))
           : patch.priceVariants === null || patch.priceVariants === undefined
             ? current.priceVariants
             : undefined,

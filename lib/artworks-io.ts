@@ -8,6 +8,7 @@ const KV_KEY = "luxury_gallery:artworks";
 
 export interface PriceVariant {
   size: string; // Örn: "90 cm çap", "100 cm çap"
+  sizeEN?: string;
   priceTRY: number;
   priceUSD?: number;
 }
@@ -28,6 +29,12 @@ export interface ArtworkJson {
   dimensionsIN: string;
   /** Çoklu fiyat/ölçü kombinasyonları. Varsa modal'da bunlar gösterilir, tek fiyat değil. */
   priceVariants?: PriceVariant[];
+  /**
+   * true: her zaman kategori `defaultPriceVariants` kullan.
+   * false: sadece bu kayıttaki `priceVariants` (boşsa tek fiyat).
+   * undefined: eserde varyant yoksa kategori listesi, varsa eser listesi.
+   */
+  useCategoryPricing?: boolean;
   tags?: string[];
   isFeatured: boolean;
 }
@@ -59,14 +66,21 @@ function normalizeEntry(raw: unknown): ArtworkJson {
     tags: Array.isArray(r.tags) ? (r.tags as string[]) : undefined,
     isFeatured: Boolean(r.isFeatured),
     priceVariants: Array.isArray(r.priceVariants)
-      ? (r.priceVariants as PriceVariant[]).filter(
-          (v) =>
-            typeof v === "object" &&
-            v !== null &&
-            typeof v.size === "string" &&
-            typeof v.priceTRY === "number"
-        )
+      ? (r.priceVariants as PriceVariant[])
+          .filter(
+            (v) =>
+              typeof v === "object" &&
+              v !== null &&
+              typeof v.size === "string" &&
+              typeof v.priceTRY === "number"
+          )
+          .map((v) => ({
+            ...v,
+            sizeEN: typeof v.sizeEN === "string" ? v.sizeEN : undefined,
+          }))
       : undefined,
+    useCategoryPricing:
+      r.useCategoryPricing === true ? true : r.useCategoryPricing === false ? false : undefined,
   };
 }
 

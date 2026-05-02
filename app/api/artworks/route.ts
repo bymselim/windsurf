@@ -6,6 +6,14 @@ import {
   type ArtworkJson,
 } from "@/lib/artworks-io";
 import { dimensionsCMToIN } from "@/lib/dimensions";
+import { readCategoriesFromFile } from "@/lib/categories-io";
+import type { CategoryJson } from "@/lib/categories-io";
+import {
+  categoryByName,
+  derivePrimaryFromVariants,
+  effectivePriceVariants,
+  mergeDescriptions,
+} from "@/lib/category-pricing";
 
 const COOKIE_NAME = "admin_session";
 const ARTWORKS_BASE = process.env.NEXT_PUBLIC_IMAGES_BASE ?? "/artworks";
@@ -53,14 +61,14 @@ function toPublicUrl(value: string): string {
   return isAbsoluteUrl(value) ? value : `${ARTWORKS_BASE}/${value}`;
 }
 
-function toResponseItem(item: ArtworkJson) {
+function buildResponseItem(item: ArtworkJson, categories: CategoryJson[], mergeCategory: boolean) {
   const mediaType = VIDEO_EXT.test(item.filename) ? ("video" as const) : ("image" as const);
   const imageUrl = toPublicUrl(item.filename);
   const thumbnailUrl =
     typeof item.thumbnailFilename === "string" && item.thumbnailFilename.trim() !== ""
       ? toPublicUrl(item.thumbnailFilename)
       : undefined;
-  return {
+  const base = {
     id: item.id,
     category: item.category,
     filename: item.filename,
@@ -69,14 +77,34 @@ function toResponseItem(item: ArtworkJson) {
     mediaType,
     titleTR: item.titleTR,
     titleEN: item.titleEN,
-    descriptionTR: item.descriptionTR ?? null,
-    descriptionEN: item.descriptionEN ?? null,
-    priceTRY: item.priceTRY,
-    priceUSD: item.priceUSD,
     dimensionsCM: item.dimensionsCM,
     dimensionsIN: item.dimensionsIN,
-    priceVariants: Array.isArray(item.priceVariants) && item.priceVariants.length > 0 ? item.priceVariants : undefined,
     isFeatured: item.isFeatured,
+  };
+
+  if (!mergeCategory) {
+    return {
+      ...base,
+      descriptionTR: item.descriptionTR ?? null,
+      descriptionEN: item.descriptionEN ?? null,
+      priceTRY: item.priceTRY,
+      priceUSD: item.priceUSD,
+      priceVariants: Array.isArray(item.priceVariants) && item.priceVariants.length > 0 ? item.priceVariants : undefined,
+      useCategoryPricing: item.useCategoryPricing,
+    };
+  }
+
+  const cat = categoryByName(categories, item.category);
+  const variants = effectivePriceVariants(item, cat);
+  const primary = derivePrimaryFromVariants(variants, { try: item.priceTRY, usd: item.priceUSD });
+  const desc = mergeDescriptions(item, cat);
+  return {
+    ...base,
+    descriptionTR: desc.tr,
+    descriptionEN: desc.en,
+    priceTRY: primary.try,
+    priceUSD: primary.usd,
+    priceVariants: variants?.length ? variants : undefined,
   };
 }
 
@@ -88,6 +116,11 @@ export async function GET(request: NextRequest) {
   const limitRaw = url.searchParams.get("limit");
   const categoryRaw = url.searchParams.get("category");
   const seedRaw = url.searchParams.get("seed");
+  const raw = url.searchParams.get("raw") === "1";
+  const isAdmin = request.cookies.get(COOKIE_NAME)?.value === "1";
+  const mergeCategory = !(raw && isAdmin);
+
+  const categories = mergeCategory ? await readCategoriesFromFile() : [];
 
   const page = pageRaw ? Math.max(1, Number(pageRaw) || 1) : null;
   const limit = limitRaw ? Math.max(1, Math.min(200, Number(limitRaw) || 0)) : null;
@@ -97,9 +130,11 @@ export async function GET(request: NextRequest) {
   const filtered = category ? entries.filter((e) => e.category === category) : entries;
   const shuffled = shuffleWithSeed(filtered, seed);
 
+  const mapItem = (item: ArtworkJson) => buildResponseItem(item, categories, mergeCategory);
+
   // Backwards compatibility: if pagination not requested, return full list (admin relies on this).
   if (!page || !limit) {
-    return NextResponse.json(shuffled.map(toResponseItem));
+    return NextResponse.json(shuffled.map(mapItem));
   }
 
   const total = shuffled.length;
@@ -107,7 +142,7 @@ export async function GET(request: NextRequest) {
   const end = start + limit;
   const slice = shuffled.slice(start, end);
   return NextResponse.json({
-    items: slice.map(toResponseItem),
+    items: slice.map(mapItem),
     page,
     limit,
     total,
@@ -139,9 +174,29 @@ export async function PUT(request: NextRequest) {
     typeof body.dimensionsCM === "string" ? body.dimensionsCM : current.dimensionsCM;
   const dimensionsIN = dimensionsCMToIN(dimensionsCM);
 
+  let useCategoryPricing: boolean | undefined = current.useCategoryPricing;
+  if (body.useCategoryPricing === true) useCategoryPricing = true;
+  else if (body.useCategoryPricing === false) useCategoryPricing = false;
+  else if (body.useCategoryPricing === null) useCategoryPricing = undefined;
+
+  const normalizeVariant = (v: unknown) => {
+    if (typeof v !== "object" || v === null) return null;
+    const o = v as Record<string, unknown>;
+    if (typeof o.size !== "string" || typeof o.priceTRY !== "number") return null;
+    return {
+      size: o.size,
+      sizeEN: typeof o.sizeEN === "string" ? o.sizeEN : undefined,
+      priceTRY: o.priceTRY,
+      priceUSD:
+        typeof o.priceUSD === "number" && Number.isFinite(o.priceUSD) ? o.priceUSD : undefined,
+    };
+  };
+
   entries[index] = {
     id: current.id,
     filename: current.filename,
+    thumbnailFilename: current.thumbnailFilename,
+    contentHash: current.contentHash,
     category: typeof body.category === "string" ? body.category : current.category,
     titleTR: typeof body.titleTR === "string" ? body.titleTR : current.titleTR,
     titleEN: typeof body.titleEN === "string" ? body.titleEN : current.titleEN,
@@ -165,22 +220,17 @@ export async function PUT(request: NextRequest) {
     dimensionsIN,
     isFeatured: Boolean(body.isFeatured),
     tags: current.tags,
+    useCategoryPricing,
     priceVariants:
       Array.isArray(body.priceVariants) && body.priceVariants.length > 0
-        ? body.priceVariants.filter(
-            (v: unknown) =>
-              typeof v === "object" &&
-              v !== null &&
-              typeof (v as { size?: unknown }).size === "string" &&
-              typeof (v as { priceTRY?: unknown }).priceTRY === "number"
-          )
+        ? (body.priceVariants.map(normalizeVariant).filter(Boolean) as ArtworkJson["priceVariants"])
         : body.priceVariants === null || body.priceVariants === undefined
           ? current.priceVariants
           : undefined,
   };
 
   await writeArtworksToFile(entries);
-  return NextResponse.json(toResponseItem(entries[index]));
+  return NextResponse.json(buildResponseItem(entries[index], [], false));
 }
 
 export async function DELETE(request: NextRequest) {

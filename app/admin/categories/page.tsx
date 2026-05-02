@@ -12,7 +12,17 @@ interface Category {
   artworkCount?: number;
   previewImageUrl?: string;
   hidden?: boolean;
+  defaultPriceVariants?: Array<{
+    size: string;
+    sizeEN?: string;
+    priceTRY: number;
+    priceUSD?: number;
+  }>;
+  defaultDescriptionTR?: string;
+  defaultDescriptionEN?: string;
 }
+
+type VariantDraft = { size: string; sizeEN: string; priceTRY: string; priceUSD: string };
 
 export default function AdminCategoriesPage() {
   const router = useRouter();
@@ -40,7 +50,15 @@ export default function AdminCategoriesPage() {
   const [editIcon, setEditIcon] = useState("");
   const [editOrder, setEditOrder] = useState("0");
   const [editPreviewImageUrl, setEditPreviewImageUrl] = useState<string>("");
+  const [editDefaultVariants, setEditDefaultVariants] = useState<VariantDraft[]>([]);
+  const [editDescTR, setEditDescTR] = useState("");
+  const [editDescEN, setEditDescEN] = useState("");
   const [editError, setEditError] = useState("");
+
+  const [inflationPercent, setInflationPercent] = useState("");
+  const [inflationCategory, setInflationCategory] = useState("");
+  const [inflationLoading, setInflationLoading] = useState(false);
+  const [inflationMessage, setInflationMessage] = useState("");
 
   // Delete
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -167,6 +185,19 @@ export default function AdminCategoriesPage() {
     setEditIcon(cat.icon);
     setEditOrder(String(typeof cat.order === "number" && Number.isFinite(cat.order) ? cat.order : 0));
     setEditPreviewImageUrl(typeof cat.previewImageUrl === "string" ? cat.previewImageUrl : "");
+    const vars = cat.defaultPriceVariants?.length
+      ? cat.defaultPriceVariants
+      : [{ size: "", sizeEN: "", priceTRY: 0, priceUSD: undefined as number | undefined }];
+    setEditDefaultVariants(
+      vars.map((v) => ({
+        size: v.size,
+        sizeEN: typeof v.sizeEN === "string" ? v.sizeEN : "",
+        priceTRY: String(v.priceTRY ?? ""),
+        priceUSD: v.priceUSD !== undefined && v.priceUSD !== null ? String(v.priceUSD) : "",
+      }))
+    );
+    setEditDescTR(cat.defaultDescriptionTR ?? "");
+    setEditDescEN(cat.defaultDescriptionEN ?? "");
     setEditError("");
     loadPreviewOptions(cat.name);
   };
@@ -196,6 +227,19 @@ export default function AdminCategoriesPage() {
           order: Number(editOrder),
           previewImageUrl: editPreviewImageUrl,
           hidden: categories.find((c) => c.name === editingName)?.hidden ?? false,
+          defaultPriceVariants: editDefaultVariants
+            .filter((v) => v.size.trim() !== "" && Number(v.priceTRY) > 0)
+            .map((v) => ({
+              size: v.size.trim(),
+              sizeEN: v.sizeEN.trim() || undefined,
+              priceTRY: Number(v.priceTRY),
+              priceUSD:
+                v.priceUSD.trim() !== "" && Number.isFinite(Number(v.priceUSD))
+                  ? Number(v.priceUSD)
+                  : undefined,
+            })),
+          defaultDescriptionTR: editDescTR,
+          defaultDescriptionEN: editDescEN,
         }),
       });
       const data = await res.json();
@@ -239,6 +283,41 @@ export default function AdminCategoriesPage() {
     }
   };
 
+  const applyInflation = async () => {
+    const p = Number(String(inflationPercent).replace(",", "."));
+    if (!Number.isFinite(p)) {
+      setInflationMessage("Geçerli bir yüzde girin.");
+      return;
+    }
+    setInflationLoading(true);
+    setInflationMessage("");
+    try {
+      const res = await fetch("/api/admin/categories/apply-price-percent", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          percent: p,
+          categoryName: inflationCategory.trim() || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setInflationMessage(typeof data?.error === "string" ? data.error : "İşlem başarısız");
+        return;
+      }
+      const names = Array.isArray(data.updatedCategories) ? (data.updatedCategories as string[]).join(", ") : "";
+      setInflationMessage(
+        names ? `Güncellenen kategoriler: ${names}` : "Seçimde güncellenecek fiyat listesi yoktu."
+      );
+      await loadCategories();
+    } catch {
+      setInflationMessage("İşlem başarısız.");
+    } finally {
+      setInflationLoading(false);
+    }
+  };
+
   if (isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
@@ -263,8 +342,54 @@ export default function AdminCategoriesPage() {
 
         <h1 className="text-2xl md:text-3xl font-bold mb-2">Categories</h1>
         <p className="text-zinc-400 mb-8">
-          Manage categories. Artworks use these for filtering.
+          Manage categories. Artworks use these for filtering. Varsayılan ölçü/fiyat satırları ve kategori
+          açıklamaları galeri modalında birleştirilir; % zamda TL binlik, USD yüzlük yuvarlanır.
         </p>
+
+        <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/50 mb-8">
+          <h2 className="text-lg font-semibold mb-2">Kategori fiyat listesine % zam</h2>
+          <p className="text-sm text-zinc-500 mb-4">
+            Sadece kayıtlı varsayılan varyant fiyatlarına uygulanır (her satırda TRY/USD çarpılır; TL → en yakın
+            1000, USD → en yakın 100).
+          </p>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div>
+              <label className="block text-zinc-400 text-sm mb-1">Yüzde (örn. 5)</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={inflationPercent}
+                onChange={(e) => setInflationPercent(e.target.value)}
+                placeholder="5"
+                className="w-24 p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100"
+              />
+            </div>
+            <div>
+              <label className="block text-zinc-400 text-sm mb-1">Kategori (boş = tümü)</label>
+              <select
+                value={inflationCategory}
+                onChange={(e) => setInflationCategory(e.target.value)}
+                className="min-w-[180px] p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100"
+              >
+                <option value="">Tüm kategoriler</option>
+                {categories.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              disabled={inflationLoading}
+              onClick={() => void applyInflation()}
+              className="px-5 py-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-semibold transition disabled:opacity-50"
+            >
+              {inflationLoading ? "Uygulanıyor…" : "Zam uygula"}
+            </button>
+          </div>
+          {inflationMessage ? <p className="mt-3 text-sm text-zinc-400">{inflationMessage}</p> : null}
+        </div>
 
         {/* Add category form */}
         <form
@@ -353,126 +478,276 @@ export default function AdminCategoriesPage() {
                 </tr>
               </thead>
               <tbody>
-                {categories.map((cat) => (
-                  <tr
-                    key={cat.name}
-                    className="border-t border-zinc-800 hover:bg-zinc-900/30"
-                  >
-                    <td className="p-4 text-zinc-400 font-mono text-sm">
-                      {typeof cat.order === "number" && Number.isFinite(cat.order) ? cat.order : 0}
-                    </td>
-                    <td className="p-4 font-medium">{cat.name}</td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-6 h-6 rounded border border-zinc-600"
-                          style={{ backgroundColor: cat.color }}
-                        />
-                        <span className="text-zinc-400 font-mono text-sm">{cat.color}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-2xl">{cat.icon}</td>
-                    <td className="p-4 text-zinc-400 text-sm">
-                      {cat.previewImageUrl ? "✓" : "—"}
-                    </td>
-                    <td className="p-4 text-zinc-400">{cat.artworkCount ?? 0}</td>
-                    <td className="p-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={!!cat.hidden}
-                          onChange={async (e) => {
-                            const hidden = e.target.checked;
-                            try {
-                              const res = await fetch("/api/admin/categories", {
-                                method: "PATCH",
-                                headers: { "Content-Type": "application/json" },
-                                credentials: "include",
-                                body: JSON.stringify({ name: cat.name, hidden }),
-                              });
-                              if (res.ok) {
-                                setCategories((prev) =>
-                                  prev.map((c) =>
-                                    c.name === cat.name ? { ...c, hidden } : c
-                                  )
-                                );
-                              }
-                            } catch {
-                              // ignore
-                            }
-                          }}
-                          className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-amber-500 focus:ring-amber-500/50"
-                        />
-                        <span className="text-sm text-zinc-400">
-                          {cat.hidden ? "Gizli" : "Görünür"}
-                        </span>
-                      </label>
-                    </td>
-                    <td className="p-4">
-                      {editingName === cat.name ? (
-                        <div className="flex flex-wrap gap-2 items-center">
-                          <input
-                            type="number"
-                            value={editOrder}
-                            onChange={(e) => setEditOrder(e.target.value)}
-                            placeholder="0"
-                            className="w-20 p-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm"
-                          />
-                          <input
-                            type="text"
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                            placeholder="Name"
-                            className="w-28 p-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm"
-                          />
-                          <input
-                            type="color"
-                            value={editColor}
-                            onChange={(e) => setEditColor(e.target.value)}
-                            className="w-8 h-8 rounded cursor-pointer"
-                          />
-                          <input
-                            type="text"
-                            value={editIcon}
-                            onChange={(e) => setEditIcon(e.target.value)}
-                            placeholder="🎨"
-                            className="w-14 p-1.5 bg-zinc-800 border border-zinc-700 rounded text-center text-lg"
-                          />
-                          <select
-                            value={editPreviewImageUrl}
-                            onChange={(e) => setEditPreviewImageUrl(e.target.value)}
-                            className="w-56 p-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm text-zinc-100"
-                          >
-                            <option value="">Preview seçme (boş)</option>
-                            {(previewOptionsByCategory[cat.name] ?? []).map((a) => {
-                              const url = a.thumbnailUrl || a.imageUrl;
-                              return (
-                                <option key={a.id} value={url}>
-                                  {a.id.slice(0, 6)}… {a.thumbnailUrl ? "(thumb)" : "(img)"}
-                                </option>
-                              );
-                            })}
-                          </select>
-                          {previewLoadingByCategory[cat.name] ? (
-                            <span className="text-xs text-zinc-500">Loading previews…</span>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={saveEdit}
-                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 rounded text-sm text-zinc-950"
-                          >
-                            Save
-                          </button>
-                          <button
-                            type="button"
-                            onClick={cancelEdit}
-                            className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 rounded text-sm"
-                          >
-                            Cancel
-                          </button>
-                          {editError && <span className="text-red-400 text-sm">{editError}</span>}
+                {categories.map((cat) =>
+                  editingName === cat.name ? (
+                    <tr key={`${cat.name}-edit`} className="border-t border-zinc-800">
+                      <td colSpan={8} className="p-6 bg-zinc-900/50 align-top">
+                        <div className="space-y-6 max-w-4xl">
+                          <h3 className="text-lg font-semibold text-zinc-200">Kategori: düzenle</h3>
+                          <div className="flex flex-wrap gap-4 items-end">
+                            <div>
+                              <label className="block text-zinc-400 text-xs mb-1">Sıra</label>
+                              <input
+                                type="number"
+                                value={editOrder}
+                                onChange={(e) => setEditOrder(e.target.value)}
+                                className="w-20 p-2 bg-zinc-800 border border-zinc-700 rounded text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-zinc-400 text-xs mb-1">Ad</label>
+                              <input
+                                type="text"
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                className="w-40 p-2 bg-zinc-800 border border-zinc-700 rounded text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-zinc-400 text-xs mb-1">Renk</label>
+                              <div className="flex gap-2 items-center">
+                                <input
+                                  type="color"
+                                  value={editColor}
+                                  onChange={(e) => setEditColor(e.target.value)}
+                                  className="w-10 h-10 rounded cursor-pointer border border-zinc-700"
+                                />
+                                <input
+                                  type="text"
+                                  value={editColor}
+                                  onChange={(e) => setEditColor(e.target.value)}
+                                  className="w-24 p-2 bg-zinc-800 border border-zinc-700 rounded text-xs font-mono"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-zinc-400 text-xs mb-1">İkon</label>
+                              <input
+                                type="text"
+                                value={editIcon}
+                                onChange={(e) => setEditIcon(e.target.value)}
+                                className="w-16 p-2 bg-zinc-800 border border-zinc-700 rounded text-center text-lg"
+                              />
+                            </div>
+                            <div className="min-w-[200px]">
+                              <label className="block text-zinc-400 text-xs mb-1">Önizleme görseli</label>
+                              <select
+                                value={editPreviewImageUrl}
+                                onChange={(e) => setEditPreviewImageUrl(e.target.value)}
+                                className="w-full max-w-xs p-2 bg-zinc-800 border border-zinc-700 rounded text-sm text-zinc-100"
+                              >
+                                <option value="">Boş</option>
+                                {(previewOptionsByCategory[cat.name] ?? []).map((a) => {
+                                  const url = a.thumbnailUrl || a.imageUrl;
+                                  return (
+                                    <option key={a.id} value={url}>
+                                      {a.id.slice(0, 6)}… {a.thumbnailUrl ? "(thumb)" : "(img)"}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                              {previewLoadingByCategory[cat.name] ? (
+                                <span className="text-xs text-zinc-500 ml-2">Yükleniyor…</span>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-zinc-300 text-sm font-medium mb-1">
+                              Varsayılan ölçü / fiyat (modal satırları)
+                            </label>
+                            <p className="text-xs text-zinc-500 mb-2">
+                              Bu kategorideki eserlerde (otomatik veya “kategori listesi” seçiliyse) gösterilir. Tek satır =
+                              tek fiyat.
+                            </p>
+                            <div className="space-y-2">
+                              {editDefaultVariants.map((row, idx) => (
+                                <div key={idx} className="flex flex-wrap gap-2 items-center">
+                                  <input
+                                    type="text"
+                                    value={row.size}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      setEditDefaultVariants((prev) =>
+                                        prev.map((r, i) => (i === idx ? { ...r, size: v } : r))
+                                      );
+                                    }}
+                                    placeholder="Ölçü TR (örn. 85 cm x 50 cm)"
+                                    className="flex-1 min-w-[160px] p-2 bg-zinc-800 border border-zinc-700 rounded text-sm"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={row.sizeEN}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      setEditDefaultVariants((prev) =>
+                                        prev.map((r, i) => (i === idx ? { ...r, sizeEN: v } : r))
+                                      );
+                                    }}
+                                    placeholder="Size EN"
+                                    className="flex-1 min-w-[120px] p-2 bg-zinc-800 border border-zinc-700 rounded text-sm"
+                                  />
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={row.priceTRY}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      setEditDefaultVariants((prev) =>
+                                        prev.map((r, i) => (i === idx ? { ...r, priceTRY: v } : r))
+                                      );
+                                    }}
+                                    placeholder="TRY"
+                                    className="w-28 p-2 bg-zinc-800 border border-zinc-700 rounded text-sm"
+                                  />
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={row.priceUSD}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      setEditDefaultVariants((prev) =>
+                                        prev.map((r, i) => (i === idx ? { ...r, priceUSD: v } : r))
+                                      );
+                                    }}
+                                    placeholder="USD"
+                                    className="w-24 p-2 bg-zinc-800 border border-zinc-700 rounded text-sm"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setEditDefaultVariants((prev) => prev.filter((_, i) => i !== idx))
+                                    }
+                                    className="px-2 py-1 text-sm text-red-400 hover:text-red-300"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditDefaultVariants((prev) => [
+                                    ...prev,
+                                    { size: "", sizeEN: "", priceTRY: "", priceUSD: "" },
+                                  ])
+                                }
+                                className="text-sm text-amber-500 hover:text-amber-400"
+                              >
+                                + Satır ekle
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-zinc-300 text-sm font-medium mb-1">
+                                Sabit açıklama (TR)
+                              </label>
+                              <textarea
+                                value={editDescTR}
+                                onChange={(e) => setEditDescTR(e.target.value)}
+                                rows={5}
+                                placeholder="- Satır satır veya madde işareti ile yazabilirsiniz."
+                                className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-zinc-300 text-sm font-medium mb-1">
+                                Sabit açıklama (EN)
+                              </label>
+                              <textarea
+                                value={editDescEN}
+                                onChange={(e) => setEditDescEN(e.target.value)}
+                                rows={5}
+                                className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-500"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 items-center">
+                            <button
+                              type="button"
+                              onClick={saveEdit}
+                              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-lg text-sm font-semibold text-zinc-950"
+                            >
+                              Kaydet
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEdit}
+                              className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-sm"
+                            >
+                              İptal
+                            </button>
+                            {editError ? <span className="text-red-400 text-sm">{editError}</span> : null}
+                          </div>
                         </div>
-                      ) : (
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr
+                      key={cat.name}
+                      className="border-t border-zinc-800 hover:bg-zinc-900/30"
+                    >
+                      <td className="p-4 text-zinc-400 font-mono text-sm">
+                        {typeof cat.order === "number" && Number.isFinite(cat.order) ? cat.order : 0}
+                      </td>
+                      <td className="p-4 font-medium">
+                        {cat.name}
+                        {cat.defaultPriceVariants?.length ? (
+                          <span className="block text-xs text-zinc-500 font-normal mt-0.5">
+                            {cat.defaultPriceVariants.length} varsayılan fiyat satırı
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-6 h-6 rounded border border-zinc-600"
+                            style={{ backgroundColor: cat.color }}
+                          />
+                          <span className="text-zinc-400 font-mono text-sm">{cat.color}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-2xl">{cat.icon}</td>
+                      <td className="p-4 text-zinc-400 text-sm">
+                        {cat.previewImageUrl ? "✓" : "—"}
+                      </td>
+                      <td className="p-4 text-zinc-400">{cat.artworkCount ?? 0}</td>
+                      <td className="p-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={!!cat.hidden}
+                            onChange={async (e) => {
+                              const hidden = e.target.checked;
+                              try {
+                                const res = await fetch("/api/admin/categories", {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  credentials: "include",
+                                  body: JSON.stringify({ name: cat.name, hidden }),
+                                });
+                                if (res.ok) {
+                                  setCategories((prev) =>
+                                    prev.map((c) =>
+                                      c.name === cat.name ? { ...c, hidden } : c
+                                    )
+                                  );
+                                }
+                              } catch {
+                                // ignore
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-amber-500 focus:ring-amber-500/50"
+                          />
+                          <span className="text-sm text-zinc-400">
+                            {cat.hidden ? "Gizli" : "Görünür"}
+                          </span>
+                        </label>
+                      </td>
+                      <td className="p-4">
                         <div className="flex gap-2">
                           <button
                             type="button"
@@ -494,10 +769,10 @@ export default function AdminCategoriesPage() {
                             Delete
                           </button>
                         </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  )
+                )}
               </tbody>
             </table>
           </div>

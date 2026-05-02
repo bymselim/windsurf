@@ -34,7 +34,7 @@ export function mapFullToArtwork(full: ArtworkFull, locale: GalleryLocale): Artw
     price: full.priceUSD,
     currency: "$",
     priceVariants: full.priceVariants?.map((v) => ({
-      size: v.size,
+      size: v.sizeEN?.trim() ? v.sizeEN : v.size,
       priceTRY: v.priceTRY,
       priceUSD: v.priceUSD ?? Math.round(v.priceTRY / 30),
     })),

@@ -1,5 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
+import type { PriceVariant } from "./types";
 import { kvGetJson, kvSetJson, isKvAvailable } from "./kv-adapter";
 
 const CATEGORIES_JSON = path.join(process.cwd(), "lib", "data", "categories.json");
@@ -12,6 +13,11 @@ export interface CategoryJson {
   previewImageUrl?: string;
   order?: number;
   hidden?: boolean;
+  /** Bu kategorideki eserler için varsayılan ölçü / TL / USD satırları (modal listesi). */
+  defaultPriceVariants?: PriceVariant[];
+  /** Modalda kategori başına sabit açıklama (eser metni altına eklenir). */
+  defaultDescriptionTR?: string;
+  defaultDescriptionEN?: string;
 }
 
 export async function readCategoriesFromFile(): Promise<CategoryJson[]> {

@@ -4,6 +4,8 @@ export type MediaType = "image" | "video";
 
 export interface PriceVariant {
   size: string; // Örn: "90 cm çap", "100 cm çap"
+  /** İngilizce galeride ölçü satırı; yoksa `size` kullanılır. */
+  sizeEN?: string;
   priceTRY: number;
   priceUSD?: number;
 }
@@ -25,6 +27,8 @@ export interface ArtworkFull {
   dimensionsCM: string;
   dimensionsIN: string;
   priceVariants?: PriceVariant[];
+  /** Raw admin API: kategori fiyat listesi kullanımı. */
+  useCategoryPricing?: boolean;
   isFeatured: boolean;
 }
 

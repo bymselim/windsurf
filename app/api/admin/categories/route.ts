@@ -6,6 +6,7 @@ import {
   writeCategoriesToFile,
   type CategoryJson,
 } from "@/lib/categories-io";
+import type { PriceVariant } from "@/lib/types";
 import { readArtworksFromFile, writeArtworksToFile } from "@/lib/artworks-io";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +46,23 @@ async function ensureCategoryFolder(categoryName: string): Promise<void> {
   } catch {
     // Best-effort only: on serverless platforms (e.g. Vercel) the filesystem may be read-only.
   }
+}
+
+function parseDefaultPriceVariants(raw: unknown): PriceVariant[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: PriceVariant[] = [];
+  for (const it of raw) {
+    if (typeof it !== "object" || it === null) continue;
+    const o = it as Record<string, unknown>;
+    if (typeof o.size !== "string" || typeof o.priceTRY !== "number") continue;
+    out.push({
+      size: o.size,
+      sizeEN: typeof o.sizeEN === "string" ? o.sizeEN : undefined,
+      priceTRY: o.priceTRY,
+      priceUSD: typeof o.priceUSD === "number" && Number.isFinite(o.priceUSD) ? o.priceUSD : undefined,
+    });
+  }
+  return out.length ? out : undefined;
 }
 
 async function requireAdmin(request: NextRequest): Promise<boolean> {
@@ -98,12 +116,25 @@ export async function POST(request: NextRequest) {
   if (categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
     return NextResponse.json({ error: "Category already exists" }, { status: 400 });
   }
+  const defaultPriceVariants = parseDefaultPriceVariants(body?.defaultPriceVariants);
+  const defaultDescriptionTR =
+    typeof body?.defaultDescriptionTR === "string" && body.defaultDescriptionTR.trim() !== ""
+      ? String(body.defaultDescriptionTR)
+      : undefined;
+  const defaultDescriptionEN =
+    typeof body?.defaultDescriptionEN === "string" && body.defaultDescriptionEN.trim() !== ""
+      ? String(body.defaultDescriptionEN)
+      : undefined;
+
   categories.push({
     name,
     color,
     icon,
     previewImageUrl: previewImageUrl || undefined,
     order: Number.isFinite(order) ? Math.round(order) : 0,
+    defaultPriceVariants,
+    defaultDescriptionTR,
+    defaultDescriptionEN,
   });
   await writeCategoriesToFile(categories);
   await ensureCategoryFolder(name);
@@ -113,6 +144,9 @@ export async function POST(request: NextRequest) {
     icon,
     previewImageUrl: previewImageUrl || undefined,
     order: Number.isFinite(order) ? Math.round(order) : 0,
+    defaultPriceVariants,
+    defaultDescriptionTR,
+    defaultDescriptionEN,
   });
 }
 
@@ -141,14 +175,36 @@ export async function PUT(request: NextRequest) {
   if (nameChanged && categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
     return NextResponse.json({ error: "Target category name already exists" }, { status: 400 });
   }
-  const hidden = typeof body?.hidden === "boolean" ? body.hidden : (categories[index] as { hidden?: boolean }).hidden;
+  const prev = categories[index];
+  const hidden = typeof body?.hidden === "boolean" ? body.hidden : prev.hidden;
+  const defaultPriceVariants =
+    body?.defaultPriceVariants !== undefined
+      ? parseDefaultPriceVariants(body.defaultPriceVariants)
+      : prev.defaultPriceVariants;
+  const defaultDescriptionTR =
+    body?.defaultDescriptionTR !== undefined
+      ? String(body.defaultDescriptionTR).trim() === ""
+        ? undefined
+        : String(body.defaultDescriptionTR)
+      : prev.defaultDescriptionTR;
+  const defaultDescriptionEN =
+    body?.defaultDescriptionEN !== undefined
+      ? String(body.defaultDescriptionEN).trim() === ""
+        ? undefined
+        : String(body.defaultDescriptionEN)
+      : prev.defaultDescriptionEN;
+
   categories[index] = {
+    ...prev,
     name,
     color,
     icon,
     previewImageUrl: previewImageUrl === "" ? undefined : previewImageUrl,
-    order: Number.isFinite(order) ? Math.round(order) : (categories[index] as { order?: number }).order ?? 0,
+    order: Number.isFinite(order) ? Math.round(order) : prev.order ?? 0,
     hidden: hidden ?? false,
+    defaultPriceVariants,
+    defaultDescriptionTR,
+    defaultDescriptionEN,
   };
   await writeCategoriesToFile(categories);
   if (nameChanged) {

@@ -27,6 +27,7 @@ function isOptimizableImage(url: string): boolean {
 
 interface PriceVariant {
   size: string;
+  sizeEN?: string;
   priceTRY: number;
   priceUSD?: number;
 }
@@ -45,6 +46,8 @@ interface ArtworkRow {
   dimensionsCM: string;
   dimensionsIN: string;
   priceVariants?: PriceVariant[];
+  /** true / false / undefined = otomatik */
+  useCategoryPricing?: boolean;
   isFeatured: boolean;
 }
 
@@ -148,7 +151,7 @@ export default function ArtworksAdminPage() {
   const loadArtworks = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/artworks", { credentials: "include" });
+      const res = await fetch("/api/artworks?raw=1", { credentials: "include" });
       const data = await res.json();
       const list = Array.isArray(data) ? (data as ArtworkRow[]) : [];
       setArtworks(list);
@@ -306,6 +309,8 @@ export default function ArtworksAdminPage() {
     if (!o) return true;
     const priceVariantsEqual =
       JSON.stringify(a.priceVariants ?? []) === JSON.stringify(o.priceVariants ?? []);
+    const pricingMode = (u: boolean | undefined) =>
+      u === true ? "c" : u === false ? "o" : "a";
     return (
       a.category !== o.category ||
       a.titleTR !== o.titleTR ||
@@ -315,6 +320,7 @@ export default function ArtworksAdminPage() {
       a.priceTRY !== o.priceTRY ||
       a.priceUSD !== o.priceUSD ||
       a.isFeatured !== o.isFeatured ||
+      pricingMode(a.useCategoryPricing) !== pricingMode(o.useCategoryPricing) ||
       !priceVariantsEqual
     );
   };
@@ -336,7 +342,7 @@ export default function ArtworksAdminPage() {
       prev.map((art) => {
         if (art.id !== artworkId) return art;
         const variants = [...(art.priceVariants ?? [])];
-        variants.push({ size: "", priceTRY: 0 });
+        variants.push({ size: "", sizeEN: "", priceTRY: 0 });
         return { ...art, priceVariants: variants };
       })
     );
@@ -457,6 +463,12 @@ export default function ArtworksAdminPage() {
           priceUSD: artwork.priceUSD,
           priceVariants: artwork.priceVariants && artwork.priceVariants.length > 0 ? artwork.priceVariants : null,
           isFeatured: artwork.isFeatured,
+          useCategoryPricing:
+            artwork.useCategoryPricing === true
+              ? true
+              : artwork.useCategoryPricing === false
+                ? false
+                : null,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -1406,6 +1418,31 @@ export default function ArtworksAdminPage() {
                             </option>
                           ))}
                         </select>
+                        <label className="mt-2 block text-[10px] uppercase tracking-wide text-zinc-500">
+                          Fiyat listesi
+                        </label>
+                        <select
+                          value={
+                            artwork.useCategoryPricing === true
+                              ? "c"
+                              : artwork.useCategoryPricing === false
+                                ? "o"
+                                : "a"
+                          }
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            updateArtwork(
+                              artwork.id,
+                              "useCategoryPricing",
+                              v === "a" ? undefined : v === "c" ? true : false
+                            );
+                          }}
+                          className="mt-0.5 w-full p-1.5 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 text-[11px] focus:border-amber-500/50 focus:outline-none"
+                        >
+                          <option value="a">Otomatik</option>
+                          <option value="c">Kategori listesi</option>
+                          <option value="o">Eser varyantları</option>
+                        </select>
                       </td>
                       <td className="p-2">
                         <input
@@ -1436,7 +1473,9 @@ export default function ArtworksAdminPage() {
                         </button>
                         {expandedPriceVariants[artwork.id] && (
                           <div className="mt-2 space-y-2 rounded-lg border border-zinc-700 bg-zinc-800/50 p-2">
-                            <div className="text-xs text-zinc-400 mb-1">Örn: &quot;90 cm çap&quot; → 22.000 ₺ / 700 $</div>
+                            <div className="text-xs text-zinc-400 mb-1">
+                              Ölçü TR / EN; örn. &quot;90 cm çap&quot; → 22.000 ₺ / 700 $
+                            </div>
                             {(artwork.priceVariants ?? []).map((variant, idx) => (
                               <div key={idx} className="flex gap-2 items-center flex-wrap">
                                 <input
@@ -1445,8 +1484,17 @@ export default function ArtworksAdminPage() {
                                   onChange={(e) =>
                                     updatePriceVariant(artwork.id, idx, "size", e.target.value)
                                   }
-                                  placeholder="90 cm çap"
-                                  className="flex-1 min-w-[120px] p-1.5 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-xs focus:border-amber-500/50 focus:outline-none"
+                                  placeholder="Ölçü TR"
+                                  className="flex-1 min-w-[100px] p-1.5 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-xs focus:border-amber-500/50 focus:outline-none"
+                                />
+                                <input
+                                  type="text"
+                                  value={variant.sizeEN ?? ""}
+                                  onChange={(e) =>
+                                    updatePriceVariant(artwork.id, idx, "sizeEN", e.target.value)
+                                  }
+                                  placeholder="Size EN"
+                                  className="flex-1 min-w-[90px] p-1.5 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-xs focus:border-amber-500/50 focus:outline-none"
                                 />
                                 <input
                                   type="number"
@@ -1532,7 +1580,7 @@ export default function ArtworksAdminPage() {
                           }
                           className="w-full min-w-[140px] p-2 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 text-sm focus:border-amber-500/50 focus:outline-none resize-y"
                           rows={3}
-                          placeholder="Açıklama (TR)"
+                          placeholder="Ek açıklama (TR) — kategori metniyle birleşir"
                         />
                         <button
                           type="button"
@@ -1556,7 +1604,7 @@ export default function ArtworksAdminPage() {
                           }
                           className="w-full min-w-[140px] p-2 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 text-sm focus:border-amber-500/50 focus:outline-none resize-y"
                           rows={3}
-                          placeholder="Description (EN)"
+                          placeholder="Extra (EN) — merged with category text"
                         />
                         <button
                           type="button"
