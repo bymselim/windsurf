@@ -24,11 +24,19 @@ export async function POST(request: NextRequest) {
     request.headers.get("x-real-ip") ||
     "";
 
-  await appendChangeRequest({
-    webpin,
-    message,
-    ...(ip ? { clientIp: ip } : {}),
-  });
+  try {
+    await appendChangeRequest({
+      webpin,
+      message,
+      ...(ip ? { clientIp: ip } : {}),
+    });
+  } catch (e) {
+    console.error("[verify-art/change-request] append failed", e);
+    return NextResponse.json(
+      { error: "storage_failed", message: "Could not persist request" },
+      { status: 503 }
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

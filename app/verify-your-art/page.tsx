@@ -56,6 +56,7 @@ const UI: Record<
     errChangeShort: string;
     errChangeSend: string;
     errChangeFail: string;
+    errChangeStorage: string;
     send: string;
     sending: string;
     cancel: string;
@@ -87,6 +88,8 @@ const UI: Record<
     errChangeShort: "Lütfen talebinizi birkaç cümle ile açıklayın.",
     errChangeSend: "Gönderilemedi.",
     errChangeFail: "Gönderim başarısız.",
+    errChangeStorage:
+      "Talep sunucuya yazılamadı (bulut ortamı). Lütfen bir süre sonra tekrar deneyin veya melikesevinc.com üzerinden iletişime geçin.",
     send: "Gönder",
     sending: "Gönderiliyor…",
     cancel: "Vazgeç",
@@ -119,6 +122,8 @@ const UI: Record<
     errChangeShort: "Please describe your request in a few sentences.",
     errChangeSend: "Could not send.",
     errChangeFail: "Send failed.",
+    errChangeStorage:
+      "Your request could not be saved. Please try again later or contact us via melikesevinc.com.",
     send: "Send",
     sending: "Sending…",
     cancel: "Cancel",
@@ -220,8 +225,11 @@ export default function VerifyYourArtPage() {
         body: JSON.stringify({ webpin: data.webpin, message: msg }),
       });
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        setChangeErr(typeof j?.error === "string" ? j.error : messages.errChangeSend);
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        const code = j?.error;
+        if (code === "storage_failed") setChangeErr(messages.errChangeStorage);
+        else if (code === "not_found") setChangeErr(messages.err404);
+        else setChangeErr(typeof code === "string" ? code : messages.errChangeSend);
         return;
       }
       setChangeDone(true);
@@ -295,30 +303,6 @@ export default function VerifyYourArtPage() {
           <p className="mx-auto mt-5 max-w-xl text-sm leading-relaxed text-neutral-600 sm:text-base">{t.intro}</p>
         </header>
 
-        {/* Sertifika beyanı — her zaman iki dil */}
-        <section
-          className="mx-auto w-full max-w-2xl rounded-2xl border border-neutral-200/90 bg-white/80 px-5 py-6 shadow-sm backdrop-blur-sm sm:px-8 sm:py-8 animate-fade-in"
-          style={{ animationDelay: "0.04s" }}
-          aria-labelledby="declaration-heading"
-        >
-          <h2 id="declaration-heading" className="sr-only">
-            Certificate declaration
-          </h2>
-          <p
-            lang="en"
-            className="text-center text-[13px] leading-relaxed text-neutral-600 sm:text-sm md:text-[15px] md:leading-7"
-          >
-            {DECLARATION_EN}
-          </p>
-          <div className="my-5 h-px w-full bg-gradient-to-r from-transparent via-[#7D5BB2]/35 to-transparent" />
-          <p
-            lang="tr"
-            className="text-center text-[13px] leading-relaxed text-neutral-500 sm:text-sm md:text-[15px] md:leading-7"
-          >
-            {DECLARATION_TR}
-          </p>
-        </section>
-
         <section
           className="relative rounded-2xl border border-[#e8dff5] bg-[#f3ecfa]/95 p-6 shadow-[0_12px_40px_-24px_rgba(125,91,178,0.45)] sm:p-8 animate-fade-in"
           style={{ animationDelay: "0.08s" }}
@@ -353,6 +337,29 @@ export default function VerifyYourArtPage() {
 
         {data && (
           <section className="space-y-8 animate-fade-in">
+            {/* Sertifika beyanı — yalnızca webpin doğrulandıktan sonra */}
+            <div
+              className="mx-auto w-full max-w-2xl rounded-2xl border border-neutral-200/90 bg-white/80 px-5 py-6 shadow-sm backdrop-blur-sm sm:px-8 sm:py-8"
+              aria-labelledby="declaration-heading"
+            >
+              <h2 id="declaration-heading" className="sr-only">
+                Certificate declaration
+              </h2>
+              <p
+                lang="en"
+                className="text-center text-[13px] leading-relaxed text-neutral-600 sm:text-sm md:text-[15px] md:leading-7"
+              >
+                {DECLARATION_EN}
+              </p>
+              <div className="my-5 h-px w-full bg-gradient-to-r from-transparent via-[#7D5BB2]/35 to-transparent" />
+              <p
+                lang="tr"
+                className="text-center text-[13px] leading-relaxed text-neutral-500 sm:text-sm md:text-[15px] md:leading-7"
+              >
+                {DECLARATION_TR}
+              </p>
+            </div>
+
             <div className="relative rounded-2xl border border-neutral-200 bg-white/95 p-6 shadow-lg sm:p-8">
               <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-neutral-100 pb-6">
                 <div>
