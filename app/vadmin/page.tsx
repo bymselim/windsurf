@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { APP_NAME, APP_VERSION } from "@/lib/app-version";
 import { getVadminAuthHeaders, setVadminPasswordClient } from "@/lib/vadmin-auth-client";
 
 export default function VadminLoginPage() {
@@ -94,6 +95,9 @@ export default function VadminLoginPage() {
           Şifre sırası: <code className="text-zinc-500">VADMIN_PASSWORD</code> →{" "}
           <code className="text-zinc-500">ADMIN_PASSWORD</code> (ikisi de yoksa Redis/KV) → dosya{" "}
           <code className="text-zinc-500">lib/data/vadmin-password.txt</code>.
+        </p>
+        <p className="mt-4 text-center text-[11px] text-zinc-600 font-mono">
+          {APP_NAME} · v{APP_VERSION}
         </p>
       </div>
     </div>

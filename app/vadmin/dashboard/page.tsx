@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { CertificateRecord, VerifyChangeRequest } from "@/lib/certificate-types";
+import { APP_NAME, APP_VERSION } from "@/lib/app-version";
 import { clearVadminPasswordClient, getVadminAuthHeaders } from "@/lib/vadmin-auth-client";
 
 async function vadminFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
@@ -275,6 +276,10 @@ export default function VadminDashboardPage() {
             </table>
           </div>
         </div>
+
+        <p className="mt-10 text-center text-xs text-zinc-600 font-mono">
+          {APP_NAME} · v{APP_VERSION}
+        </p>
       </div>
     </div>
   );

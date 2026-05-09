@@ -1,10 +1,9 @@
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { del, put } from "@vercel/blob";
 import { randomUUID } from "crypto";
 
 let r2Client: S3Client | null = null;
 
-/** R2 (S3 API) + public URL base — hepsi doluysa R2 kullanılır. */
+/** R2 (S3 API) — tüm ortam değişkenleri doluysa kullanılır. */
 export function isR2Configured(): boolean {
   return Boolean(
     process.env.R2_ACCOUNT_ID &&
@@ -58,9 +57,16 @@ export function keyFromR2PublicUrl(urlStr: string): string | null {
   }
 }
 
+function requireR2(): void {
+  if (!isR2Configured()) {
+    throw new Error(
+      "R2 ortam değişkenleri eksik: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_BASE_URL"
+    );
+  }
+}
+
 /**
  * R2: key = `${prefix}/${uuid}-${filename}` (çakışma önlemi).
- * Blob: BLOB_READ_WRITE_TOKEN varsa eski davranış (addRandomSuffix).
  */
 export async function uploadPublicMedia(
   keyPrefix: string,
@@ -68,31 +74,19 @@ export async function uploadPublicMedia(
   buffer: Buffer,
   contentType?: string
 ): Promise<{ url: string; pathname: string }> {
+  requireR2();
   const safe = filename.replace(/[^\w.\-]+/g, "_").slice(0, 160) || "file";
   const key = `${keyPrefix.replace(/\/+$/, "")}/${randomUUID()}-${safe}`;
 
-  if (isR2Configured()) {
-    await getR2Client().send(
-      new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME!,
-        Key: key,
-        Body: buffer,
-        ContentType: contentType || "application/octet-stream",
-      })
-    );
-    return { url: publicUrlForKey(key), pathname: key };
-  }
-
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error("R2 ortam değişkenleri veya BLOB_READ_WRITE_TOKEN tanımlı değil.");
-  }
-
-  const res = await put(key, buffer, {
-    access: "public",
-    addRandomSuffix: false,
-    contentType: contentType || undefined,
-  });
-  return { url: res.url, pathname: res.pathname };
+  await getR2Client().send(
+    new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME!,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType || "application/octet-stream",
+    })
+  );
+  return { url: publicUrlForKey(key), pathname: key };
 }
 
 /**
@@ -104,50 +98,32 @@ export async function uploadPublicExactKey(
   buffer: Buffer,
   contentType?: string
 ): Promise<{ url: string; pathname: string }> {
+  requireR2();
   const key = objectKey.replace(/^\/+/, "");
 
-  if (isR2Configured()) {
-    await getR2Client().send(
-      new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME!,
-        Key: key,
-        Body: buffer,
-        ContentType: contentType || "application/octet-stream",
-      })
-    );
-    return { url: publicUrlForKey(key), pathname: key };
-  }
-
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error("R2 ortam değişkenleri veya BLOB_READ_WRITE_TOKEN tanımlı değil.");
-  }
-
-  const res = await put(key, buffer, {
-    access: "public",
-    addRandomSuffix: false,
-    contentType: contentType || undefined,
-  });
-  return { url: res.url, pathname: res.pathname };
+  await getR2Client().send(
+    new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME!,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType || "application/octet-stream",
+    })
+  );
+  return { url: publicUrlForKey(key), pathname: key };
 }
 
-/** Tam public URL: R2 veya Vercel Blob silmeyi dener. */
+/** Tam public URL: yalnızca R2 public URL’leri silinir. */
 export async function deleteStoredMediaByUrl(url: string): Promise<void> {
   if (!/^https?:\/\//i.test(url)) return;
+  if (!isR2Configured()) return;
 
-  if (isR2Configured()) {
-    const key = keyFromR2PublicUrl(url);
-    if (key) {
-      await getR2Client().send(
-        new DeleteObjectCommand({
-          Bucket: process.env.R2_BUCKET_NAME!,
-          Key: key,
-        })
-      );
-      return;
-    }
-  }
+  const key = keyFromR2PublicUrl(url);
+  if (!key) return;
 
-  if (/\.(blob\.vercel-storage\.com|public\.blob\.vercel-storage\.com)/i.test(url)) {
-    await del(url);
-  }
+  await getR2Client().send(
+    new DeleteObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME!,
+      Key: key,
+    })
+  );
 }

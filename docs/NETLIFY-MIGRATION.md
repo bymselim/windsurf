@@ -2,11 +2,11 @@
 
 ## Özet
 
-Projenizde **veritabanı** olarak kullanılan servisler:
+Projenizde **kalıcı veri** olarak kullanılan servisler:
 1. **Redis (Upstash)** – Kategoriler, loglar, ayarlar, FAQ erişim kayıtları
-2. **Vercel Blob** – Eser görselleri (upload)
+2. **Cloudflare R2** – Eser görselleri (S3 uyumlu API; `R2_*` ortam değişkenleri)
 
-Her ikisi de **platform bağımsız**. Netlify'a geçerken veriyi taşımaya gerek yok; sadece environment variable'ları Netlify'a eklemeniz yeterli.
+Redis **platform bağımsızdır**. R2 de uygulamanın çalıştığı host’tan bağımsızdır; Netlify’a geçerken `REDIS_URL` ve `R2_*` değişkenlerini Netlify ortamına eklemeniz yeterlidir.
 
 ---
 
@@ -59,11 +59,12 @@ Vercel'deki tüm environment variable'ları Netlify'a kopyalayın.
 | `REDIS_URL` | Upstash Redis bağlantı URL'si (KV verisi) |
 | `KV_REST_API_URL` | (Alternatif) Upstash REST API URL |
 | `KV_REST_API_TOKEN` | (Alternatif) Upstash REST API token |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob token (mevcut görseller için) |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_BASE_URL` | Cloudflare R2 (görsel yükleme ve silme) |
+| `NEXT_PUBLIC_R2_IMAGE_HOST` | R2 public hostname (`next.config` remotePatterns; örn. `pub-xxxxx.r2.dev`) |
 | `ADMIN_PASSWORD_HASH` | Admin panel şifresi (varsa) |
 | `NEXTAUTH_SECRET` veya benzeri | Auth secret (varsa) |
 
-**Önemli:** `BLOB_READ_WRITE_TOKEN` Vercel Blob için. Bu token Netlify'dan da çalışır; Vercel Blob API'si platform bağımsızdır. Mevcut görselleriniz aynen kalır, taşımaya gerek yok.
+**Önemli:** Görseller artık Vercel Blob üzerinden servis edilmez; yükleme ve silme doğrudan R2 API ile yapılır.
 
 ---
 
@@ -75,18 +76,11 @@ Vercel'deki tüm environment variable'ları Netlify'a kopyalayın.
 
 ---
 
-## 4. Vercel Blob (Görseller) – Taşımaya Gerek Yok
+## 4. Görseller (R2)
 
-- Vercel Blob, `BLOB_READ_WRITE_TOKEN` ile erişilir
-- Bu token Netlify'dan da geçerlidir
-- Mevcut görseller aynı URL'lerle çalışmaya devam eder
-
-**Alternatif:** İleride tamamen Netlify'a geçmek isterseniz:
-- [Netlify Blob](https://docs.netlify.com/blobs/overview/) (beta)
-- Cloudinary
-- AWS S3
-
-Bu durumda kodda `@vercel/blob` yerine yeni storage client kullanmanız gerekir.
+- Yüklemeler `lib/object-storage.ts` üzerinden **yalnızca R2**’ye gider.
+- Netlify’da da aynı `R2_*` ve `NEXT_PUBLIC_R2_IMAGE_HOST` değişkenlerini tanımlayın.
+- Eski Blob URL’leri varsa `npm run migrate:blob-to-r2` ile R2’ye taşıyıp kayıtları güncelleyin; ardından Vercel Blob depolamasını kapatabilirsiniz.
 
 ---
 
@@ -155,4 +149,4 @@ Netlify stabil çalıştıktan sonra:
 
 1. Production domain'i Netlify'a yönlendirin
 2. Vercel projesini durdurabilir veya silebilirsiniz
-3. `BLOB_READ_WRITE_TOKEN` Vercel Blob hesabına bağlı; Vercel hesabını kapatsanız bile Blob storage ayrı bir servis olarak çalışmaya devam edebilir (Vercel dokümantasyonunu kontrol edin)
+3. Görseller R2’deyse bucket ve custom domain’i Cloudflare panelinden yönetmeye devam edin; Vercel Blob kullanılmıyorsa ilgili token ve depoyu güvenlik için kaldırabilirsiniz

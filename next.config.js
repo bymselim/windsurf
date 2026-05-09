@@ -1,19 +1,13 @@
 /** @type {import('next').NextConfig} */
 const r2ImageHost = process.env.NEXT_PUBLIC_R2_IMAGE_HOST?.trim();
 
-const remotePatterns = [
-  { protocol: 'https', hostname: 'res.cloudinary.com', pathname: '/**' },
-  { protocol: 'https', hostname: 'picsum.photos', pathname: '/**' },
-  { protocol: 'https', hostname: '*.public.blob.vercel-storage.com', pathname: '/**' },
-  { protocol: 'https', hostname: '*.blob.vercel-storage.com', pathname: '/**' },
-  { protocol: 'https', hostname: 'images.unsplash.com', pathname: '/**' },
-];
+const remotePatterns = [];
 
 if (r2ImageHost) {
   remotePatterns.push({
-    protocol: 'https',
+    protocol: "https",
     hostname: r2ImageHost,
-    pathname: '/**',
+    pathname: "/**",
   });
 }
 

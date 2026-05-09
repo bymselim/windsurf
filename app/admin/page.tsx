@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { clearAdminPassword } from "@/lib/admin-auth-client";
+import { APP_NAME, APP_VERSION } from "@/lib/app-version";
 
 const NAV = [
   { href: "/admin/artworks", label: "Artworks", desc: "Edit all artworks", icon: "🖼️" },
@@ -84,6 +85,9 @@ export default function AdminDashboardPage() {
         <div className="mt-8 p-4 rounded-xl border border-zinc-800 bg-zinc-900/30">
           <p className="text-sm text-zinc-500">
             Import/Export for bulk operations can be added later.
+          </p>
+          <p className="mt-3 text-xs text-zinc-600 font-mono">
+            {APP_NAME} · v{APP_VERSION}
           </p>
         </div>
       </div>

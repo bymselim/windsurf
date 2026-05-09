@@ -1,6 +1,6 @@
 # Cloudflare R2 ile medya depolama
 
-Bu proje artık **Cloudflare R2** (S3 uyumlu API) veya ortam değişkenleri yoksa **Vercel Blob** ile yükleyebilir. R2 değişkenleri tanımlıysa yeni yüklemeler R2’ye gider.
+Bu proje medya yüklemeleri için **Cloudflare R2** (S3 uyumlu API) kullanır. `R2_*` ortam değişkenleri üretimde tanımlı olmalıdır.
 
 ## 1) Cloudflare’de
 
@@ -25,11 +25,9 @@ Projede **Production** (ve gerekirse Preview) için ekleyin:
 
 > `NEXT_PUBLIC_*` değişkeni deploy sonrası `next.config.js` içinde `images.remotePatterns` için kullanılır; değiştirdikten sonra **yeniden deploy** gerekir.
 
-R2 tanımlı değilse eski davranış: `BLOB_READ_WRITE_TOKEN` ile Vercel Blob kullanılır.
+## 3) Eski depodan R2’ye geçiş
 
-## 3) Mevcut Blob dosyalarını R2’ye taşıma
-
-1. Blob’daki dosyaları bilgisayara veya doğrudan R2’ye kopyalayın (Cloudflare **Super Slurper** veya `rclone` S3→R2).
+1. Eski ortamdaki dosyaları bilgisayara veya doğrudan R2’ye kopyalayın (Cloudflare **Super Slurper** veya `rclone`).
 2. Eser kayıtlarındaki `filename` / `thumbnailFilename` URL’lerini yeni R2 public URL’leri ile güncelleyin (admin veya JSON düzenlemesi).
 
 Yerel `public/artworks` klasöründen toplu yükleme:

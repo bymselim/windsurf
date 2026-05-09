@@ -9,23 +9,6 @@ import { InfoTip } from "@/components/admin/InfoTip";
 
 const PAGE_SIZE = 50;
 
-const OPTIMIZABLE_HOSTS = [
-  "blob.vercel-storage.com",
-  "public.blob.vercel-storage.com",
-  "res.cloudinary.com",
-  "picsum.photos",
-];
-
-function isOptimizableImage(url: string): boolean {
-  try {
-    const u = new URL(url, "https://x");
-    const host = u.hostname.toLowerCase();
-    return OPTIMIZABLE_HOSTS.some((h) => host.endsWith(h));
-  } catch {
-    return false;
-  }
-}
-
 interface PriceVariant {
   size: string;
   sizeEN?: string;
@@ -1512,10 +1495,7 @@ export default function ArtworksAdminPage() {
                             sizes="64px"
                             loading="lazy"
                             className="w-16 h-16 object-cover rounded"
-                            unoptimized={
-                              (artwork.imageUrl ?? "").startsWith("http") &&
-                              !isOptimizableImage(artwork.imageUrl ?? "")
-                            }
+                            unoptimized={/^https?:\/\//i.test(artwork.imageUrl ?? "")}
                           />
                         </button>
                       </td>

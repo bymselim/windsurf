@@ -249,25 +249,33 @@ export default function VerifyYourArtPage() {
               {data.mediaUrls?.length > 0 && (
                 <div className="mb-8">
                   <FieldLabel tr={FIELD.media.tr} en={FIELD.media.en} />
-                  <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  <div className="mt-3 grid gap-4 sm:grid-cols-2 sm:items-start">
                     {data.mediaUrls.map((url, i) =>
                       isVideoUrl(url) ? (
-                        <video
+                        <div
                           key={`${url}-${i}`}
-                          src={url}
-                          controls
-                          playsInline
-                          className="aspect-video w-full rounded-xl border border-neutral-200 bg-black object-contain shadow-sm"
-                        />
+                          className="flex min-h-0 justify-center rounded-xl border border-neutral-200 bg-black p-2 shadow-sm"
+                        >
+                          <video
+                            src={url}
+                            controls
+                            playsInline
+                            className="max-h-[min(85vh,900px)] max-w-full w-auto rounded-lg object-contain"
+                          />
+                        </div>
                       ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <div
                           key={`${url}-${i}`}
-                          src={url}
-                          alt=""
-                          className="aspect-[4/3] w-full rounded-xl border border-neutral-200 object-cover shadow-sm"
-                          loading="lazy"
-                        />
+                          className="flex min-h-0 justify-center rounded-xl border border-neutral-200 bg-neutral-100 p-2 shadow-sm"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={url}
+                            alt=""
+                            className="max-h-[min(85vh,900px)] max-w-full w-auto h-auto rounded-lg object-contain"
+                            loading="lazy"
+                          />
+                        </div>
                       )
                     )}
                   </div>
