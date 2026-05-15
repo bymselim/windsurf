@@ -233,7 +233,7 @@ function MonthBox({
   const ciro = computeToplamCiro(ord);
   const tah = computeTahsilat(ord);
   const gid = exp.reduce((s, e) => s + (+e.tutar || 0), 0);
-  const net = tah - gid;
+  const net = ciro - gid;
   return (
     <div style={{ display: "grid", gap: 6 }}>
       {[
@@ -735,6 +735,49 @@ export default function ErpApp() {
   );
 
   const exportCSV = useCallback(() => {
+    const escCell = (v: string | number | null | undefined) =>
+      '"' + String(v ?? "").replace(/"/g, '""') + '"';
+    const toCsv = (rows: (string | number | null | undefined)[][]) =>
+      rows.map((r) => r.map(escCell).join(",")).join("\n");
+
+    if (tab === "giderler") {
+      const list = [...expenses];
+      list.sort((a, b) => {
+        const cmp = compareExpenses(a, b, expenseSort.key);
+        return expenseSort.asc ? cmp : -cmp;
+      });
+      const rows: (string | number | null | undefined)[][] = [
+        [
+          "id",
+          "Tarih",
+          "Kategori",
+          "Açıklama",
+          "Tutar",
+          "Fatura No",
+          "Dosya",
+          "Dosya URL",
+        ],
+      ];
+      list.forEach((e) =>
+        rows.push([
+          e.id,
+          e.tarih,
+          e.kat,
+          e.acik,
+          e.tutar,
+          e.fatno,
+          e.dosya,
+          e.dosya_url,
+        ])
+      );
+      const csv = toCsv(rows);
+      const a = document.createElement("a");
+      a.href = "data:text/csv;charset=utf-8,\uFEFF" + encodeURIComponent(csv);
+      a.download = "giderler_" + todayStr() + ".csv";
+      a.click();
+      return;
+    }
+
     const rows: (string | number)[][] = [
       [
         "#",
@@ -775,16 +818,12 @@ export default function ErpApp() {
         o.bilgi,
       ])
     );
-    const csv = rows
-      .map((r) =>
-        r.map((v) => '"' + String(v ?? "").replace(/"/g, '""') + '"').join(",")
-      )
-      .join("\n");
+    const csv = toCsv(rows);
     const a = document.createElement("a");
     a.href = "data:text/csv;charset=utf-8,\uFEFF" + encodeURIComponent(csv);
     a.download = "siparisler_" + todayStr() + ".csv";
     a.click();
-  }, [orders, getNum]);
+  }, [tab, orders, expenses, getNum, expenseSort]);
 
   const prepareEmail = useCallback(() => {
     const thisM = monthStr(0);
@@ -1192,7 +1231,12 @@ Saygılarımla`;
               <button type="button" className="btn sm" onClick={openExpModal}>
                 + Gider
               </button>
-              <button type="button" className="btn sm" onClick={exportCSV}>
+              <button
+                type="button"
+                className="btn sm"
+                title={tab === "giderler" ? "Gider listesi CSV" : "Sipariş listesi CSV"}
+                onClick={exportCSV}
+              >
                 ↓ CSV
               </button>
             </div>
