@@ -21,6 +21,7 @@ import {
   toggleErpOrderDone,
   updateErpOrder,
 } from "@/components/erp/api";
+import { ErpImportPanel } from "@/components/erp/ErpImportPanel";
 import type { ErpExpense, ErpOrder, ErpSettings } from "@/lib/erp/types";
 import {
   addWorkdays,
@@ -269,14 +270,18 @@ export default function ErpApp() {
 
   const hideLoading = useCallback(() => setLoading(false), []);
 
+  const applyErpData = useCallback((data: { orders: ErpOrder[]; expenses: ErpExpense[]; settings: ErpSettings }) => {
+    setOrders(data.orders);
+    setExpenses(data.expenses);
+    setSettings(data.settings);
+    setSyncOk(true);
+  }, []);
+
   const loadData = useCallback(async () => {
     showLoading("Veriler yükleniyor...");
     try {
       const data = await fetchErpData();
-      setOrders(data.orders);
-      setExpenses(data.expenses);
-      setSettings(data.settings);
-      setSyncOk(true);
+      applyErpData(data);
     } catch (e) {
       console.error(e);
       setSyncOk(false);
@@ -287,7 +292,7 @@ export default function ErpApp() {
     } finally {
       hideLoading();
     }
-  }, [showLoading, hideLoading]);
+  }, [showLoading, hideLoading, applyErpData]);
 
   useEffect(() => {
     void loadData();
@@ -1803,6 +1808,13 @@ Saygılarımla`;
                   </div>
                 </div>
               </div>
+              <ErpImportPanel
+                orderCount={orders.length}
+                expenseCount={expenses.length}
+                onImported={applyErpData}
+                onLoading={showLoading}
+                onLoaded={hideLoading}
+              />
               <div className="alert info" style={{ marginTop: 14 }}>
                 ⚙ Burada tanımladığınız kategoriler, sipariş ve gider formlarında seçenek
                 olarak görünür. Değişiklikler sunucuda kaydedilir.

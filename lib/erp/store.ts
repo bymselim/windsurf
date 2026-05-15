@@ -2,6 +2,13 @@ import { promises as fs } from "fs";
 import path from "path";
 import { kvGetJson, kvSetJson, isKvAvailable } from "@/lib/kv-adapter";
 import type { ErpData, ErpExpense, ErpOrder, ErpSettings } from "./types";
+import {
+  type ErpImportMode,
+  type ErpImportPayload,
+  type ErpImportResult,
+  normalizeExpenseForImport,
+  normalizeOrderForImport,
+} from "./import";
 import { DEF_EXP_CATS, DEF_ORDER_CATS } from "./utils";
 
 const DATA_DIR = path.join(process.cwd(), "lib", "data");
@@ -236,4 +243,139 @@ export async function saveErpSettings(settings: ErpSettings): Promise<ErpSetting
   const normalized = normalizeSettings(settings);
   await writeSettings(normalized);
   return normalized;
+}
+
+async function persistNextId(maxId: number): Promise<void> {
+  if (maxId > 0 && (await isKvAvailable())) {
+    await kvSetJson(KV_NEXT_ID, maxId);
+  }
+}
+
+function prepareOrders(raw: unknown[], startId: number): { items: ErpOrder[]; skipped: number } {
+  let autoId = startId;
+  const items: ErpOrder[] = [];
+  let skipped = 0;
+  for (const row of raw) {
+    autoId++;
+    const o = normalizeOrderForImport(row, autoId);
+    if (!o) {
+      skipped++;
+      continue;
+    }
+    autoId = Math.max(autoId, o.id);
+    items.push(o);
+  }
+  return { items, skipped };
+}
+
+function prepareExpenses(raw: unknown[], startId: number): { items: ErpExpense[]; skipped: number } {
+  let autoId = startId;
+  const items: ErpExpense[] = [];
+  let skipped = 0;
+  for (const row of raw) {
+    autoId++;
+    const e = normalizeExpenseForImport(row, autoId);
+    if (!e) {
+      skipped++;
+      continue;
+    }
+    autoId = Math.max(autoId, e.id);
+    items.push(e);
+  }
+  return { items, skipped };
+}
+
+function mergeById<T extends { id: number }>(
+  existing: T[],
+  incoming: T[],
+  mode: ErpImportMode
+): { list: T[]; added: number; updated: number } {
+  if (mode === "replace") {
+    return { list: incoming, added: incoming.length, updated: 0 };
+  }
+  const map = new Map(existing.map((x) => [x.id, x]));
+  let added = 0;
+  let updated = 0;
+  for (const row of incoming) {
+    if (map.has(row.id)) {
+      map.set(row.id, row);
+      updated++;
+    } else {
+      map.set(row.id, row);
+      added++;
+    }
+  }
+  return { list: Array.from(map.values()), added, updated };
+}
+
+export async function importErpData(
+  payload: ErpImportPayload,
+  mode: ErpImportMode
+): Promise<ErpImportResult> {
+  const [curOrders, curExpenses, curSettings] = await Promise.all([
+    readOrders(),
+    readExpenses(),
+    readSettings(),
+  ]);
+
+  const maxId = Math.max(
+    curOrders.reduce((m, o) => Math.max(m, o.id), 0),
+    curExpenses.reduce((m, e) => Math.max(m, e.id), 0),
+    0
+  );
+
+  const result: ErpImportResult = {
+    orders: { added: 0, updated: 0, skipped: 0 },
+    expenses: { added: 0, updated: 0, skipped: 0 },
+    settingsUpdated: false,
+  };
+
+  let runningMax = maxId;
+  if (payload.orders?.length) {
+    const { items, skipped } = prepareOrders(payload.orders, runningMax);
+    result.orders.skipped = skipped;
+    const merged = mergeById(mode === "replace" ? [] : curOrders, items, mode);
+    result.orders.added = merged.added;
+    result.orders.updated = merged.updated;
+    await writeOrders(merged.list);
+    runningMax = merged.list.reduce((m, o) => Math.max(m, o.id), runningMax);
+  }
+
+  if (payload.expenses?.length) {
+    const { items, skipped } = prepareExpenses(payload.expenses, runningMax);
+    result.expenses.skipped = skipped;
+    const merged = mergeById(
+      mode === "replace" ? [] : curExpenses,
+      items,
+      mode
+    );
+    result.expenses.added = merged.added;
+    result.expenses.updated = merged.updated;
+    await writeExpenses(merged.list);
+  }
+
+  if (payload.settings) {
+    const s = payload.settings;
+    if (s && typeof s === "object") {
+      const incoming = s as Record<string, unknown>;
+      const orderCats = Array.isArray(incoming.orderCats)
+        ? incoming.orderCats.map(String).filter(Boolean)
+        : curSettings.orderCats;
+      const expCats = Array.isArray(incoming.expCats)
+        ? incoming.expCats.map(String).filter(Boolean)
+        : curSettings.expCats;
+      await saveErpSettings({ orderCats, expCats });
+      result.settingsUpdated = true;
+    }
+  }
+
+  const final = await readErpData();
+  const finalMax = Math.max(
+    final.orders.reduce((m, o) => Math.max(m, o.id), 0),
+    final.expenses.reduce((m, e) => Math.max(m, e.id), 0),
+    0
+  );
+  await persistNextId(finalMax);
+
+  return result;
 }

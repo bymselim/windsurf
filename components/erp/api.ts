@@ -1,4 +1,5 @@
 import { getAdminAuthHeaders } from "@/lib/admin-auth-client";
+import type { ErpImportMode, ErpImportResult } from "@/lib/erp/import";
 import type { ErpData, ErpExpense, ErpOrder, ErpSettings } from "@/lib/erp/types";
 
 function headers(json = true): HeadersInit {
@@ -78,6 +79,27 @@ export async function deleteErpExpense(id: number): Promise<void> {
     const json = await res.json().catch(() => ({}));
     throw new Error(json?.error ?? "Silinemedi");
   }
+}
+
+export async function importErpJson(
+  options: { mode: ErpImportMode; json?: string; files?: File[] }
+): Promise<{ result: ErpImportResult; data: ErpData }> {
+  const form = new FormData();
+  form.set("mode", options.mode);
+  if (options.json?.trim()) form.set("json", options.json.trim());
+  for (const file of options.files ?? []) {
+    form.append("files", file);
+  }
+
+  const res = await fetch("/api/admin/erp/import", {
+    method: "POST",
+    credentials: "include",
+    headers: getAdminAuthHeaders(),
+    body: form,
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body?.error ?? "İçe aktarma başarısız");
+  return body;
 }
 
 export async function saveErpSettings(settings: ErpSettings): Promise<ErpSettings> {
