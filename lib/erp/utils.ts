@@ -1,4 +1,4 @@
-import type { ErpOrder } from "./types";
+import type { ErpExpense, ErpOrder } from "./types";
 
 export const DEF_ORDER_CATS = [
   "Tablo",
@@ -92,6 +92,22 @@ export function isInMonth(
   ym: string
 ): boolean {
   return dateMonthKey(tarih) === ym;
+}
+
+/** Gider / sipariş tarihi → YYYY-MM-DD (`<input type="date">`). */
+export function toInputDateValue(tarih: string | null | undefined): string {
+  const s = String(tarih ?? "").trim();
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const dot = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (dot) {
+    return `${dot[3]}-${dot[2].padStart(2, "0")}-${dot[1].padStart(2, "0")}`;
+  }
+  const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) {
+    return `${slash[3]}-${slash[2].padStart(2, "0")}-${slash[1].padStart(2, "0")}`;
+  }
+  return "";
 }
 
 export function daysLeft(end: string): number {
@@ -216,6 +232,34 @@ export function computeTahsilat(orders: ErpOrder[]): number {
 /** Tahsil edilmemiş kalan bakiyelerin toplamı. */
 export function computeAlacak(orders: ErpOrder[]): number {
   return orders.reduce((s, o) => s + orderKalan(o), 0);
+}
+
+export type ExpenseSortKey = "tarih" | "kat" | "acik" | "tutar" | "fatno" | "id";
+
+export function compareExpenses(
+  a: ErpExpense,
+  b: ErpExpense,
+  key: ExpenseSortKey
+): number {
+  switch (key) {
+    case "tarih": {
+      const ta = toInputDateValue(a.tarih) || a.tarih;
+      const tb = toInputDateValue(b.tarih) || b.tarih;
+      return ta.localeCompare(tb);
+    }
+    case "kat":
+      return (a.kat || "").localeCompare(b.kat || "", "tr");
+    case "acik":
+      return (a.acik || "").localeCompare(b.acik || "", "tr");
+    case "tutar":
+      return (+a.tutar || 0) - (+b.tutar || 0);
+    case "fatno":
+      return (a.fatno || "").localeCompare(b.fatno || "", "tr");
+    case "id":
+      return a.id - b.id;
+    default:
+      return 0;
+  }
 }
 
 export function assignOrderNums(orders: ErpOrder[]): Map<number, number> {

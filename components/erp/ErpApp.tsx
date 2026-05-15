@@ -19,6 +19,7 @@ import {
   fetchErpData,
   saveErpSettings,
   toggleErpOrderDone,
+  updateErpExpense,
   updateErpOrder,
 } from "@/components/erp/api";
 import { ErpImportPanel } from "@/components/erp/ErpImportPanel";
@@ -32,6 +33,7 @@ import {
   fmtMK,
   fmtPct,
   compareOrders,
+  compareExpenses,
   computeAlacak,
   computeTahsilat,
   computeToplamCiro,
@@ -41,6 +43,8 @@ import {
   isInMonth,
   monthStr,
   orderKalan,
+  toInputDateValue,
+  type ExpenseSortKey,
   type OrderSortKey,
   STATUS_COLORS,
   STATUS_LABELS,
@@ -249,6 +253,10 @@ export default function ErpApp() {
     key: "tarih",
     asc: false,
   });
+  const [expenseSort, setExpenseSort] = useState<{ key: ExpenseSortKey; asc: boolean }>({
+    key: "tarih",
+    asc: false,
+  });
 
   const [rYear, setRYear] = useState(String(new Date().getFullYear()));
   const [rPeriod, setRPeriod] = useState("all");
@@ -354,6 +362,26 @@ export default function ErpApp() {
   const sortIndicator = (key: OrderSortKey) => {
     if (orderSort.key !== key) return "";
     return orderSort.asc ? " ↑" : " ↓";
+  };
+
+  const sortedExpenses = useMemo(() => {
+    const list = [...expenses];
+    list.sort((a, b) => {
+      const cmp = compareExpenses(a, b, expenseSort.key);
+      return expenseSort.asc ? cmp : -cmp;
+    });
+    return list;
+  }, [expenses, expenseSort]);
+
+  const toggleExpenseSort = useCallback((key: ExpenseSortKey) => {
+    setExpenseSort((prev) =>
+      prev.key === key ? { key, asc: !prev.asc } : { key, asc: true }
+    );
+  }, []);
+
+  const expSortIndicator = (key: ExpenseSortKey) => {
+    if (expenseSort.key !== key) return "";
+    return expenseSort.asc ? " ↑" : " ↓";
   };
 
   const bitisHint = useMemo(() => {
@@ -561,6 +589,21 @@ export default function ErpApp() {
       try {
         await deleteErpExpense(id);
         setExpenses((prev) => prev.filter((e) => e.id !== id));
+      } catch (e) {
+        alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+      } finally {
+        hideLoading();
+      }
+    },
+    [showLoading, hideLoading]
+  );
+
+  const patchExpense = useCallback(
+    async (id: number, patch: Record<string, unknown>) => {
+      showLoading("Güncelleniyor...");
+      try {
+        const updated = await updateErpExpense(id, patch);
+        setExpenses((prev) => prev.map((e) => (e.id === id ? { ...e, ...updated } : e)));
       } catch (e) {
         alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
       } finally {
@@ -818,13 +861,15 @@ Saygılarımla`;
 
     const upcoming = orders
       .filter((o) => isOrderDueTracked(o))
-      .sort((a, b) => daysLeft(a.bitis) - daysLeft(b.bitis))
-      .slice(0, 5);
+      .sort((a, b) => daysLeft(a.bitis) - daysLeft(b.bitis));
 
     const expCats: Record<string, number> = {};
     expenses.forEach((e) => {
       expCats[e.kat] = (expCats[e.kat] || 0) + (+e.tutar || 0);
     });
+    const expCatEntries = (Object.entries(expCats) as [string, number][]).filter(
+      ([k]) => k.trim().localeCompare("Diğer", "tr", { sensitivity: "base" }) !== 0
+    );
 
     const prodCats: Record<string, number> = {};
     orders.forEach((o) => {
@@ -845,7 +890,7 @@ Saygılarımla`;
       },
       alerts,
       upcoming,
-      expCatEntries: Object.entries(expCats) as [string, number][],
+      expCatEntries,
       prodCatEntries: Object.entries(prodCats) as [string, number][],
     };
   }, [orders, expenses]);
@@ -1179,7 +1224,7 @@ Saygılarımla`;
               <div className="grid2">
                 <div className="card">
                   <div className="card-title">⏱ Bitime Yakın</div>
-                  <div id="d-upcoming">
+                  <div id="d-upcoming" className="d-upcoming-scroll">
                     {dashboard.upcoming.length ? (
                       dashboard.upcoming.map((o) => {
                         const dl = daysLeft(o.bitis);
@@ -1201,7 +1246,7 @@ Saygılarımla`;
                               borderBottom: "1px solid var(--border)",
                             }}
                           >
-                            <div>
+                            <div style={{ minWidth: 0, flex: 1, paddingRight: 8 }}>
                               <div
                                 style={{
                                   fontSize: 13,
@@ -1216,12 +1261,16 @@ Saygılarımla`;
                                   fontSize: 11,
                                   color: "var(--text3)",
                                   marginTop: 2,
+                                  lineHeight: 1.35,
                                 }}
                               >
-                                {o.cat || ""} · {fmtDate(o.bitis)}
+                                {(o.cat || "—") + " · Bitiş " + fmtDate(o.bitis)}
+                                <span style={{ color: "var(--text2)" }}> · {label}</span>
                               </div>
                             </div>
-                            <span className={`badge ${c}`}>{label}</span>
+                            <span className={`badge ${c}`} style={{ flexShrink: 0 }}>
+                              {label}
+                            </span>
                           </div>
                         );
                       })
@@ -1621,21 +1670,56 @@ Saygılarımla`;
                   <table>
                     <thead>
                       <tr>
-                        <th>Tarih</th>
-                        <th>Kategori</th>
-                        <th>Açıklama</th>
-                        <th>Tutar</th>
-                        <th>Fatura No</th>
+                        <th
+                          className={`sortable${expenseSort.key === "tarih" ? " sorted" : ""}`}
+                          onClick={() => toggleExpenseSort("tarih")}
+                        >
+                          Tarih{expSortIndicator("tarih")}
+                        </th>
+                        <th
+                          className={`sortable${expenseSort.key === "kat" ? " sorted" : ""}`}
+                          onClick={() => toggleExpenseSort("kat")}
+                        >
+                          Kategori{expSortIndicator("kat")}
+                        </th>
+                        <th
+                          className={`sortable${expenseSort.key === "acik" ? " sorted" : ""}`}
+                          onClick={() => toggleExpenseSort("acik")}
+                        >
+                          Açıklama{expSortIndicator("acik")}
+                        </th>
+                        <th
+                          className={`sortable${expenseSort.key === "tutar" ? " sorted" : ""}`}
+                          onClick={() => toggleExpenseSort("tutar")}
+                        >
+                          Tutar{expSortIndicator("tutar")}
+                        </th>
+                        <th
+                          className={`sortable${expenseSort.key === "fatno" ? " sorted" : ""}`}
+                          onClick={() => toggleExpenseSort("fatno")}
+                        >
+                          Fatura No{expSortIndicator("fatno")}
+                        </th>
                         <th>Dosya</th>
                         <th />
                       </tr>
                     </thead>
                     <tbody id="g-tbody">
-                      {expenses.length ? (
-                        expenses.map((e) => (
+                      {sortedExpenses.length ? (
+                        sortedExpenses.map((e) => (
                           <tr key={e.id}>
-                            <td style={{ fontSize: 12, color: "var(--text3)" }}>
-                              {fmtDate(e.tarih)}
+                            <td style={{ verticalAlign: "middle" }}>
+                              <input
+                                type="date"
+                                className="erp-exp-date"
+                                value={toInputDateValue(e.tarih)}
+                                onChange={(ev) => {
+                                  const v = ev.target.value;
+                                  if (!v || v === toInputDateValue(e.tarih)) return;
+                                  void patchExpense(e.id, { tarih: v });
+                                }}
+                                aria-label="Gider tarihi"
+                              />
                             </td>
                             <td>
                               <span className="badge blue" style={{ fontSize: 10 }}>

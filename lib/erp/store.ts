@@ -231,6 +231,18 @@ export async function createExpense(
   return expense;
 }
 
+export async function updateExpense(
+  id: number,
+  patch: Partial<Omit<ErpExpense, "id" | "created_at">>
+): Promise<ErpExpense | null> {
+  const expenses = await readExpenses();
+  const idx = expenses.findIndex((e) => e.id === id);
+  if (idx < 0) return null;
+  expenses[idx] = { ...expenses[idx], ...patch };
+  await writeExpenses(expenses);
+  return expenses[idx];
+}
+
 export async function deleteExpense(id: number): Promise<boolean> {
   const expenses = await readExpenses();
   const next = expenses.filter((e) => e.id !== id);

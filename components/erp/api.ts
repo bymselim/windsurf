@@ -81,6 +81,21 @@ export async function deleteErpExpense(id: number): Promise<void> {
   }
 }
 
+export async function updateErpExpense(
+  id: number,
+  patch: Record<string, unknown>
+): Promise<ErpExpense> {
+  const res = await fetch(`/api/admin/erp/expenses/${id}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: headers(),
+    body: JSON.stringify(patch),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? "Güncelleme başarısız");
+  return json.expense;
+}
+
 export async function importErpJson(
   options: { mode: ErpImportMode; json?: string; files?: File[] }
 ): Promise<{ result: ErpImportResult; data: ErpData }> {
