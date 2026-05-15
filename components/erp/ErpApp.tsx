@@ -30,8 +30,11 @@ import {
   fmtDate,
   fmtM,
   fmtPct,
+  compareOrders,
   getOrderStatus,
+  isOrderDueTracked,
   monthStr,
+  type OrderSortKey,
   STATUS_COLORS,
   STATUS_LABELS,
   todayStr,
@@ -237,6 +240,10 @@ export default function ErpApp() {
   const [sSearch, setSSearch] = useState("");
   const [sStatus, setSStatus] = useState("");
   const [sCat, setSCat] = useState("");
+  const [orderSort, setOrderSort] = useState<{ key: OrderSortKey; asc: boolean }>({
+    key: "tarih",
+    asc: false,
+  });
 
   const [rYear, setRYear] = useState(String(new Date().getFullYear()));
   const [rPeriod, setRPeriod] = useState("all");
@@ -322,6 +329,27 @@ export default function ErpApp() {
       return true;
     });
   }, [orders, sSearch, sStatus, sCat]);
+
+  const sortedOrders = useMemo(() => {
+    const list = [...filteredOrders];
+    const num = (id: number) => Number(getNum(id)) || id;
+    list.sort((a, b) => {
+      const cmp = compareOrders(a, b, orderSort.key, num);
+      return orderSort.asc ? cmp : -cmp;
+    });
+    return list;
+  }, [filteredOrders, orderSort, getNum]);
+
+  const toggleOrderSort = useCallback((key: OrderSortKey) => {
+    setOrderSort((prev) =>
+      prev.key === key ? { key, asc: !prev.asc } : { key, asc: true }
+    );
+  }, []);
+
+  const sortIndicator = (key: OrderSortKey) => {
+    if (orderSort.key !== key) return "";
+    return orderSort.asc ? " ↑" : " ↓";
+  };
 
   const bitisHint = useMemo(() => {
     if (!orderForm.tarih) return "";
@@ -424,6 +452,24 @@ export default function ErpApp() {
       }
     },
     [showLoading, hideLoading]
+  );
+
+  const setAskida = useCallback(
+    async (id: number) => {
+      const o = orders.find((x) => x.id === id);
+      if (!o) return;
+      const nextDurum = o.durum === "askida" ? "bekleyen" : "askida";
+      showLoading("Güncelleniyor...");
+      try {
+        const updated = await updateErpOrder(id, { durum: nextDurum });
+        setOrders((prev) => prev.map((x) => (x.id === id ? updated : x)));
+      } catch (e) {
+        alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+      } finally {
+        hideLoading();
+      }
+    },
+    [orders, showLoading, hideLoading]
   );
 
   const delOrder = useCallback(
@@ -643,9 +689,9 @@ ${thisM} dönemine ait mali özet bilgileri aşağıda yer almaktadır.
 ─────────────────────────────────────
 SİPARİŞ & TAHSİLAT
 ─────────────────────────────────────
-Aktif sipariş        : ${orders.filter((o) => getOrderStatus(o) !== "biten").length}
+Aktif sipariş        : ${orders.filter((o) => isOrderDueTracked(o)).length}
 Toplam tahsilat      : ${fmtM(allTah)}
-Kalan alacak         : ${fmtM(orders.reduce((s, o) => s + (+o.toplam || 0) - (+o.tahsilat || 0), 0))}
+Alacak         : ${fmtM(orders.reduce((s, o) => s + (+o.toplam || 0) - (+o.tahsilat || 0), 0))}
 
 ─────────────────────────────────────
 BU AY GİDERLER (${thisM})
@@ -689,6 +735,12 @@ Saygılarımla`;
           ✓
         </span>
       );
+    if (st === "askida")
+      return (
+        <span className="badge purple" style={{ fontSize: 10 }}>
+          Askıda
+        </span>
+      );
     const dl = daysLeft(o.bitis);
     if (dl < 0)
       return (
@@ -726,8 +778,18 @@ Saygılarımla`;
     const bekleyen = orders.filter((o) => getOrderStatus(o) === "bekleyen");
     const geciken = orders.filter((o) => getOrderStatus(o) === "geciken");
     const topTah = orders.reduce((s, o) => s + (+o.tahsilat || 0), 0);
+    const topCiro = orders
+      .filter((o) => o.durum !== "askida")
+      .reduce((s, o) => s + (+o.toplam || 0), 0);
+    const bitenAdet = orders
+      .filter((o) => o.durum === "biten")
+      .reduce((s, o) => s + (+o.adet || 0), 0);
+    const bekleyenAdet = orders
+      .filter((o) => isOrderDueTracked(o))
+      .reduce((s, o) => s + (+o.adet || 0), 0);
+    const toplamAdet = bitenAdet + bekleyenAdet;
     const topKalan = orders
-      .filter((o) => getOrderStatus(o) !== "biten")
+      .filter((o) => isOrderDueTracked(o))
       .reduce((s, o) => s + (+o.toplam || 0) - (+o.tahsilat || 0), 0);
     const topGider = expenses.reduce((s, e) => s + (+e.tutar || 0), 0);
     const netKar = topTah - topGider;
@@ -741,6 +803,7 @@ Saygılarımla`;
       );
     const soon = orders.filter(
       (o) =>
+        isOrderDueTracked(o) &&
         getOrderStatus(o) === "bekleyen" &&
         daysLeft(o.bitis) >= 0 &&
         daysLeft(o.bitis) <= 3
@@ -753,7 +816,7 @@ Saygılarımla`;
       );
 
     const upcoming = orders
-      .filter((o) => getOrderStatus(o) !== "biten")
+      .filter((o) => isOrderDueTracked(o))
       .sort((a, b) => daysLeft(a.bitis) - daysLeft(b.bitis))
       .slice(0, 5);
 
@@ -768,7 +831,17 @@ Saygılarımla`;
     });
 
     return {
-      metrics: { bekleyen, biten, geciken, topTah, topKalan, topGider, netKar },
+      metrics: {
+        bekleyen,
+        biten,
+        geciken,
+        topCiro,
+        topTah,
+        toplamAdet,
+        topKalan,
+        topGider,
+        netKar,
+      },
       alerts,
       upcoming,
       expCatEntries: Object.entries(expCats) as [string, number][],
@@ -829,7 +902,7 @@ Saygılarımla`;
     const week = orders
       .filter(
         (o) =>
-          getOrderStatus(o) !== "biten" &&
+          isOrderDueTracked(o) &&
           daysLeft(o.bitis) >= 0 &&
           daysLeft(o.bitis) <= 7
       )
@@ -1042,13 +1115,32 @@ Saygılarımla`;
                   </div>
                 </div>
                 <div className="metric">
+                  <div className="metric-label">Toplam Ciro</div>
+                  <div className="metric-value" style={{ color: "var(--blue)" }}>
+                    {fmtM(dashboard.metrics.topCiro)}
+                  </div>
+                </div>
+                <div className="metric">
+                  <div className="metric-label">Toplam Adet</div>
+                  <div
+                    className="metric-value"
+                    style={{ color: "var(--text)" }}
+                    title="Tamamlanan + bekleyen/geciken sipariş adetleri"
+                  >
+                    {dashboard.metrics.toplamAdet}
+                  </div>
+                  <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 4 }}>
+                    biten + bekleyen
+                  </div>
+                </div>
+                <div className="metric">
                   <div className="metric-label">Tahsilat</div>
                   <div className="metric-value" style={{ color: "var(--green)" }}>
                     {fmtM(dashboard.metrics.topTah)}
                   </div>
                 </div>
                 <div className="metric">
-                  <div className="metric-label">Kalan Alacak</div>
+                  <div className="metric-label">Alacak</div>
                   <div className="metric-value" style={{ color: "var(--amber)" }}>
                     {fmtM(dashboard.metrics.topKalan)}
                   </div>
@@ -1234,6 +1326,7 @@ Saygılarımla`;
                   <option value="bekleyen">Bekleyen</option>
                   <option value="biten">Tamamlanan</option>
                   <option value="geciken">Geciken</option>
+                  <option value="askida">Askıda</option>
                 </select>
                 <select id="s-cat" value={sCat} onChange={(e) => setSCat(e.target.value)}>
                   <option value="">Kategori</option>
@@ -1247,7 +1340,7 @@ Saygılarımla`;
                   style={{ fontSize: 12, color: "var(--text3)", flexShrink: 0 }}
                   id="s-count"
                 >
-                  {filteredOrders.length} kayıt
+                  {sortedOrders.length} kayıt
                 </span>
               </div>
               <div className="card" style={{ padding: 0, overflow: "hidden" }}>
@@ -1255,22 +1348,72 @@ Saygılarımla`;
                   <table>
                     <thead>
                       <tr>
-                        <th>#</th>
-                        <th>Tarih</th>
-                        <th>Kaç Gün</th>
-                        <th>Kategori</th>
-                        <th>Özel Bilgi</th>
-                        <th>Kapora</th>
-                        <th>Tahsilat</th>
-                        <th>Kalan</th>
-                        <th>Ad Soyad</th>
-                        <th>Bitiş Tarihi</th>
+                        <th
+                          className={`sortable${orderSort.key === "num" ? " sorted" : ""}`}
+                          onClick={() => toggleOrderSort("num")}
+                        >
+                          #{sortIndicator("num")}
+                        </th>
+                        <th
+                          className={`sortable${orderSort.key === "tarih" ? " sorted" : ""}`}
+                          onClick={() => toggleOrderSort("tarih")}
+                        >
+                          Tarih{sortIndicator("tarih")}
+                        </th>
+                        <th
+                          className={`sortable${orderSort.key === "gun" ? " sorted" : ""}`}
+                          onClick={() => toggleOrderSort("gun")}
+                        >
+                          Kaç Gün{sortIndicator("gun")}
+                        </th>
+                        <th
+                          className={`sortable${orderSort.key === "cat" ? " sorted" : ""}`}
+                          onClick={() => toggleOrderSort("cat")}
+                        >
+                          Kategori{sortIndicator("cat")}
+                        </th>
+                        <th
+                          className={`sortable${orderSort.key === "bilgi" ? " sorted" : ""}`}
+                          onClick={() => toggleOrderSort("bilgi")}
+                        >
+                          Özel Bilgi{sortIndicator("bilgi")}
+                        </th>
+                        <th
+                          className={`sortable${orderSort.key === "kapora" ? " sorted" : ""}`}
+                          onClick={() => toggleOrderSort("kapora")}
+                        >
+                          Kapora{sortIndicator("kapora")}
+                        </th>
+                        <th
+                          className={`sortable${orderSort.key === "tahsilat" ? " sorted" : ""}`}
+                          onClick={() => toggleOrderSort("tahsilat")}
+                        >
+                          Tahsilat{sortIndicator("tahsilat")}
+                        </th>
+                        <th
+                          className={`sortable${orderSort.key === "kalan" ? " sorted" : ""}`}
+                          onClick={() => toggleOrderSort("kalan")}
+                        >
+                          Kalan{sortIndicator("kalan")}
+                        </th>
+                        <th
+                          className={`sortable${orderSort.key === "ad" ? " sorted" : ""}`}
+                          onClick={() => toggleOrderSort("ad")}
+                        >
+                          Ad Soyad{sortIndicator("ad")}
+                        </th>
+                        <th
+                          className={`sortable${orderSort.key === "bitis" ? " sorted" : ""}`}
+                          onClick={() => toggleOrderSort("bitis")}
+                        >
+                          Bitiş Tarihi{sortIndicator("bitis")}
+                        </th>
                         <th>İşlem</th>
                       </tr>
                     </thead>
                     <tbody id="s-tbody">
-                      {filteredOrders.length ? (
-                        filteredOrders.map((o) => {
+                      {sortedOrders.length ? (
+                        sortedOrders.map((o) => {
                           const st = getOrderStatus(o);
                           const kalan = (+o.toplam || 0) - (+o.tahsilat || 0);
                           const bilgiTxt = o.bilgi
@@ -1352,8 +1495,21 @@ Saygılarımla`;
                                   type="button"
                                   className="btn sm"
                                   onClick={() => void toggleDone(o.id)}
+                                  title={st === "biten" ? "Bekleyene al" : "Tamamlandı"}
                                 >
                                   {st === "biten" ? "↺" : "✓"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`btn sm${st === "askida" ? " primary" : ""}`}
+                                  onClick={() => void setAskida(o.id)}
+                                  title={
+                                    st === "askida"
+                                      ? "Askıdan çıkar"
+                                      : "Askıya al (teslim/ödeme beklenmiyor)"
+                                  }
+                                >
+                                  ⏸
                                 </button>
                                 <button
                                   type="button"
@@ -1663,7 +1819,7 @@ Saygılarımla`;
                         ["Toplam Ciro", reports.allToplam, "var(--blue)"],
                         ["Tahsil Edilen", reports.allTah, "var(--green)"],
                         [
-                          "Kalan Alacak",
+                          "Alacak",
                           reports.allToplam - reports.allTah,
                           "var(--amber)",
                         ],

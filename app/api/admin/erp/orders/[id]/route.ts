@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth-server";
-import { addWorkdays } from "@/lib/erp/utils";
+import { addWorkdays, parseOrderDurum } from "@/lib/erp/utils";
 import { deleteOrder, readErpData, updateOrder } from "@/lib/erp/store";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +50,9 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 
   if (patch.tarih && !patch.bitis) {
     patch.bitis = addWorkdays(String(patch.tarih), 25).toISOString().slice(0, 10);
+  }
+  if (patch.durum !== undefined) {
+    patch.durum = parseOrderDurum(patch.durum);
   }
 
   const order = await updateOrder(id, patch);

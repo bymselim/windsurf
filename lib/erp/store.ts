@@ -9,7 +9,7 @@ import {
   normalizeExpenseForImport,
   normalizeOrderForImport,
 } from "./import";
-import { DEF_EXP_CATS, DEF_ORDER_CATS } from "./utils";
+import { DEF_EXP_CATS, DEF_ORDER_CATS, parseOrderDurum } from "./utils";
 
 const DATA_DIR = path.join(process.cwd(), "lib", "data");
 const ORDERS_FILE = path.join(DATA_DIR, "erp-orders.json");
@@ -59,7 +59,7 @@ function normalizeOrder(raw: unknown): ErpOrder | null {
     tahsilat: Number(o.tahsilat) || 0,
     not_icerik: String(o.not_icerik ?? ""),
     bilgi: String(o.bilgi ?? ""),
-    durum: o.durum === "biten" ? "biten" : "bekleyen",
+    durum: parseOrderDurum(o.durum),
     created_at: typeof o.created_at === "string" ? o.created_at : new Date().toISOString(),
   };
 }

@@ -78,17 +78,83 @@ export const STATUS_LABELS: Record<string, string> = {
   biten: "Tamamlandı",
   bekleyen: "Bekliyor",
   geciken: "Gecikti",
+  askida: "Askıda",
 };
 
 export const STATUS_COLORS: Record<string, string> = {
   biten: "green",
   bekleyen: "amber",
   geciken: "red",
+  askida: "purple",
 };
 
-export function getOrderStatus(o: ErpOrder): "biten" | "bekleyen" | "geciken" {
+export type OrderDisplayStatus = "biten" | "bekleyen" | "geciken" | "askida";
+
+export function getOrderStatus(o: ErpOrder): OrderDisplayStatus {
+  if (o.durum === "askida") return "askida";
   if (o.durum === "biten") return "biten";
   return daysLeft(o.bitis) < 0 ? "geciken" : "bekleyen";
+}
+
+/** Teslim takibi listelerinde gösterilir (biten ve askıda hariç). */
+export function isOrderDueTracked(o: ErpOrder): boolean {
+  return o.durum !== "biten" && o.durum !== "askida";
+}
+
+export function parseOrderDurum(raw: unknown): ErpOrder["durum"] {
+  const d = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (d === "biten" || d === "tamamlandı" || d === "tamamlandi") return "biten";
+  if (d === "askida" || d === "askıda") return "askida";
+  return "bekleyen";
+}
+
+export type OrderSortKey =
+  | "num"
+  | "tarih"
+  | "gun"
+  | "cat"
+  | "bilgi"
+  | "kapora"
+  | "tahsilat"
+  | "kalan"
+  | "ad"
+  | "bitis";
+
+export function compareOrders(
+  a: ErpOrder,
+  b: ErpOrder,
+  key: OrderSortKey,
+  displayNum: (id: number) => number
+): number {
+  switch (key) {
+    case "num":
+      return displayNum(a.id) - displayNum(b.id);
+    case "tarih":
+      return (a.tarih || "").localeCompare(b.tarih || "");
+    case "gun":
+      return daysLeft(a.bitis) - daysLeft(b.bitis);
+    case "cat":
+      return (a.cat || "").localeCompare(b.cat || "", "tr");
+    case "bilgi":
+      return (a.bilgi || "").localeCompare(b.bilgi || "", "tr");
+    case "kapora":
+      return (+a.kapora || 0) - (+b.kapora || 0);
+    case "tahsilat":
+      return (+a.tahsilat || 0) - (+b.tahsilat || 0);
+    case "kalan":
+      return (+a.toplam || 0) - (+a.tahsilat || 0) - ((+b.toplam || 0) - (+b.tahsilat || 0));
+    case "ad": {
+      const na = `${a.ad} ${a.soyad}`.trim();
+      const nb = `${b.ad} ${b.soyad}`.trim();
+      return na.localeCompare(nb, "tr");
+    }
+    case "bitis":
+      return (a.bitis || "").localeCompare(b.bitis || "");
+    default:
+      return 0;
+  }
 }
 
 export function assignOrderNums(orders: ErpOrder[]): Map<number, number> {

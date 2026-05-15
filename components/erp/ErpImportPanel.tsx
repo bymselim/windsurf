@@ -23,7 +23,7 @@ export function ErpImportPanel({
   const [json, setJson] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [fileLabel, setFileLabel] = useState(
-    "JSON dosyası seçin veya sürükleyin (birden fazla olabilir)"
+    "JSON/CSV dosyası seçin veya sürükleyin (birden fazla olabilir)"
   );
   const [status, setStatus] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -62,7 +62,7 @@ export function ErpImportPanel({
       setStatus(parts.join(" · ") || "Tamamlandı");
       setJson("");
       setFiles([]);
-      setFileLabel("JSON dosyası seçin veya sürükleyin (birden fazla olabilir)");
+      setFileLabel("JSON/CSV dosyası seçin veya sürükleyin (birden fazla olabilir)");
     } catch (e) {
       alert(e instanceof Error ? e.message : "İçe aktarma başarısız");
     } finally {
@@ -74,10 +74,9 @@ export function ErpImportPanel({
     <div className="card" style={{ marginTop: 14 }}>
       <div className="card-title">Veri içe aktar</div>
       <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>
-        Supabase veya yedek JSON dosyalarınızı yükleyin. Tek dosyada{" "}
-        <code style={{ color: "var(--blue)" }}>{`{ "orders": [], "expenses": [] }`}</code> veya
-        ayrı <code style={{ color: "var(--blue)" }}>orders.json</code> /{" "}
-        <code style={{ color: "var(--blue)" }}>expenses.json</code> kullanabilirsiniz.
+        JSON veya CSV dosyalarınızı yükleyin (Supabase export, sipariş/gider listesi).
+        Ayrı <code style={{ color: "var(--blue)" }}>orders.csv</code> /{" "}
+        <code style={{ color: "var(--blue)" }}>expenses.csv</code> veya birleşik JSON.
       </p>
       <div className="fg c2" style={{ marginBottom: 12 }}>
         <div>
@@ -116,7 +115,9 @@ export function ErpImportPanel({
         onDrop={(e) => {
           e.preventDefault();
           e.currentTarget.style.borderColor = "";
-          const list = Array.from(e.dataTransfer.files).filter((f) => f.name.endsWith(".json"));
+          const list = Array.from(e.dataTransfer.files).filter((f) =>
+            /\.(json|csv)$/i.test(f.name)
+          );
           if (list.length) {
             setFiles(list);
             setFileLabel(list.length === 1 ? `📎 ${list[0].name}` : `📎 ${list.length} dosya`);
@@ -129,7 +130,7 @@ export function ErpImportPanel({
       <input
         ref={fileRef}
         type="file"
-        accept=".json,application/json"
+        accept=".json,.csv,application/json,text/csv"
         multiple
         style={{ display: "none" }}
         onChange={(e) => {
@@ -137,7 +138,7 @@ export function ErpImportPanel({
           setFiles(list);
           setFileLabel(
             list.length === 0
-              ? "JSON dosyası seçin veya sürükleyin (birden fazla olabilir)"
+              ? "JSON/CSV dosyası seçin veya sürükleyin (birden fazla olabilir)"
               : list.length === 1
                 ? `📎 ${list[0].name}`
                 : `📎 ${list.length} dosya`
@@ -164,7 +165,7 @@ export function ErpImportPanel({
           onClick={() => {
             setJson("");
             setFiles([]);
-            setFileLabel("JSON dosyası seçin veya sürükleyin (birden fazla olabilir)");
+            setFileLabel("JSON/CSV dosyası seçin veya sürükleyin (birden fazla olabilir)");
             setStatus(null);
           }}
         >

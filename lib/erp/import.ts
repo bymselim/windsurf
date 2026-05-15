@@ -1,4 +1,6 @@
+import { parseErpCsv } from "./csv";
 import type { ErpExpense, ErpOrder } from "./types";
+import { parseOrderDurum } from "./utils";
 
 export type ErpImportMode = "merge" | "replace";
 
@@ -43,7 +45,7 @@ export function normalizeOrderForImport(raw: unknown, autoId: number): ErpOrder 
     tahsilat: Number(o.tahsilat) || 0,
     not_icerik: String(o.not_icerik ?? o.not ?? ""),
     bilgi: String(o.bilgi ?? ""),
-    durum: o.durum === "biten" ? "biten" : "bekleyen",
+    durum: parseOrderDurum(o.durum),
     created_at:
       typeof o.created_at === "string" ? o.created_at : new Date().toISOString(),
   };
@@ -77,6 +79,23 @@ function looksLikeOrder(row: Record<string, unknown>): boolean {
 
 function looksLikeExpense(row: Record<string, unknown>): boolean {
   return ("kat" in row || "acik" in row) && !looksLikeOrder(row);
+}
+
+/** JSON veya CSV metnini çözümler. */
+export function parseErpImportText(text: string, filename?: string): ErpImportPayload {
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error("Boş dosya");
+
+  const lower = filename?.toLowerCase() ?? "";
+  const looksCsv =
+    lower.endsWith(".csv") ||
+    (!trimmed.startsWith("{") &&
+      !trimmed.startsWith("[") &&
+      trimmed.includes(",") &&
+      !trimmed.startsWith('{"'));
+
+  if (looksCsv) return parseErpCsv(trimmed);
+  return parseErpImportJson(trimmed);
 }
 
 /** Tek dosya veya birleşik JSON gövdesini çözümler. */

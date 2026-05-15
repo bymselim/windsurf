@@ -1,4 +1,4 @@
-export type ErpOrderStatus = "biten" | "bekleyen";
+export type ErpOrderStatus = "biten" | "bekleyen" | "askida";
 
 export interface ErpOrder {
   id: number;

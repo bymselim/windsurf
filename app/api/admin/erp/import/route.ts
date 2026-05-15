@@ -3,6 +3,7 @@ import { verifyAdminAuth } from "@/lib/admin-auth-server";
 import {
   mergeImportPayloads,
   parseErpImportJson,
+  parseErpImportText,
   type ErpImportMode,
 } from "@/lib/erp/import";
 import { importErpData, readErpData } from "@/lib/erp/store";
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
 
   const contentType = request.headers.get("content-type") ?? "";
   let mode: ErpImportMode = "merge";
-  const payloads: ReturnType<typeof parseErpImportJson>[] = [];
+  const payloads: Awaited<ReturnType<typeof parseErpImportJson>>[] = [];
 
   try {
     if (contentType.includes("multipart/form-data")) {
@@ -25,18 +26,18 @@ export async function POST(request: NextRequest) {
       if (modeRaw === "replace") mode = "replace";
 
       const pasted = String(form.get("json") ?? "").trim();
-      if (pasted) payloads.push(parseErpImportJson(pasted));
+      if (pasted) payloads.push(parseErpImportText(pasted));
 
       const files = form.getAll("files").filter((f): f is File => f instanceof File);
       for (const file of files) {
         const text = await file.text();
-        payloads.push(parseErpImportJson(text));
+        payloads.push(parseErpImportText(text, file.name));
       }
     } else {
       const body = await request.json();
       if (body?.mode === "replace") mode = "replace";
       if (typeof body?.json === "string" && body.json.trim()) {
-        payloads.push(parseErpImportJson(body.json));
+        payloads.push(parseErpImportText(body.json));
       } else if (body?.orders || body?.expenses || body?.settings) {
         payloads.push({
           orders: Array.isArray(body.orders) ? body.orders : undefined,
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     if (payloads.length === 0) {
       return NextResponse.json(
-        { error: "İçe aktarılacak JSON bulunamadı" },
+        { error: "İçe aktarılacak dosya veya JSON bulunamadı" },
         { status: 400 }
       );
     }

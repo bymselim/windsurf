@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth-server";
-import { addWorkdays } from "@/lib/erp/utils";
+import { addWorkdays, parseOrderDurum } from "@/lib/erp/utils";
 import { createOrder } from "@/lib/erp/store";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     tahsilat,
     not_icerik: String(body?.not_icerik ?? "").trim(),
     bilgi: String(body?.bilgi ?? "").trim(),
-    durum: body?.durum === "biten" ? "biten" : "bekleyen",
+    durum: parseOrderDurum(body?.durum ?? "bekleyen"),
   });
 
   return NextResponse.json({ order }, { status: 201 });
