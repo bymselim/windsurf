@@ -36,6 +36,10 @@ body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(-
 .btn.danger:hover{background:var(--red-bg)}
 .btn.full{width:100%;justify-content:center}
 .metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
+.metric-grid.dashboard-metrics{grid-template-columns:repeat(9,minmax(0,1fr));gap:8px}
+.metric-grid.dashboard-metrics .metric{padding:12px 10px}
+.metric-grid.dashboard-metrics .metric-label{font-size:9px;letter-spacing:.35px}
+.metric-grid.dashboard-metrics .metric-value{font-size:17px}
 .metric{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
 .metric-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
 .metric-value{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
@@ -106,7 +110,8 @@ select option{background:var(--bg3)}
 .tag-list{display:flex;flex-direction:column;gap:2px}
 .tag-row{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:var(--rs);background:var(--bg3);font-size:13px}
 .tag-row:hover{background:var(--bg4)}
-@media(max-width:768px){.sidebar{display:none}.hamburger{display:block}.mobile-nav{display:none}.mobile-nav.open{display:block}.content{padding:14px}.grid2{grid-template-columns:1fr}.fg.c2,.fg.c3{grid-template-columns:1fr}.metric-grid{grid-template-columns:repeat(2,1fr)}.topbar{padding:12px 14px}table{min-width:500px}}
+@media(max-width:1200px){.metric-grid.dashboard-metrics{overflow-x:auto;-webkit-overflow-scrolling:touch;grid-template-columns:repeat(9,minmax(88px,1fr))}}
+@media(max-width:768px){.sidebar{display:none}.hamburger{display:block}.mobile-nav{display:none}.mobile-nav.open{display:block}.content{padding:14px}.grid2{grid-template-columns:1fr}.fg.c2,.fg.c3{grid-template-columns:1fr}.metric-grid{grid-template-columns:repeat(2,1fr)}.metric-grid.dashboard-metrics{grid-template-columns:repeat(9,minmax(76px,1fr))}.topbar{padding:12px 14px}table{min-width:500px}}
 
 .erp-back-link{position:fixed;top:12px;right:12px;z-index:50;font-size:12px;color:var(--text2);text-decoration:none;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--bg2)}
 .erp-back-link:hover{color:var(--text);border-color:var(--blue)}

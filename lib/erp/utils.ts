@@ -53,6 +53,11 @@ export function fmtM(n: number | string | null | undefined): string {
   return "₺" + Math.round(Number(n) || 0).toLocaleString("tr-TR");
 }
 
+/** Dashboard: bin TL (son üç sıfır atılmış). */
+export function fmtMK(n: number | string | null | undefined): string {
+  return "₺" + Math.round((Number(n) || 0) / 1000).toLocaleString("tr-TR");
+}
+
 export function fmtPct(n: number): string {
   return Math.round(n * 10) / 10 + "%";
 }
@@ -144,7 +149,7 @@ export function compareOrders(
     case "tahsilat":
       return (+a.tahsilat || 0) - (+b.tahsilat || 0);
     case "kalan":
-      return (+a.toplam || 0) - (+a.tahsilat || 0) - ((+b.toplam || 0) - (+b.tahsilat || 0));
+      return orderKalan(a) - orderKalan(b);
     case "ad": {
       const na = `${a.ad} ${a.soyad}`.trim();
       const nb = `${b.ad} ${b.soyad}`.trim();
@@ -155,6 +160,31 @@ export function compareOrders(
     default:
       return 0;
   }
+}
+
+/** Sipariş listesindeki kalan bakiye (yalnızca pozitif; vadeli alacak). */
+export function orderKalan(o: ErpOrder): number {
+  const v = (+o.toplam || 0) - (+o.tahsilat || 0);
+  return v > 0 ? v : 0;
+}
+
+/** Tüm siparişlerin toplam tutarı (ciro). */
+export function computeToplamCiro(orders: ErpOrder[]): number {
+  return orders.reduce((s, o) => s + (+o.toplam || 0), 0);
+}
+
+/** Kapanmış siparişlerin tahsilatı + açık siparişlerde alınan kapora. */
+export function computeTahsilat(orders: ErpOrder[]): number {
+  return orders.reduce((s, o) => {
+    if (o.durum === "biten") return s + (+o.tahsilat || 0);
+    if (o.durum === "askida") return s;
+    return s + (+o.kapora || 0);
+  }, 0);
+}
+
+/** Tahsil edilmemiş kalan bakiyelerin toplamı. */
+export function computeAlacak(orders: ErpOrder[]): number {
+  return orders.reduce((s, o) => s + orderKalan(o), 0);
 }
 
 export function assignOrderNums(orders: ErpOrder[]): Map<number, number> {

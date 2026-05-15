@@ -29,11 +29,16 @@ import {
   daysLeft,
   fmtDate,
   fmtM,
+  fmtMK,
   fmtPct,
   compareOrders,
+  computeAlacak,
+  computeTahsilat,
+  computeToplamCiro,
   getOrderStatus,
   isOrderDueTracked,
   monthStr,
+  orderKalan,
   type OrderSortKey,
   STATUS_COLORS,
   STATUS_LABELS,
@@ -176,7 +181,7 @@ function MonthBox({
 }) {
   const ord = orders.filter((o) => o.tarih?.startsWith(ms));
   const exp = expenses.filter((e) => e.tarih?.startsWith(ms));
-  const tah = ord.reduce((s, o) => s + (+o.tahsilat || 0), 0);
+  const tah = computeTahsilat(ord);
   const gid = exp.reduce((s, e) => s + (+e.tutar || 0), 0);
   const net = tah - gid;
   return (
@@ -652,7 +657,7 @@ export default function ErpApp() {
         o.toplam,
         o.kapora,
         o.tahsilat,
-        (+o.toplam || 0) - (+o.tahsilat || 0),
+        orderKalan(o),
         getOrderStatus(o),
         o.not_icerik,
         o.bilgi,
@@ -672,8 +677,8 @@ export default function ErpApp() {
   const prepareEmail = useCallback(() => {
     const thisM = todayStr().slice(0, 7);
     const ay = expenses.filter((e) => e.tarih?.startsWith(thisM));
-    const allTah = orders.reduce((s, o) => s + (+o.tahsilat || 0), 0);
     const allGider = expenses.reduce((s, e) => s + (+e.tutar || 0), 0);
+    const tahsilEdilen = computeTahsilat(orders);
     const cats: Record<string, number> = {};
     ay.forEach((e) => {
       cats[e.kat] = (cats[e.kat] || 0) + (+e.tutar || 0);
@@ -690,8 +695,8 @@ ${thisM} dönemine ait mali özet bilgileri aşağıda yer almaktadır.
 SİPARİŞ & TAHSİLAT
 ─────────────────────────────────────
 Aktif sipariş        : ${orders.filter((o) => isOrderDueTracked(o)).length}
-Toplam tahsilat      : ${fmtM(allTah)}
-Alacak         : ${fmtM(orders.reduce((s, o) => s + (+o.toplam || 0) - (+o.tahsilat || 0), 0))}
+Toplam tahsilat      : ${fmtM(computeTahsilat(orders))}
+Alacak         : ${fmtM(computeAlacak(orders))}
 
 ─────────────────────────────────────
 BU AY GİDERLER (${thisM})
@@ -713,7 +718,7 @@ Fatura dosyaları     : ${dosyaList.map((e) => e.dosya).join(", ") || "—"}
 GENEL MALİ DURUM
 ─────────────────────────────────────
 Toplam gider         : ${fmtM(allGider)}
-Net kar              : ${fmtM(allTah - allGider)}
+Net kar              : ${fmtM(tahsilEdilen - allGider)}
 
 Saygılarımla`;
     setEmailBody(body);
@@ -777,10 +782,9 @@ Saygılarımla`;
     const biten = orders.filter((o) => getOrderStatus(o) === "biten");
     const bekleyen = orders.filter((o) => getOrderStatus(o) === "bekleyen");
     const geciken = orders.filter((o) => getOrderStatus(o) === "geciken");
-    const topTah = orders.reduce((s, o) => s + (+o.tahsilat || 0), 0);
-    const topCiro = orders
-      .filter((o) => o.durum !== "askida")
-      .reduce((s, o) => s + (+o.toplam || 0), 0);
+    const askida = orders.filter((o) => getOrderStatus(o) === "askida");
+    const topCiro = computeToplamCiro(orders);
+    const topTah = computeTahsilat(orders);
     const bitenAdet = orders
       .filter((o) => o.durum === "biten")
       .reduce((s, o) => s + (+o.adet || 0), 0);
@@ -788,11 +792,8 @@ Saygılarımla`;
       .filter((o) => isOrderDueTracked(o))
       .reduce((s, o) => s + (+o.adet || 0), 0);
     const toplamAdet = bitenAdet + bekleyenAdet;
-    const topKalan = orders
-      .filter((o) => isOrderDueTracked(o))
-      .reduce((s, o) => s + (+o.toplam || 0) - (+o.tahsilat || 0), 0);
+    const topKalan = computeAlacak(orders);
     const topGider = expenses.reduce((s, e) => s + (+e.tutar || 0), 0);
-    const netKar = topTah - topGider;
 
     const alerts: ReactNode[] = [];
     if (geciken.length)
@@ -827,7 +828,7 @@ Saygılarımla`;
 
     const prodCats: Record<string, number> = {};
     orders.forEach((o) => {
-      if (o.cat) prodCats[o.cat] = (prodCats[o.cat] || 0) + (+o.tahsilat || 0);
+      if (o.cat) prodCats[o.cat] = (prodCats[o.cat] || 0) + (+o.toplam || 0);
     });
 
     return {
@@ -835,12 +836,12 @@ Saygılarımla`;
         bekleyen,
         biten,
         geciken,
-        topCiro,
-        topTah,
+        askida,
         toplamAdet,
+        topTah,
         topKalan,
         topGider,
-        netKar,
+        topCiro,
       },
       alerts,
       upcoming,
@@ -877,8 +878,8 @@ Saygılarımla`;
   const reports = useMemo(() => {
     const ord = filterByPeriod(orders, rPeriod, rYear);
     const exp = filterByPeriod(expenses, rPeriod, rYear);
-    const topTah = ord.reduce((s, o) => s + (+o.tahsilat || 0), 0);
-    const topToplam = ord.reduce((s, o) => s + (+o.toplam || 0), 0);
+    const topToplam = computeToplamCiro(ord);
+    const topTah = computeTahsilat(ord);
     const topGider = exp.reduce((s, e) => s + (+e.tutar || 0), 0);
     const topAdet = ord.reduce((s, o) => s + (+o.adet || 0), 0);
     const sipAdet = ord.length;
@@ -908,8 +909,9 @@ Saygılarımla`;
       )
       .sort((a, b) => daysLeft(a.bitis) - daysLeft(b.bitis));
 
-    const allTah = orders.reduce((s, o) => s + (+o.tahsilat || 0), 0);
-    const allToplam = orders.reduce((s, o) => s + (+o.toplam || 0), 0);
+    const allToplam = computeToplamCiro(orders);
+    const allTah = computeTahsilat(orders);
+    const allAlacak = computeAlacak(orders);
     const allGider = expenses.reduce((s, e) => s + (+e.tutar || 0), 0);
     const tahRate = allToplam ? Math.round((allTah / allToplam) * 100) : 0;
 
@@ -933,29 +935,29 @@ Saygılarımla`;
         ["Poly sipariş", polyOrd.length, "var(--purple)"],
       ] as [string, string | number, string][],
       averages: [
-        ["Parça başı ortalama (ciro ÷ adet)", avg(topTah, topAdet), "var(--green)"],
-        ["Sipariş başı ortalama (ciro ÷ sipariş)", avg(topTah, sipAdet), "var(--green)"],
-        ["Parça başı toplam tutar", avg(topToplam, topAdet), ""],
-        ["Sipariş başı toplam tutar", avg(topToplam, sipAdet), ""],
+        ["Parça başı ortalama (ciro ÷ adet)", avg(topToplam, topAdet), "var(--green)"],
+        ["Sipariş başı ortalama (ciro ÷ sipariş)", avg(topToplam, sipAdet), "var(--green)"],
+        ["Parça başı tahsilat", avg(topTah, topAdet), ""],
+        ["Sipariş başı tahsilat", avg(topTah, sipAdet), ""],
       ] as [string, string, string][],
       revenue: [
-        ["Toplam ciro (tahsilat)", fmtM(topTah), "var(--green)"],
-        ["Toplam sipariş tutarı", fmtM(topToplam), ""],
+        ["Toplam ciro", fmtM(topToplam), "var(--blue)"],
+        ["Tahsilat", fmtM(topTah), "var(--green)"],
         [
           "PLX (Pleksi) cirosu",
-          fmtM(plxOrd.reduce((s, o) => s + (+o.tahsilat || 0), 0)),
+          fmtM(plxOrd.reduce((s, o) => s + (+o.toplam || 0), 0)),
           "var(--blue)",
         ],
         [
           "Poly (Polyester) cirosu",
-          fmtM(polyOrd.reduce((s, o) => s + (+o.tahsilat || 0), 0)),
+          fmtM(polyOrd.reduce((s, o) => s + (+o.toplam || 0), 0)),
           "var(--purple)",
         ],
-        ["Maliyetin ciroda yüzdesi", pct(topGider, topTah), "var(--red)"],
+        ["Maliyetin ciroda yüzdesi", pct(topGider, topToplam), "var(--red)"],
       ] as [string, string, string][],
       ads: [
         ["Toplam reklam gideri", fmtM(reklam), ""],
-        ["Reklamların ciroda yüzdesi", pct(reklam, topTah), "var(--amber)"],
+        ["Reklamların ciroda yüzdesi", pct(reklam, topToplam), "var(--amber)"],
         ["Birim başı reklam maliyeti", avg(reklam, topAdet), ""],
         ["Sipariş başı reklam maliyeti", avg(reklam, sipAdet), ""],
       ] as [string, string, string][],
@@ -966,13 +968,13 @@ Saygılarımla`;
       ] as [string, string, string][],
       salary: [
         ["Toplam maaş gideri", fmtM(maas), ""],
-        ["Maaşların ciroda yüzdesi", pct(maas, topTah), "var(--amber)"],
+        ["Maaşların ciroda yüzdesi", pct(maas, topToplam), "var(--amber)"],
         ["Maaşların birim maliyeti", avg(maas, topAdet), ""],
         ["Maaşların sipariş maliyeti", avg(maas, sipAdet), ""],
       ] as [string, string, string][],
       cargo: [
         ["Toplam nakliye gideri", fmtM(nakliye), ""],
-        ["Nakliyenin ciroda yüzdesi", pct(nakliye, topTah), "var(--amber)"],
+        ["Nakliyenin ciroda yüzdesi", pct(nakliye, topToplam), "var(--amber)"],
         ["Nakliyenin birim maliyeti", avg(nakliye, topAdet), ""],
         ["Nakliyenin sipariş maliyeti", avg(nakliye, sipAdet), ""],
       ] as [string, string, string][],
@@ -980,6 +982,7 @@ Saygılarımla`;
       tahRate,
       allToplam,
       allTah,
+      allAlacak,
       allGider,
       monthlyEntries,
       mMax,
@@ -1095,7 +1098,7 @@ Saygılarımla`;
             {/* DASHBOARD */}
             <div className={`page${tab === "dashboard" ? " active" : ""}`} id="page-dashboard">
               <div id="d-alerts">{dashboard.alerts}</div>
-              <div className="metric-grid" id="d-metrics">
+              <div className="metric-grid dashboard-metrics" id="d-metrics">
                 <div className="metric">
                   <div className="metric-label">Bekleyen</div>
                   <div className="metric-value" style={{ color: "var(--amber)" }}>
@@ -1115,52 +1118,55 @@ Saygılarımla`;
                   </div>
                 </div>
                 <div className="metric">
-                  <div className="metric-label">Toplam Ciro</div>
-                  <div className="metric-value" style={{ color: "var(--blue)" }}>
-                    {fmtM(dashboard.metrics.topCiro)}
+                  <div className="metric-label">Askıda</div>
+                  <div className="metric-value" style={{ color: "var(--purple)" }}>
+                    {dashboard.metrics.askida.length}
                   </div>
                 </div>
                 <div className="metric">
                   <div className="metric-label">Toplam Adet</div>
-                  <div
-                    className="metric-value"
-                    style={{ color: "var(--text)" }}
-                    title="Tamamlanan + bekleyen/geciken sipariş adetleri"
-                  >
+                  <div className="metric-value" style={{ color: "var(--text)" }}>
                     {dashboard.metrics.toplamAdet}
-                  </div>
-                  <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 4 }}>
-                    biten + bekleyen
                   </div>
                 </div>
                 <div className="metric">
                   <div className="metric-label">Tahsilat</div>
-                  <div className="metric-value" style={{ color: "var(--green)" }}>
-                    {fmtM(dashboard.metrics.topTah)}
+                  <div
+                    className="metric-value"
+                    style={{ color: "var(--green)" }}
+                    title={fmtM(dashboard.metrics.topTah)}
+                  >
+                    {fmtMK(dashboard.metrics.topTah)}
                   </div>
                 </div>
                 <div className="metric">
                   <div className="metric-label">Alacak</div>
-                  <div className="metric-value" style={{ color: "var(--amber)" }}>
-                    {fmtM(dashboard.metrics.topKalan)}
+                  <div
+                    className="metric-value"
+                    style={{ color: "var(--amber)" }}
+                    title={fmtM(dashboard.metrics.topKalan)}
+                  >
+                    {fmtMK(dashboard.metrics.topKalan)}
                   </div>
                 </div>
                 <div className="metric">
                   <div className="metric-label">Toplam Gider</div>
-                  <div className="metric-value" style={{ color: "var(--red)" }}>
-                    {fmtM(dashboard.metrics.topGider)}
+                  <div
+                    className="metric-value"
+                    style={{ color: "var(--red)" }}
+                    title={fmtM(dashboard.metrics.topGider)}
+                  >
+                    {fmtMK(dashboard.metrics.topGider)}
                   </div>
                 </div>
                 <div className="metric">
-                  <div className="metric-label">Net Kar</div>
+                  <div className="metric-label">Toplam Ciro</div>
                   <div
                     className="metric-value"
-                    style={{
-                      color:
-                        dashboard.metrics.netKar >= 0 ? "var(--blue)" : "var(--red)",
-                    }}
+                    style={{ color: "var(--blue)" }}
+                    title={fmtM(dashboard.metrics.topCiro)}
                   >
-                    {fmtM(dashboard.metrics.netKar)}
+                    {fmtMK(dashboard.metrics.topCiro)}
                   </div>
                 </div>
               </div>
@@ -1265,7 +1271,7 @@ Saygılarımla`;
                     <tbody id="d-orders">
                       {orders.slice(0, 6).map((o) => {
                         const st = getOrderStatus(o);
-                        const kalan = (+o.toplam || 0) - (+o.tahsilat || 0);
+                        const kalan = orderKalan(o);
                         return (
                           <tr key={o.id}>
                             <td style={{ fontSize: 11, color: "var(--text3)" }}>
@@ -1415,7 +1421,7 @@ Saygılarımla`;
                       {sortedOrders.length ? (
                         sortedOrders.map((o) => {
                           const st = getOrderStatus(o);
-                          const kalan = (+o.toplam || 0) - (+o.tahsilat || 0);
+                          const kalan = orderKalan(o);
                           const bilgiTxt = o.bilgi
                             ? o.bilgi.slice(0, 40) + (o.bilgi.length > 40 ? "…" : "")
                             : "—";
@@ -1779,7 +1785,7 @@ Saygılarımla`;
                               }}
                             >
                               {o.cat || ""} · {o.tur}×{o.adet} · Kalan:{" "}
-                              {fmtM((+o.toplam || 0) - (+o.tahsilat || 0))}
+                              {fmtM(orderKalan(o))}
                             </div>
                           </div>
                         );
@@ -1818,11 +1824,7 @@ Saygılarımla`;
                       [
                         ["Toplam Ciro", reports.allToplam, "var(--blue)"],
                         ["Tahsil Edilen", reports.allTah, "var(--green)"],
-                        [
-                          "Alacak",
-                          reports.allToplam - reports.allTah,
-                          "var(--amber)",
-                        ],
+                        ["Alacak", reports.allAlacak, "var(--amber)"],
                         ["Toplam Gider", reports.allGider, "var(--red)"],
                         [
                           "Net Kar",
