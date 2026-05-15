@@ -7,6 +7,7 @@ import { clearAdminPassword } from "@/lib/admin-auth-client";
 import { APP_NAME, APP_VERSION } from "@/lib/app-version";
 
 const NAV = [
+  { href: "/c", label: "Hızlı mesajlar", desc: "Kayıtlı cevaplar — kopyala / yapıştır", icon: "⚡" },
   { href: "/admin/artworks", label: "Artworks", desc: "Edit all artworks", icon: "🖼️" },
   { href: "/admin/uploads", label: "Uploads", desc: "Upload photos/videos", icon: "⬆️" },
   { href: "/admin/categories", label: "Categories", desc: "Manage categories", icon: "📁" },

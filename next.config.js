@@ -18,6 +18,13 @@ const nextConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384, 512],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
   },
+  async headers() {
+    const noIndex = "noindex, nofollow, noarchive, nosnippet, noimageindex";
+    return [
+      { source: "/c", headers: [{ key: "X-Robots-Tag", value: noIndex }] },
+      { source: "/c/:path*", headers: [{ key: "X-Robots-Tag", value: noIndex }] },
+    ];
+  },
 };
 
 module.exports = nextConfig;
