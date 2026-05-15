@@ -174,6 +174,51 @@ function renderBarChart(
   });
 }
 
+function renderProductCatRevenueChart(
+  rows: { cat: string; ciro: number; adet: number }[]
+): ReactNode {
+  if (!rows.length) return <div className="empty">Veri yok</div>;
+  const sorted = [...rows].sort((a, b) => b.ciro - a.ciro);
+  const max = Math.max(...sorted.map((r) => r.ciro), 1);
+  return sorted.map((r, i) => {
+    const pct = Math.round((r.ciro / max) * 100);
+    return (
+      <div className="bar-row" key={r.cat + i} style={{ alignItems: "flex-start" }}>
+        <div className="bar-label" style={{ paddingTop: 3 }}>
+          {r.cat}
+        </div>
+        <div className="bar-track" style={{ marginTop: 4 }}>
+          <div
+            className="bar-fill"
+            style={{
+              width: `${pct}%`,
+              background: COLS[i % COLS.length],
+            }}
+          >
+            {pct > 18 ? fmtM(r.ciro) : ""}
+          </div>
+        </div>
+        <div
+          className="bar-val"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 2,
+            lineHeight: 1.2,
+            minWidth: 72,
+          }}
+        >
+          <span>{fmtM(r.ciro)}</span>
+          <span style={{ fontSize: 10, color: "var(--text3)", fontWeight: 500 }}>
+            {r.adet} adet
+          </span>
+        </div>
+      </div>
+    );
+  });
+}
+
 function MonthBox({
   ms,
   orders,
@@ -185,6 +230,7 @@ function MonthBox({
 }) {
   const ord = orders.filter((o) => isInMonth(o.tarih, ms));
   const exp = expenses.filter((e) => isInMonth(e.tarih, ms));
+  const ciro = computeToplamCiro(ord);
   const tah = computeTahsilat(ord);
   const gid = exp.reduce((s, e) => s + (+e.tutar || 0), 0);
   const net = tah - gid;
@@ -192,6 +238,7 @@ function MonthBox({
     <div style={{ display: "grid", gap: 6 }}>
       {[
         ["Sipariş", `${ord.length} adet`, undefined],
+        ["Toplam Ciro", fmtM(ciro), "var(--blue)"],
         ["Tahsilat", fmtM(tah), "var(--green)"],
         ["Gider", fmtM(gid), "var(--red)"],
         ["Net", fmtM(net), net >= 0 ? "var(--blue)" : "var(--red)"],
@@ -894,9 +941,18 @@ Saygılarımla`;
     );
 
     const prodCats: Record<string, number> = {};
+    const prodAdet: Record<string, number> = {};
     orders.forEach((o) => {
-      if (o.cat) prodCats[o.cat] = (prodCats[o.cat] || 0) + (+o.toplam || 0);
+      if (o.cat) {
+        prodCats[o.cat] = (prodCats[o.cat] || 0) + (+o.toplam || 0);
+        prodAdet[o.cat] = (prodAdet[o.cat] || 0) + (+o.adet || 0);
+      }
     });
+    const prodCatRows = Object.keys(prodCats).map((cat) => ({
+      cat,
+      ciro: prodCats[cat],
+      adet: prodAdet[cat] || 0,
+    }));
 
     return {
       metrics: {
@@ -913,7 +969,7 @@ Saygılarımla`;
       alerts,
       upcoming,
       expCatEntries,
-      prodCatEntries: Object.entries(prodCats) as [string, number][],
+      prodCatRows,
     };
   }, [orders, expenses]);
 
@@ -1311,13 +1367,7 @@ Saygılarımla`;
               <div className="card">
                 <div className="card-title">Ürün Kategorisi Ciroları</div>
                 <div className="bar-chart" id="d-cat-revenue">
-                  {dashboard.prodCatEntries.length
-                    ? renderBarChart(dashboard.prodCatEntries, {
-                        labelFn: (k) => k,
-                      })
-                    : (
-                      <div className="empty">Veri yok</div>
-                    )}
+                  {renderProductCatRevenueChart(dashboard.prodCatRows)}
                 </div>
               </div>
               <div className="card">
