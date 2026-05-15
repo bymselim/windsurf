@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { getAdminAuthHeaders } from "@/lib/admin-auth-client";
 
 type UploadedFile = {
   name: string;
@@ -50,6 +51,10 @@ export default function AdminUploadsPage() {
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   /** Yükleme sırasında her dosyanın durumu (sıra ile) */
   const [fileStatuses, setFileStatuses] = useState<("pending" | "success" | "error" | "skipped")[]>([]);
+
+  const [instagramUrl, setInstagramUrl] = useState("");
+  const [igImporting, setIgImporting] = useState(false);
+  const [igStatus, setIgStatus] = useState<string | null>(null);
 
   const BATCH_SIZE = 3;
 
@@ -223,6 +228,62 @@ export default function AdminUploadsPage() {
     }
   };
 
+  const importFromInstagram = async () => {
+    setError(null);
+    setIgStatus(null);
+    if (!category.trim()) {
+      setError("Önce kategori seçin.");
+      return;
+    }
+    const url = instagramUrl.trim();
+    if (!url) {
+      setError("Instagram gönderi linkini yapıştırın.");
+      return;
+    }
+    setIgImporting(true);
+    try {
+      const res = await fetch("/api/admin/uploads/instagram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAdminAuthHeaders() },
+        credentials: "include",
+        body: JSON.stringify({ url, category: category.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json?.error ?? "Instagram içe aktarma başarısız.");
+        return;
+      }
+      if (json.skipped) {
+        setIgStatus(json.message ?? "Bu görsel zaten vardı (atlandı).");
+        return;
+      }
+      const file = json.file as UploadedFile | undefined;
+      if (file?.url) {
+        setUploaded((prev) => [
+          {
+            name: `instagram-${url}`,
+            size: 0,
+            type: "image/jpeg",
+            pathname: "",
+            url: file.url,
+            thumbUrl: file.thumbUrl,
+          },
+          ...prev,
+        ]);
+      }
+      const created = json.createdArtwork as CreatedArtwork | null | undefined;
+      if (created?.id) {
+        setCreatedArtworks((prev) => [created, ...prev]);
+      }
+      setIgStatus("Görsel galeriye eklendi.");
+      setInstagramUrl("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Bağlantı hatası.");
+    } finally {
+      setIgImporting(false);
+    }
+  };
+
   const copyAll = async () => {
     const text = uploaded.map((u) => u.url).join("\n");
     if (!text) return;
@@ -253,7 +314,7 @@ export default function AdminUploadsPage() {
         </div>
 
         <h1 className="text-2xl md:text-3xl font-bold mb-2">Uploads</h1>
-        <p className="text-zinc-400 mb-8">Upload files to Vercel Blob.</p>
+        <p className="text-zinc-400 mb-8">Dosya yükleme veya Instagram gönderi linki ile içe aktarma.</p>
 
         <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/50">
           <div className="flex flex-col gap-4">
@@ -293,6 +354,29 @@ export default function AdminUploadsPage() {
               <p className="mt-2 text-xs text-zinc-500">
                 Upload will create artwork records under the selected category.
               </p>
+            </div>
+
+            <div className="pt-2 border-t border-zinc-800">
+              <h2 className="text-base font-semibold text-zinc-200 mb-1">Instagram’dan içe aktar</h2>
+              <p className="text-xs text-zinc-500 mb-3">
+                Herkese açık gönderi veya reel linki. Çoklu fotoğrafta yalnızca kapak görseli alınır.
+              </p>
+              <input
+                  type="url"
+                  value={instagramUrl}
+                  onChange={(e) => setInstagramUrl(e.target.value)}
+                  placeholder="https://www.instagram.com/p/… veya /reel/…"
+                  className="w-full p-3 mb-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  disabled={igImporting || !category.trim() || !instagramUrl.trim()}
+                  onClick={() => void importFromInstagram()}
+                  className="w-full sm:w-auto px-4 py-3 bg-amber-500 hover:bg-amber-600 rounded-lg font-medium text-zinc-950 disabled:opacity-50 transition"
+                >
+                  {igImporting ? "İndiriliyor…" : "Linkten yükle"}
+                </button>
+                {igStatus ? <p className="mt-2 text-sm text-emerald-400">{igStatus}</p> : null}
             </div>
 
             <div>
