@@ -37,6 +37,8 @@ import {
   computeToplamCiro,
   getOrderStatus,
   isOrderDueTracked,
+  dateMonthKey,
+  isInMonth,
   monthStr,
   orderKalan,
   type OrderSortKey,
@@ -120,10 +122,8 @@ function filterByPeriod<T extends { tarih?: string }>(
   const thisM = monthStr(0);
   const lastM = monthStr(-1);
   if (period === "all") return list;
-  if (period === "thismonth")
-    return list.filter((o) => o.tarih?.startsWith(thisM));
-  if (period === "lastmonth")
-    return list.filter((o) => o.tarih?.startsWith(lastM));
+  if (period === "thismonth") return list.filter((o) => isInMonth(o.tarih, thisM));
+  if (period === "lastmonth") return list.filter((o) => isInMonth(o.tarih, lastM));
   const q: Record<string, string[]> = {
     q1: ["01", "02", "03"],
     q2: ["04", "05", "06"],
@@ -131,10 +131,10 @@ function filterByPeriod<T extends { tarih?: string }>(
     q4: ["10", "11", "12"],
   };
   if (q[period]) {
-    return list.filter(
-      (o) =>
-        o.tarih?.startsWith(year) && q[period].includes(o.tarih.slice(5, 7))
-    );
+    return list.filter((o) => {
+      const key = dateMonthKey(o.tarih);
+      return key.startsWith(year) && q[period].includes(key.slice(5, 7));
+    });
   }
   return list;
 }
@@ -179,8 +179,8 @@ function MonthBox({
   orders: ErpOrder[];
   expenses: ErpExpense[];
 }) {
-  const ord = orders.filter((o) => o.tarih?.startsWith(ms));
-  const exp = expenses.filter((e) => e.tarih?.startsWith(ms));
+  const ord = orders.filter((o) => isInMonth(o.tarih, ms));
+  const exp = expenses.filter((e) => isInMonth(e.tarih, ms));
   const tah = computeTahsilat(ord);
   const gid = exp.reduce((s, e) => s + (+e.tutar || 0), 0);
   const net = tah - gid;
@@ -675,8 +675,8 @@ export default function ErpApp() {
   }, [orders, getNum]);
 
   const prepareEmail = useCallback(() => {
-    const thisM = todayStr().slice(0, 7);
-    const ay = expenses.filter((e) => e.tarih?.startsWith(thisM));
+    const thisM = monthStr(0);
+    const ay = expenses.filter((e) => isInMonth(e.tarih, thisM));
     const allGider = expenses.reduce((s, e) => s + (+e.tutar || 0), 0);
     const tahsilEdilen = computeTahsilat(orders);
     const cats: Record<string, number> = {};
@@ -853,9 +853,9 @@ Saygılarımla`;
   /* ─── Expenses computed ─── */
   const expenseView = useMemo(() => {
     const total = expenses.reduce((s, e) => s + (+e.tutar || 0), 0);
-    const thisM = todayStr().slice(0, 7);
+    const thisM = monthStr(0);
     const aylik = expenses
-      .filter((e) => e.tarih?.startsWith(thisM))
+      .filter((e) => isInMonth(e.tarih, thisM))
       .reduce((s, e) => s + (+e.tutar || 0), 0);
     const faturali = expenses.filter((e) => e.fatno || e.dosya).length;
     const cats: Record<string, number> = {};
@@ -864,10 +864,8 @@ Saygılarımla`;
     });
     const months: Record<string, number> = {};
     expenses.forEach((e) => {
-      if (e.tarih) {
-        const m = e.tarih.slice(0, 7);
-        months[m] = (months[m] || 0) + (+e.tutar || 0);
-      }
+      const m = dateMonthKey(e.tarih);
+      if (m) months[m] = (months[m] || 0) + (+e.tutar || 0);
     });
     const monthEntries = Object.entries(months).sort().slice(-6) as [string, number][];
     const mMax = Math.max(...monthEntries.map(([, v]) => v), 1);
@@ -917,10 +915,8 @@ Saygılarımla`;
 
     const months: Record<string, number> = {};
     orders.forEach((o) => {
-      if (o.tarih) {
-        const m = o.tarih.slice(0, 7);
-        months[m] = (months[m] || 0) + (+o.tahsilat || 0);
-      }
+      const m = dateMonthKey(o.tarih);
+      if (m) months[m] = (months[m] || 0) + (+o.tahsilat || 0);
     });
     const monthlyEntries = Object.entries(months).sort().slice(-8) as [string, number][];
     const mMax = Math.max(...monthlyEntries.map(([, v]) => v), 1);

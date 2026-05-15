@@ -62,8 +62,36 @@ export function fmtPct(n: number): string {
   return Math.round(n * 10) / 10 + "%";
 }
 
+/** Yerel takvim günü YYYY-MM-DD (UTC kayması yok). */
 export function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Tarihten YYYY-MM ay anahtarı; ISO ve DD.MM.YYYY destekler. */
+export function dateMonthKey(tarih: string | null | undefined): string {
+  const s = String(tarih ?? "").trim();
+  if (!s) return "";
+  if (/^\d{4}-\d{2}/.test(s)) return s.slice(0, 7);
+  const dot = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (dot) {
+    return `${dot[3]}-${dot[2].padStart(2, "0")}`;
+  }
+  const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (slash) {
+    return `${slash[3]}-${slash[2].padStart(2, "0")}`;
+  }
+  return "";
+}
+
+export function isInMonth(
+  tarih: string | null | undefined,
+  ym: string
+): boolean {
+  return dateMonthKey(tarih) === ym;
 }
 
 export function daysLeft(end: string): number {
@@ -72,11 +100,14 @@ export function daysLeft(end: string): number {
   return Math.round((new Date(end + "T00:00:00").getTime() - t.getTime()) / 864e5);
 }
 
+/** Yerel takvim ayı YYYY-MM (UTC kayması yok). */
 export function monthStr(offset = 0): string {
   const d = new Date();
   d.setDate(1);
   d.setMonth(d.getMonth() + offset);
-  return d.toISOString().slice(0, 7);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
 }
 
 export const STATUS_LABELS: Record<string, string> = {
