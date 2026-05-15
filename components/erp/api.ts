@@ -83,13 +83,14 @@ export async function deleteErpExpense(id: number): Promise<void> {
 
 export async function updateErpExpense(
   id: number,
-  patch: Record<string, unknown>
+  body: Record<string, unknown> | FormData
 ): Promise<ErpExpense> {
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
   const res = await fetch(`/api/admin/erp/expenses/${id}`, {
     method: "PATCH",
     credentials: "include",
-    headers: headers(),
-    body: JSON.stringify(patch),
+    headers: isForm ? getAdminAuthHeaders() : headers(),
+    body: isForm ? body : JSON.stringify(body),
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json?.error ?? "Güncelleme başarısız");

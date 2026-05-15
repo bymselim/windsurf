@@ -121,5 +121,4 @@ th.sortable{cursor:pointer;user-select:none}
 th.sortable:hover{color:var(--text)}
 th.sortable.sorted{color:var(--blue)}
 .d-upcoming-scroll{max-height:min(70vh,560px);overflow-y:auto;padding-right:4px;-webkit-overflow-scrolling:touch}
-.erp-exp-date{width:100%;max-width:148px;padding:6px 8px;font-size:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text);font-family:inherit}
 

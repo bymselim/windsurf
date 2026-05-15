@@ -232,6 +232,7 @@ export default function ErpApp() {
 
   const [orderModalOpen, setOrderModalOpen] = useState(false);
   const [expModalOpen, setExpModalOpen] = useState(false);
+  const [expEditId, setExpEditId] = useState<number | null>(null);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [orderForm, setOrderForm] = useState<OrderForm>(emptyOrderForm);
@@ -522,6 +523,7 @@ export default function ErpApp() {
   );
 
   const openExpModal = useCallback(() => {
+    setExpEditId(null);
     setExpForm({
       tarih: todayStr(),
       kat: settings.expCats[0] ?? "",
@@ -534,6 +536,36 @@ export default function ErpApp() {
     if (fileInputRef.current) fileInputRef.current.value = "";
     setExpModalOpen(true);
   }, [settings.expCats]);
+
+  const closeExpModal = useCallback(() => {
+    setExpModalOpen(false);
+    setExpEditId(null);
+    setExpFile(null);
+    setFileLabel("Tıkla veya sürükle (PDF, JPG, PNG)");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
+
+  const openEditExpense = useCallback(
+    (e: ErpExpense) => {
+      setExpEditId(e.id);
+      setExpForm({
+        tarih: toInputDateValue(e.tarih) || todayStr(),
+        kat: e.kat || settings.expCats[0] || "",
+        acik: e.acik || "",
+        tutar: e.tutar ? String(e.tutar) : "",
+        fatno: e.fatno || "",
+      });
+      setExpFile(null);
+      setFileLabel(
+        e.dosya
+          ? `Mevcut: ${e.dosya} — değiştirmek için yeni dosya seçin`
+          : "Tıkla veya sürükle (PDF, JPG, PNG)"
+      );
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setExpModalOpen(true);
+    },
+    [settings.expCats]
+  );
 
   const handleFilePick = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -570,17 +602,22 @@ export default function ErpApp() {
     form.append("tutar", String(+tutar));
     form.append("fatno", fatno.trim());
     if (expFile) form.append("file", expFile);
-    showLoading("Kaydediliyor...");
+    showLoading(expEditId != null ? "Güncelleniyor..." : "Kaydediliyor...");
     try {
-      const created = await createErpExpense(form);
-      setExpenses((prev) => [created, ...prev]);
-      setExpModalOpen(false);
+      if (expEditId != null) {
+        const updated = await updateErpExpense(expEditId, form);
+        setExpenses((prev) => prev.map((x) => (x.id === expEditId ? { ...x, ...updated } : x)));
+      } else {
+        const created = await createErpExpense(form);
+        setExpenses((prev) => [created, ...prev]);
+      }
+      closeExpModal();
     } catch (e) {
       alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
     } finally {
       hideLoading();
     }
-  }, [expForm, expFile, showLoading, hideLoading]);
+  }, [expForm, expFile, expEditId, showLoading, hideLoading, closeExpModal]);
 
   const delExpense = useCallback(
     async (id: number) => {
@@ -589,21 +626,6 @@ export default function ErpApp() {
       try {
         await deleteErpExpense(id);
         setExpenses((prev) => prev.filter((e) => e.id !== id));
-      } catch (e) {
-        alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
-      } finally {
-        hideLoading();
-      }
-    },
-    [showLoading, hideLoading]
-  );
-
-  const patchExpense = useCallback(
-    async (id: number, patch: Record<string, unknown>) => {
-      showLoading("Güncelleniyor...");
-      try {
-        const updated = await updateErpExpense(id, patch);
-        setExpenses((prev) => prev.map((e) => (e.id === id ? { ...e, ...updated } : e)));
       } catch (e) {
         alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
       } finally {
@@ -1701,25 +1723,15 @@ Saygılarımla`;
                           Fatura No{expSortIndicator("fatno")}
                         </th>
                         <th>Dosya</th>
-                        <th />
+                        <th>İşlem</th>
                       </tr>
                     </thead>
                     <tbody id="g-tbody">
                       {sortedExpenses.length ? (
                         sortedExpenses.map((e) => (
                           <tr key={e.id}>
-                            <td style={{ verticalAlign: "middle" }}>
-                              <input
-                                type="date"
-                                className="erp-exp-date"
-                                value={toInputDateValue(e.tarih)}
-                                onChange={(ev) => {
-                                  const v = ev.target.value;
-                                  if (!v || v === toInputDateValue(e.tarih)) return;
-                                  void patchExpense(e.id, { tarih: v });
-                                }}
-                                aria-label="Gider tarihi"
-                              />
+                            <td style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>
+                              {fmtDate(e.tarih)}
                             </td>
                             <td>
                               <span className="badge blue" style={{ fontSize: 10 }}>
@@ -1747,13 +1759,22 @@ Saygılarımla`;
                               )}
                             </td>
                             <td>
-                              <button
-                                type="button"
-                                className="btn sm danger"
-                                onClick={() => void delExpense(e.id)}
-                              >
-                                ✕
-                              </button>
+                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                                <button
+                                  type="button"
+                                  className="btn sm"
+                                  onClick={() => openEditExpense(e)}
+                                >
+                                  Düzenle
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn sm danger"
+                                  onClick={() => void delExpense(e.id)}
+                                >
+                                  ✕
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -2271,15 +2292,22 @@ Saygılarımla`;
       <div className={`overlay${expModalOpen ? " open" : ""}`} id="m-exp">
         <div className="modal">
           <div className="modal-head">
-            <div className="modal-title">Gider / Fatura Ekle</div>
+            <div className="modal-title">
+              {expEditId != null ? "Gider / Fatura Düzenle" : "Gider / Fatura Ekle"}
+            </div>
             <button
               type="button"
               className="btn sm"
-              onClick={() => setExpModalOpen(false)}
+              onClick={() => closeExpModal()}
             >
               ✕
             </button>
           </div>
+          {expEditId != null ? (
+            <div className="hint" style={{ marginBottom: 10 }}>
+              Tarih, kategori, açıklama, tutar ve fatura bilgilerini buradan güncelleyebilirsiniz.
+            </div>
+          ) : null}
           <div className="fg c2">
             <div>
               <div className="fl">Tarih</div>
@@ -2370,7 +2398,7 @@ Saygılarımla`;
             <button
               type="button"
               className="btn"
-              onClick={() => setExpModalOpen(false)}
+              onClick={() => closeExpModal()}
             >
               İptal
             </button>
@@ -2379,7 +2407,7 @@ Saygılarımla`;
               className="btn primary"
               onClick={() => void saveExpense()}
             >
-              Kaydet
+              {expEditId != null ? "Güncelle" : "Kaydet"}
             </button>
           </div>
         </div>
