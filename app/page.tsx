@@ -36,7 +36,7 @@ export default async function HomePage() {
           </Link>
         </div>
         <div className="mt-6 pt-6 border-t border-zinc-700/50">
-          <YetkilendirmeButton />
+          <YetkilendirmeButton bilingual />
         </div>
       </div>
     </div>

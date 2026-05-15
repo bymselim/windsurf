@@ -53,8 +53,15 @@ export default function AdminUploadsPage() {
   const [fileStatuses, setFileStatuses] = useState<("pending" | "success" | "error" | "skipped")[]>([]);
 
   const [instagramUrl, setInstagramUrl] = useState("");
+  const [igLoading, setIgLoading] = useState(false);
   const [igImporting, setIgImporting] = useState(false);
   const [igStatus, setIgStatus] = useState<string | null>(null);
+  const [igPreview, setIgPreview] = useState<{
+    postUrl: string;
+    title?: string;
+    images: { id: string; index: number; url: string }[];
+  } | null>(null);
+  const [igSelected, setIgSelected] = useState<Record<string, boolean>>({});
 
   const BATCH_SIZE = 3;
 
@@ -228,16 +235,67 @@ export default function AdminUploadsPage() {
     }
   };
 
-  const importFromInstagram = async () => {
+  const fetchInstagramPreview = async () => {
+    setError(null);
+    setIgStatus(null);
+    setIgPreview(null);
+    const url = instagramUrl.trim();
+    if (!url) {
+      setError("Instagram gönderi linkini yapıştırın.");
+      return;
+    }
+    setIgLoading(true);
+    try {
+      const res = await fetch("/api/admin/uploads/instagram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAdminAuthHeaders() },
+        credentials: "include",
+        body: JSON.stringify({ action: "preview", url }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json?.error ?? "Görseller alınamadı.");
+        return;
+      }
+      const images = Array.isArray(json.images) ? json.images : [];
+      if (images.length === 0) {
+        setError("Bu gönderide görsel bulunamadı.");
+        return;
+      }
+      setIgPreview({
+        postUrl: String(json.postUrl ?? url),
+        title: typeof json.title === "string" ? json.title : undefined,
+        images,
+      });
+      const selected: Record<string, boolean> = {};
+      for (const img of images) {
+        if (img?.id && img?.url) selected[img.id] = true;
+      }
+      setIgSelected(selected);
+      setIgStatus(`${images.length} görsel bulundu — eklemek istediklerinizi işaretleyin.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Bağlantı hatası.");
+    } finally {
+      setIgLoading(false);
+    }
+  };
+
+  const importSelectedInstagram = async () => {
     setError(null);
     setIgStatus(null);
     if (!category.trim()) {
       setError("Önce kategori seçin.");
       return;
     }
-    const url = instagramUrl.trim();
-    if (!url) {
-      setError("Instagram gönderi linkini yapıştırın.");
+    if (!igPreview) {
+      setError("Önce «Görselleri getir» ile listeyi açın.");
+      return;
+    }
+    const imageUrls = igPreview.images
+      .filter((img) => igSelected[img.id])
+      .map((img) => img.url);
+    if (imageUrls.length === 0) {
+      setError("En az bir görsel seçin.");
       return;
     }
     setIgImporting(true);
@@ -246,43 +304,53 @@ export default function AdminUploadsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAdminAuthHeaders() },
         credentials: "include",
-        body: JSON.stringify({ url, category: category.trim() }),
+        body: JSON.stringify({
+          action: "import",
+          url: instagramUrl.trim(),
+          category: category.trim(),
+          imageUrls,
+        }),
       });
       const json = await res.json();
       if (!res.ok) {
-        setError(json?.error ?? "Instagram içe aktarma başarısız.");
+        setError(json?.error ?? "İçe aktarma başarısız.");
         return;
       }
-      if (json.skipped) {
-        setIgStatus(json.message ?? "Bu görsel zaten vardı (atlandı).");
-        return;
+      const responseFiles = Array.isArray(json.files)
+        ? (json.files as Array<{ url?: string; thumbUrl?: string; skipped?: boolean }>)
+        : [];
+      const newUploaded = responseFiles
+        .filter((f) => f.url && !f.skipped)
+        .map((f, i) => ({
+          name: `instagram-${i + 1}`,
+          size: 0,
+          type: "image/jpeg",
+          pathname: "",
+          url: f.url!,
+          thumbUrl: f.thumbUrl,
+        }));
+      if (newUploaded.length > 0) {
+        setUploaded((prev) => [...newUploaded, ...prev]);
       }
-      const file = json.file as UploadedFile | undefined;
-      if (file?.url) {
-        setUploaded((prev) => [
-          {
-            name: `instagram-${url}`,
-            size: 0,
-            type: "image/jpeg",
-            pathname: "",
-            url: file.url,
-            thumbUrl: file.thumbUrl,
-          },
-          ...prev,
-        ]);
+      const created = Array.isArray(json.createdArtworks)
+        ? (json.createdArtworks as CreatedArtwork[])
+        : [];
+      if (created.length > 0) {
+        setCreatedArtworks((prev) => [...created, ...prev]);
       }
-      const created = json.createdArtwork as CreatedArtwork | null | undefined;
-      if (created?.id) {
-        setCreatedArtworks((prev) => [created, ...prev]);
-      }
-      setIgStatus("Görsel galeriye eklendi.");
-      setInstagramUrl("");
+      setIgStatus(typeof json.message === "string" ? json.message : "Tamamlandı.");
+      setIgPreview(null);
+      setIgSelected({});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Bağlantı hatası.");
     } finally {
       setIgImporting(false);
     }
   };
+
+  const igSelectedCount = igPreview
+    ? igPreview.images.filter((img) => igSelected[img.id]).length
+    : 0;
 
   const copyAll = async () => {
     const text = uploaded.map((u) => u.url).join("\n");
@@ -359,24 +427,104 @@ export default function AdminUploadsPage() {
             <div className="pt-2 border-t border-zinc-800">
               <h2 className="text-base font-semibold text-zinc-200 mb-1">Instagram’dan içe aktar</h2>
               <p className="text-xs text-zinc-500 mb-3">
-                Herkese açık gönderi veya reel linki. Çoklu fotoğrafta yalnızca kapak görseli alınır.
+                Çoklu fotoğraf gönderilerinde tüm kareleri listeler; işaretlediklerinizi galeriye ekler.
               </p>
               <input
                   type="url"
                   value={instagramUrl}
-                  onChange={(e) => setInstagramUrl(e.target.value)}
+                  onChange={(e) => {
+                    setInstagramUrl(e.target.value);
+                    setIgPreview(null);
+                    setIgSelected({});
+                  }}
                   placeholder="https://www.instagram.com/p/… veya /reel/…"
                   className="w-full p-3 mb-3 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none"
                 />
-                <button
-                  type="button"
-                  disabled={igImporting || !category.trim() || !instagramUrl.trim()}
-                  onClick={() => void importFromInstagram()}
-                  className="w-full sm:w-auto px-4 py-3 bg-amber-500 hover:bg-amber-600 rounded-lg font-medium text-zinc-950 disabled:opacity-50 transition"
-                >
-                  {igImporting ? "İndiriliyor…" : "Linkten yükle"}
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    disabled={igLoading || igImporting || !instagramUrl.trim()}
+                    onClick={() => void fetchInstagramPreview()}
+                    className="flex-1 px-4 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-medium text-zinc-100 disabled:opacity-50 transition"
+                  >
+                    {igLoading ? "Alınıyor…" : "Görselleri getir"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      igImporting || igLoading || !category.trim() || !igPreview || igSelectedCount === 0
+                    }
+                    onClick={() => void importSelectedInstagram()}
+                    className="flex-1 px-4 py-3 bg-amber-500 hover:bg-amber-600 rounded-lg font-medium text-zinc-950 disabled:opacity-50 transition"
+                  >
+                    {igImporting
+                      ? `Ekleniyor (${igSelectedCount})…`
+                      : `Seçilenleri ekle (${igSelectedCount})`}
+                  </button>
+                </div>
                 {igStatus ? <p className="mt-2 text-sm text-emerald-400">{igStatus}</p> : null}
+
+                {igPreview && igPreview.images.length > 0 ? (
+                  <div className="mt-4">
+                    <div className="mb-2">
+                      <button
+                        type="button"
+                        className="text-xs text-amber-400 hover:text-amber-300 mr-3"
+                        onClick={() => {
+                          const next: Record<string, boolean> = {};
+                          for (const img of igPreview.images) next[img.id] = true;
+                          setIgSelected(next);
+                        }}
+                      >
+                        Tümünü seç
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs text-zinc-500 hover:text-zinc-300"
+                        onClick={() => setIgSelected({})}
+                      >
+                        Seçimi kaldır
+                      </button>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {igPreview.images.map((img) => {
+                        const checked = Boolean(igSelected[img.id]);
+                        return (
+                          <label
+                            key={img.id}
+                            className={`relative block rounded-xl overflow-hidden border-2 cursor-pointer transition ${
+                              checked
+                                ? "border-amber-500 ring-2 ring-amber-500/30"
+                                : "border-zinc-700 opacity-80"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="absolute top-2 left-2 z-10 h-5 w-5 accent-amber-500"
+                              checked={checked}
+                              onChange={(e) =>
+                                setIgSelected((prev) => ({ ...prev, [img.id]: e.target.checked }))
+                              }
+                            />
+                            <div className="relative aspect-square bg-zinc-800">
+                              <Image
+                                src={img.url}
+                                alt={`Görsel ${img.index + 1}`}
+                                fill
+                                className="object-cover"
+                                sizes="(max-width: 640px) 50vw, 200px"
+                                unoptimized
+                              />
+                            </div>
+                            <span className="absolute bottom-0 inset-x-0 bg-black/60 text-center text-xs py-1 text-zinc-200">
+                              {img.index + 1}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
             </div>
 
             <div>
