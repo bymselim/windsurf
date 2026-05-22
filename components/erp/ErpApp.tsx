@@ -188,37 +188,6 @@ function filterByPeriod<T extends { tarih?: string }>(
   return list;
 }
 
-function renderBarChart(
-  entries: [string, number][],
-  opts?: { maxItems?: number; labelFn?: (k: string) => string }
-): ReactNode {
-  if (!entries.length) return <div className="empty">Gider yok</div>;
-  const sorted = [...entries].sort((a, b) => b[1] - a[1]);
-  const slice = opts?.maxItems ? sorted.slice(0, opts.maxItems) : sorted;
-  const max = Math.max(...slice.map(([, v]) => v), 1);
-  const labelFn = opts?.labelFn ?? ((k: string) => k.trim());
-  return slice.map(([k, v], i) => {
-    const pct = Math.round((v / max) * 100);
-    return (
-      <div className="bar-row" key={k + i}>
-        <div className="bar-label">{labelFn(k)}</div>
-        <div className="bar-track">
-          <div
-            className="bar-fill"
-            style={{
-              width: `${pct}%`,
-              background: COLS[i % COLS.length],
-            }}
-          >
-            {pct > 18 ? fmtM(v) : ""}
-          </div>
-        </div>
-        <div className="bar-val">{fmtM(v)}</div>
-      </div>
-    );
-  });
-}
-
 type ExpenseKatGroup = {
   kat: string;
   total: number;
