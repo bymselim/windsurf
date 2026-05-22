@@ -13,11 +13,8 @@ function parseLocalYmd(s: string): Date {
   return new Date(y, (m || 1) - 1, d || 1);
 }
 
-/** Tekrarlayan kural için üretilecek tarihler (geçmiş hariç: yalnızca bugün ve sonrası). */
-export function recurringDueDates(
-  rule: ErpRecurringExpense,
-  onlyFuture = true
-): string[] {
+/** Vadesi gelmiş tekrar tarihleri: start ≤ tarih ≤ end ve tarih ≤ bugün (gelecek ay yok). */
+export function recurringDueDates(rule: ErpRecurringExpense): string[] {
   const start = toInputDateValue(rule.startDate) || rule.startDate;
   const end = toInputDateValue(rule.endDate) || rule.endDate;
   if (!start || !end || start > end) return [];
@@ -32,9 +29,7 @@ export function recurringDueDates(
     const endD = parseLocalYmd(end);
     while (cur <= endD) {
       const ymd = ymdFromDate(cur);
-      if (ymd >= start && ymd <= end) {
-        if (!onlyFuture || ymd >= today) out.push(ymd);
-      }
+      if (ymd >= start && ymd <= end && ymd <= today) out.push(ymd);
       cur = new Date(cur.getFullYear(), cur.getMonth() + 1, day);
     }
     return out;
@@ -44,17 +39,38 @@ export function recurringDueDates(
   const endD = parseLocalYmd(end);
   while (cur <= endD) {
     const ymd = ymdFromDate(cur);
-    if (!onlyFuture || ymd >= today) out.push(ymd);
+    if (ymd <= today) out.push(ymd);
     cur.setDate(cur.getDate() + 7);
   }
-  return out;
+  return out.filter((ymd) => ymd >= start && ymd <= end);
 }
 
 export function expenseRecurringKey(recurringId: number, tarih: string): string {
   return `${recurringId}:${toInputDateValue(tarih) || tarih}`;
 }
 
-/** Eksik tekrarlayan gider satırlarını oluşturur. */
+/** Otomatik oluşturulmuş, vadesi gelmemiş (tarih > bugün) giderleri listeden çıkarır. */
+export function removeFutureRecurringExpenses(expenses: ErpExpense[]): {
+  expenses: ErpExpense[];
+  removed: number;
+} {
+  const today = todayStr();
+  const kept: ErpExpense[] = [];
+  let removed = 0;
+  for (const e of expenses) {
+    if (e.recurringId != null) {
+      const d = toInputDateValue(e.tarih) || e.tarih.slice(0, 10);
+      if (d > today) {
+        removed++;
+        continue;
+      }
+    }
+    kept.push(e);
+  }
+  return { expenses: kept, removed };
+}
+
+/** Eksik tekrarlayan gider satırlarını oluşturur (yalnızca vadesi gelmiş tarihler). */
 export function applyRecurringExpenses(
   expenses: ErpExpense[],
   rules: ErpRecurringExpense[],
@@ -73,7 +89,7 @@ export function applyRecurringExpenses(
 
   for (const rule of updatedRules) {
     if (!rule.active) continue;
-    const dates = recurringDueDates(rule, true);
+    const dates = recurringDueDates(rule);
     for (const tarih of dates) {
       const key = expenseRecurringKey(rule.id, tarih);
       if (existing.has(key)) continue;

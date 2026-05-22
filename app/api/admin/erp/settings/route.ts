@@ -17,7 +17,16 @@ export async function PUT(request: NextRequest) {
   const expCats = Array.isArray(body?.expCats)
     ? body.expCats.map(String).filter(Boolean)
     : current.expCats;
+  const expSubCats =
+    body?.expSubCats && typeof body.expSubCats === "object" && !Array.isArray(body.expSubCats)
+      ? Object.fromEntries(
+          Object.entries(body.expSubCats as Record<string, unknown>).map(([k, v]) => [
+            String(k),
+            Array.isArray(v) ? v.map(String).filter(Boolean) : [],
+          ])
+        )
+      : current.expSubCats ?? {};
 
-  const settings = await saveErpSettings({ orderCats, expCats });
+  const settings = await saveErpSettings({ orderCats, expCats, expSubCats });
   return NextResponse.json({ settings });
 }

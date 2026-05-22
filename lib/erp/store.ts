@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { kvGetJson, kvSetJson, isKvAvailable } from "@/lib/kv-adapter";
 import type { ErpData, ErpExpense, ErpOrder, ErpRecurringExpense, ErpSettings } from "./types";
-import { applyRecurringExpenses } from "./recurring";
+import { applyRecurringExpenses, removeFutureRecurringExpenses } from "./recurring";
 import {
   type ErpImportMode,
   type ErpImportPayload,
@@ -223,19 +223,20 @@ async function writeRecurring(rules: ErpRecurringExpense[]): Promise<void> {
 
 async function syncRecurringExpenses(expenses: ErpExpense[]): Promise<ErpExpense[]> {
   const rules = await readRecurring();
+  const { expenses: withoutFuture, removed } = removeFutureRecurringExpenses(expenses);
   let idSeq = 0;
   const peekMax =
-    expenses.reduce((m, e) => Math.max(m, e.id), 0) +
+    withoutFuture.reduce((m, e) => Math.max(m, e.id), 0) +
     rules.reduce((m, r) => Math.max(m, r.id), 0);
   const kvNext = await kvGetJson<number>(KV_NEXT_ID);
   let cursor =
     typeof kvNext === "number" && kvNext > 0 ? kvNext : peekMax;
-  const result = applyRecurringExpenses(expenses, rules, () => {
+  const result = applyRecurringExpenses(withoutFuture, rules, () => {
     cursor += 1;
     idSeq = cursor;
     return cursor;
   });
-  if (result.created > 0) {
+  if (result.created > 0 || removed > 0) {
     await writeExpenses(result.expenses);
     if (await isKvAvailable()) await kvSetJson(KV_NEXT_ID, idSeq);
   }

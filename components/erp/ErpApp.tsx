@@ -86,6 +86,7 @@ type OrderForm = {
   soyad: string;
   tel: string;
   tarih: string;
+  bitis: string;
   cat: string;
   tur: string;
   adet: number;
@@ -94,6 +95,11 @@ type OrderForm = {
   not_icerik: string;
   bilgi: string;
 };
+
+function defaultOrderBitis(tarih: string): string {
+  if (!tarih) return "";
+  return addWorkdays(tarih, 25).toISOString().slice(0, 10);
+}
 
 type ExpenseForm = {
   tarih: string;
@@ -114,19 +120,23 @@ type RecurringForm = {
   endDate: string;
 };
 
-const emptyOrderForm = (): OrderForm => ({
-  ad: "",
-  soyad: "",
-  tel: "",
-  tarih: todayStr(),
-  cat: "",
-  tur: "PLX",
-  adet: 1,
-  toplam: "",
-  kapora: "",
-  not_icerik: "",
-  bilgi: "",
-});
+const emptyOrderForm = (): OrderForm => {
+  const tarih = todayStr();
+  return {
+    ad: "",
+    soyad: "",
+    tel: "",
+    tarih,
+    bitis: defaultOrderBitis(tarih),
+    cat: "",
+    tur: "PLX",
+    adet: 1,
+    toplam: "",
+    kapora: "",
+    not_icerik: "",
+    bilgi: "",
+  };
+};
 
 const emptyRecurringForm = (kat = "", acik = ""): RecurringForm => ({
   kat,
@@ -317,6 +327,7 @@ export default function ErpApp() {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [orderForm, setOrderForm] = useState<OrderForm>(emptyOrderForm);
+  const [bitisManual, setBitisManual] = useState(false);
   const [expForm, setExpForm] = useState<ExpenseForm>({
     tarih: todayStr(),
     kat: "",
@@ -543,14 +554,9 @@ export default function ErpApp() {
     return expenseSort.asc ? " ↑" : " ↓";
   };
 
-  const bitisHint = useMemo(() => {
-    if (!orderForm.tarih) return "";
-    const b = addWorkdays(orderForm.tarih, 25);
-    return "📅 Tahmini bitiş: " + b.toLocaleDateString("tr-TR") + " (25 iş günü)";
-  }, [orderForm.tarih]);
-
   const openOrderModal = useCallback(() => {
     setEditId(null);
+    setBitisManual(false);
     const cats = settings.orderCats;
     setOrderForm({
       ...emptyOrderForm(),
@@ -563,12 +569,17 @@ export default function ErpApp() {
     (id: number) => {
       const o = orders.find((x) => x.id === id);
       if (!o) return;
+      const tarih = o.tarih || "";
+      const defBitis = defaultOrderBitis(tarih);
+      const bitis = o.bitis || defBitis;
       setEditId(id);
+      setBitisManual(!!bitis && bitis !== defBitis);
       setOrderForm({
         ad: o.ad,
         soyad: o.soyad,
         tel: o.tel || "",
-        tarih: o.tarih || "",
+        tarih,
+        bitis,
         cat: o.cat || settings.orderCats[0] || "",
         tur: o.tur || "PLX",
         adet: o.adet || 1,
@@ -593,7 +604,11 @@ export default function ErpApp() {
       alert("Sipariş tarihi zorunlu!");
       return;
     }
-    const bitis = addWorkdays(orderForm.tarih, 25).toISOString().slice(0, 10);
+    const bitis = orderForm.bitis.trim() || defaultOrderBitis(orderForm.tarih);
+    if (!bitis) {
+      alert("Bitiş tarihi zorunlu!");
+      return;
+    }
     const kapora = +orderForm.kapora || 0;
     const existing = editId != null ? orders.find((o) => o.id === editId) : null;
     const tahsilat =
@@ -882,6 +897,7 @@ export default function ErpApp() {
     const expSubCats = { ...(settings.expSubCats ?? {}), [v]: [] };
     const next = { ...settings, expCats: [...settings.expCats, v], expSubCats };
     setNewExpCat("");
+    setSettings(next);
     void persistSettings(next);
   }, [newExpCat, settings, persistSettings]);
 
@@ -898,8 +914,10 @@ export default function ErpApp() {
         ...(settings.expSubCats ?? {}),
         [parentKat]: [...list, v],
       };
+      const next = { ...settings, expSubCats };
       setNewExpSubCatByParent((prev) => ({ ...prev, [parentKat]: "" }));
-      void persistSettings({ ...settings, expSubCats });
+      setSettings(next);
+      void persistSettings(next);
     },
     [newExpSubCatByParent, settings, persistSettings]
   );
@@ -909,7 +927,9 @@ export default function ErpApp() {
       const list = [...expSubCatsFor(settings, parentKat)];
       list.splice(idx, 1);
       const expSubCats = { ...(settings.expSubCats ?? {}), [parentKat]: list };
-      void persistSettings({ ...settings, expSubCats });
+      const next = { ...settings, expSubCats };
+      setSettings(next);
+      void persistSettings(next);
     },
     [settings, persistSettings]
   );
@@ -1279,7 +1299,8 @@ Saygılarımla`;
     const faturali = expenses.filter((e) => e.fatno || e.dosya).length;
     const cats: Record<string, number> = {};
     expenses.forEach((e) => {
-      cats[e.kat] = (cats[e.kat] || 0) + (+e.tutar || 0);
+      const key = e.subkat?.trim() ? `${e.kat} / ${e.subkat.trim()}` : e.kat;
+      cats[key] = (cats[key] || 0) + (+e.tutar || 0);
     });
     const months: Record<string, number> = {};
     expenses.forEach((e) => {
@@ -2000,8 +2021,9 @@ Saygılarımla`;
               <div className="card" style={{ marginBottom: 14 }}>
                 <div className="card-title">Tekrarlayan Giderler</div>
                 <p className="hint" style={{ marginBottom: 12 }}>
-                  Kira, maaş, elektrik gibi düzenli giderleri tanımlayın. Bugünden itibaren seçilen
-                  aralıkta otomatik gider satırı oluşturulur (geçmiş aylar elle girilmiş sayılır).
+                  Kira, maaş vb. düzenli giderler. Kayıt yalnızca ilgili gün geldiğinde gider
+                  listesine eklenir (gelecek aylar şimdiden görünmez). Bugünden önceki dönemleri
+                  elle girdiyseniz başlangıç tarihini bugün veya sonrası yapın.
                 </p>
                 <div className="fg c3">
                   <div>
@@ -2816,10 +2838,57 @@ Saygılarımla`;
                 type="date"
                 id="f-tarih"
                 value={orderForm.tarih}
-                onChange={(e) =>
-                  setOrderForm((f) => ({ ...f, tarih: e.target.value }))
-                }
+                onChange={(e) => {
+                  const tarih = e.target.value;
+                  setOrderForm((f) => ({
+                    ...f,
+                    tarih,
+                    bitis: bitisManual ? f.bitis : defaultOrderBitis(tarih),
+                  }));
+                }}
               />
+            </div>
+          </div>
+          <div className="fg c2">
+            <div>
+              <div className="fl">Bitiş Tarihi</div>
+              <input
+                type="date"
+                id="f-bitis"
+                value={orderForm.bitis}
+                onChange={(e) => {
+                  setBitisManual(true);
+                  setOrderForm((f) => ({ ...f, bitis: e.target.value }));
+                }}
+              />
+              {bitisManual ? (
+                <button
+                  type="button"
+                  className="hint"
+                  style={{
+                    marginTop: 4,
+                    padding: 0,
+                    border: "none",
+                    background: "none",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    color: "var(--accent)",
+                  }}
+                  onClick={() => {
+                    setBitisManual(false);
+                    setOrderForm((f) => ({
+                      ...f,
+                      bitis: defaultOrderBitis(f.tarih),
+                    }));
+                  }}
+                >
+                  ↺ 25 iş gününe sıfırla
+                </button>
+              ) : (
+                <div className="hint" style={{ marginTop: 4 }}>
+                  Otomatik: sipariş tarihinden 25 iş günü
+                </div>
+              )}
             </div>
           </div>
           <div className="fg c3">
@@ -2919,9 +2988,7 @@ Saygılarımla`;
               />
             </div>
           </div>
-          <div className="hint" id="f-bitis-hint">
-            {bitisHint}
-          </div>
+
           <div
             style={{
               display: "flex",
