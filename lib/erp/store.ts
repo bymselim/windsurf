@@ -223,7 +223,7 @@ async function writeRecurring(rules: ErpRecurringExpense[]): Promise<void> {
 
 async function syncRecurringExpenses(expenses: ErpExpense[]): Promise<ErpExpense[]> {
   const rules = await readRecurring();
-  const { expenses: withoutFuture, removed } = removeFutureRecurringExpenses(expenses);
+  const { expenses: withoutFuture, removed } = removeFutureRecurringExpenses(expenses, rules);
   let idSeq = 0;
   const peekMax =
     withoutFuture.reduce((m, e) => Math.max(m, e.id), 0) +

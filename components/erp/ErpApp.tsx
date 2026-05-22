@@ -27,6 +27,7 @@ import {
   toggleErpRecurringActive,
   updateErpExpense,
   updateErpOrder,
+  updateErpRecurring,
 } from "@/components/erp/api";
 import { ErpImportPanel } from "@/components/erp/ErpImportPanel";
 import { APP_VERSION } from "@/lib/app-version";
@@ -193,7 +194,7 @@ function renderBarChart(
   const sorted = [...entries].sort((a, b) => b[1] - a[1]);
   const slice = opts?.maxItems ? sorted.slice(0, opts.maxItems) : sorted;
   const max = Math.max(...slice.map(([, v]) => v), 1);
-  const labelFn = opts?.labelFn ?? ((k: string) => k.split("/")[0].trim());
+  const labelFn = opts?.labelFn ?? ((k: string) => k.trim());
   return slice.map(([k, v], i) => {
     const pct = Math.round((v / max) * 100);
     return (
@@ -338,6 +339,7 @@ export default function ErpApp() {
   });
   const [expNewSubkat, setExpNewSubkat] = useState("");
   const [recForm, setRecForm] = useState<RecurringForm>(() => emptyRecurringForm());
+  const [recEditId, setRecEditId] = useState<number | null>(null);
   const [expFile, setExpFile] = useState<File | null>(null);
   const [fileLabel, setFileLabel] = useState("Tıkla veya sürükle (PDF, JPG, PNG)");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -946,26 +948,53 @@ export default function ErpApp() {
     }
     const finalSubkat = subkat.trim();
     if (finalSubkat) await ensureExpSubkat(kat, finalSubkat);
-    showLoading("Tekrarlayan gider kaydediliyor...");
+    const payload = {
+      kat,
+      subkat: finalSubkat,
+      acik: acik.trim(),
+      tutar: +tutar,
+      freq,
+      startDate,
+      endDate,
+    };
+    showLoading(recEditId != null ? "Güncelleniyor..." : "Tekrarlayan gider kaydediliyor...");
     try {
-      const { rule, expenses: nextExpenses } = await createErpRecurring({
-        kat,
-        subkat: finalSubkat,
-        acik: acik.trim(),
-        tutar: +tutar,
-        freq,
-        startDate,
-        endDate,
-      });
-      setRecurringExpenses((prev) => [rule, ...prev]);
-      setExpenses(nextExpenses);
-      setRecForm(emptyRecurringForm(kat, acik.trim()));
+      if (recEditId != null) {
+        const { rule, expenses: nextExpenses } = await updateErpRecurring(recEditId, payload);
+        setRecurringExpenses((prev) => prev.map((r) => (r.id === recEditId ? rule : r)));
+        setExpenses(nextExpenses);
+        setRecEditId(null);
+        setRecForm(emptyRecurringForm());
+      } else {
+        const { rule, expenses: nextExpenses } = await createErpRecurring(payload);
+        setRecurringExpenses((prev) => [rule, ...prev]);
+        setExpenses(nextExpenses);
+        setRecForm(emptyRecurringForm(kat, acik.trim()));
+      }
     } catch (e) {
       alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
     } finally {
       hideLoading();
     }
-  }, [recForm, ensureExpSubkat, showLoading, hideLoading]);
+  }, [recForm, recEditId, ensureExpSubkat, showLoading, hideLoading]);
+
+  const editRecurring = useCallback((r: ErpRecurringExpense) => {
+    setRecEditId(r.id);
+    setRecForm({
+      kat: r.kat,
+      subkat: r.subkat || "",
+      acik: r.acik,
+      tutar: r.tutar ? String(r.tutar) : "",
+      freq: r.freq,
+      startDate: toInputDateValue(r.startDate) || r.startDate.slice(0, 10),
+      endDate: toInputDateValue(r.endDate) || r.endDate.slice(0, 10),
+    });
+  }, []);
+
+  const cancelRecurringEdit = useCallback(() => {
+    setRecEditId(null);
+    setRecForm(emptyRecurringForm());
+  }, []);
 
   const removeRecurring = useCallback(
     async (id: number) => {
@@ -1250,7 +1279,8 @@ Saygılarımla`;
 
     const expCats: Record<string, number> = {};
     expenses.forEach((e) => {
-      expCats[e.kat] = (expCats[e.kat] || 0) + (+e.tutar || 0);
+      const key = e.subkat?.trim() ? `${e.kat} / ${e.subkat.trim()}` : e.kat;
+      expCats[key] = (expCats[key] || 0) + (+e.tutar || 0);
     });
     const expCatEntries = (Object.entries(expCats) as [string, number][]).filter(
       ([k]) => k.trim().localeCompare("Diğer", "tr", { sensitivity: "base" }) !== 0
@@ -1727,7 +1757,9 @@ Saygılarımla`;
                             <td style={{ color: "var(--green)", fontWeight: 500 }}>
                               {fmtM(o.kapora)}
                             </td>
-                            <td style={{ fontWeight: 500 }}>{fmtM(o.toplam)}</td>
+                            <td style={{ color: "var(--amber)", fontWeight: 500 }}>
+                              {fmtM(o.toplam)}
+                            </td>
                             <td>
                               <span className={`badge ${STATUS_COLORS[st]}`}>
                                 {STATUS_LABELS[st]}
@@ -1882,7 +1914,9 @@ Saygılarımla`;
                                 {icerikTxt}
                               </td>
                               <td>{fmtM(o.kapora)}</td>
-                              <td style={{ fontWeight: 500 }}>{fmtM(o.toplam)}</td>
+                              <td style={{ color: "var(--amber)", fontWeight: 500 }}>
+                                {fmtM(o.toplam)}
+                              </td>
                               <td className="b">
                                 <span
                                   dangerouslySetInnerHTML={{
@@ -2114,9 +2148,14 @@ Saygılarımla`;
                     />
                   </div>
                 </div>
-                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12 }}>
+                  {recEditId != null ? (
+                    <button type="button" className="btn sm" onClick={cancelRecurringEdit}>
+                      İptal
+                    </button>
+                  ) : null}
                   <button type="button" className="btn sm primary" onClick={() => void saveRecurring()}>
-                    + Tekrarlayan Gider Ekle
+                    {recEditId != null ? "Güncelle" : "+ Tekrarlayan Gider Ekle"}
                   </button>
                 </div>
                 {recurringExpenses.length ? (
@@ -2158,6 +2197,13 @@ Saygılarımla`;
                             </td>
                             <td>
                               <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                                <button
+                                  type="button"
+                                  className="btn sm"
+                                  onClick={() => editRecurring(r)}
+                                >
+                                  Düzenle
+                                </button>
                                 <button
                                   type="button"
                                   className="btn sm"

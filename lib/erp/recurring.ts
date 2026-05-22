@@ -49,16 +49,24 @@ export function expenseRecurringKey(recurringId: number, tarih: string): string 
   return `${recurringId}:${toInputDateValue(tarih) || tarih}`;
 }
 
-/** Otomatik oluşturulmuş, vadesi gelmemiş (tarih > bugün) giderleri listeden çıkarır. */
-export function removeFutureRecurringExpenses(expenses: ErpExpense[]): {
+/** Otomatik oluşturulmuş, vadesi gelmemiş giderleri listeden çıkarır (pasif kurallara dokunmaz). */
+export function removeFutureRecurringExpenses(
+  expenses: ErpExpense[],
+  rules: ErpRecurringExpense[] = []
+): {
   expenses: ErpExpense[];
   removed: number;
 } {
   const today = todayStr();
+  const inactiveIds = new Set(rules.filter((r) => !r.active).map((r) => r.id));
   const kept: ErpExpense[] = [];
   let removed = 0;
   for (const e of expenses) {
     if (e.recurringId != null) {
+      if (inactiveIds.has(e.recurringId)) {
+        kept.push(e);
+        continue;
+      }
       const d = toInputDateValue(e.tarih) || e.tarih.slice(0, 10);
       if (d > today) {
         removed++;

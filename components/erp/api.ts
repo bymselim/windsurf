@@ -157,6 +157,21 @@ export async function deleteErpRecurring(id: number): Promise<void> {
   }
 }
 
+export async function updateErpRecurring(
+  id: number,
+  payload: Record<string, unknown>
+): Promise<{ rule: ErpRecurringExpense; expenses: ErpExpense[] }> {
+  const res = await fetch(`/api/admin/erp/recurring/${id}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: headers(),
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? "Güncelleme başarısız");
+  return json;
+}
+
 export async function toggleErpRecurringActive(
   id: number,
   active: boolean
