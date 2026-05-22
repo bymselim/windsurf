@@ -14,16 +14,20 @@ import {
 import {
   createErpExpense,
   createErpOrder,
+  createErpRecurring,
   deleteErpExpense,
   deleteErpOrder,
+  deleteErpRecurring,
   fetchErpData,
   saveErpSettings,
   toggleErpOrderDone,
+  toggleErpRecurringActive,
   updateErpExpense,
   updateErpOrder,
 } from "@/components/erp/api";
 import { ErpImportPanel } from "@/components/erp/ErpImportPanel";
-import type { ErpExpense, ErpOrder, ErpSettings } from "@/lib/erp/types";
+import { APP_VERSION } from "@/lib/app-version";
+import type { ErpExpense, ErpOrder, ErpRecurringExpense, ErpSettings } from "@/lib/erp/types";
 import {
   addWorkdays,
   assignOrderNums,
@@ -82,7 +86,6 @@ type OrderForm = {
   adet: number;
   toplam: string;
   kapora: string;
-  tahsilat: string;
   not_icerik: string;
   bilgi: string;
 };
@@ -90,9 +93,20 @@ type OrderForm = {
 type ExpenseForm = {
   tarih: string;
   kat: string;
+  subkat: string;
   acik: string;
   tutar: string;
   fatno: string;
+};
+
+type RecurringForm = {
+  kat: string;
+  subkat: string;
+  acik: string;
+  tutar: string;
+  freq: "monthly" | "weekly";
+  startDate: string;
+  endDate: string;
 };
 
 const emptyOrderForm = (): OrderForm => ({
@@ -105,10 +119,23 @@ const emptyOrderForm = (): OrderForm => ({
   adet: 1,
   toplam: "",
   kapora: "",
-  tahsilat: "",
   not_icerik: "",
   bilgi: "",
 });
+
+const emptyRecurringForm = (kat = "", acik = ""): RecurringForm => ({
+  kat,
+  subkat: "",
+  acik,
+  tutar: "",
+  freq: "monthly",
+  startDate: todayStr(),
+  endDate: "",
+});
+
+function expSubCatsFor(settings: ErpSettings, kat: string): string[] {
+  return settings.expSubCats?.[kat] ?? [];
+}
 
 function escHtml(s: string): string {
   return String(s)
@@ -270,7 +297,9 @@ export default function ErpApp() {
   const [settings, setSettings] = useState<ErpSettings>({
     orderCats: [],
     expCats: [],
+    expSubCats: {},
   });
+  const [recurringExpenses, setRecurringExpenses] = useState<ErpRecurringExpense[]>([]);
   const [tab, setTab] = useState<Tab>("dashboard");
   const [loading, setLoading] = useState(true);
   const [loadingMsg, setLoadingMsg] = useState("Yükleniyor...");
@@ -286,10 +315,13 @@ export default function ErpApp() {
   const [expForm, setExpForm] = useState<ExpenseForm>({
     tarih: todayStr(),
     kat: "",
+    subkat: "",
     acik: "",
     tutar: "",
     fatno: "",
   });
+  const [expNewSubkat, setExpNewSubkat] = useState("");
+  const [recForm, setRecForm] = useState<RecurringForm>(() => emptyRecurringForm());
   const [expFile, setExpFile] = useState<File | null>(null);
   const [fileLabel, setFileLabel] = useState("Tıkla veya sürükle (PDF, JPG, PNG)");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -311,6 +343,7 @@ export default function ErpApp() {
 
   const [newOrderCat, setNewOrderCat] = useState("");
   const [newExpCat, setNewExpCat] = useState("");
+  const [newExpSubCatByParent, setNewExpSubCatByParent] = useState<Record<string, string>>({});
   const [emailBody, setEmailBody] = useState("");
 
   const topbarDate = useMemo(
@@ -338,12 +371,21 @@ export default function ErpApp() {
 
   const hideLoading = useCallback(() => setLoading(false), []);
 
-  const applyErpData = useCallback((data: { orders: ErpOrder[]; expenses: ErpExpense[]; settings: ErpSettings }) => {
-    setOrders(data.orders);
-    setExpenses(data.expenses);
-    setSettings(data.settings);
-    setSyncOk(true);
-  }, []);
+  const applyErpData = useCallback(
+    (data: {
+      orders: ErpOrder[];
+      expenses: ErpExpense[];
+      settings: ErpSettings;
+      recurringExpenses?: ErpRecurringExpense[];
+    }) => {
+      setOrders(data.orders);
+      setExpenses(data.expenses);
+      setSettings(data.settings);
+      setRecurringExpenses(data.recurringExpenses ?? []);
+      setSyncOk(true);
+    },
+    []
+  );
 
   const loadData = useCallback(async () => {
     showLoading("Veriler yükleniyor...");
@@ -463,7 +505,6 @@ export default function ErpApp() {
         adet: o.adet || 1,
         toplam: o.toplam ? String(o.toplam) : "",
         kapora: o.kapora ? String(o.kapora) : "",
-        tahsilat: o.tahsilat ? String(o.tahsilat) : "",
         not_icerik: o.not_icerik || "",
         bilgi: o.bilgi || "",
       });
@@ -485,7 +526,9 @@ export default function ErpApp() {
     }
     const bitis = addWorkdays(orderForm.tarih, 25).toISOString().slice(0, 10);
     const kapora = +orderForm.kapora || 0;
-    const tahsilat = orderForm.tahsilat ? +orderForm.tahsilat : kapora;
+    const existing = editId != null ? orders.find((o) => o.id === editId) : null;
+    const tahsilat =
+      existing?.durum === "biten" ? +existing.toplam || 0 : kapora;
     const payload = {
       ad,
       soyad,
@@ -518,10 +561,18 @@ export default function ErpApp() {
     } finally {
       hideLoading();
     }
-  }, [orderForm, editId, showLoading, hideLoading]);
+  }, [orderForm, editId, orders, showLoading, hideLoading]);
 
   const toggleDone = useCallback(
     async (id: number) => {
+      const o = orders.find((x) => x.id === id);
+      if (!o) return;
+      if (o.durum !== "biten") {
+        const ok = confirm(
+          "Tam tahsilat yapıldı, siparişi kapatıyorum. Onaylıyor musunuz?"
+        );
+        if (!ok) return;
+      }
       showLoading("Güncelleniyor...");
       try {
         const updated = await toggleErpOrderDone(id);
@@ -532,7 +583,7 @@ export default function ErpApp() {
         hideLoading();
       }
     },
-    [showLoading, hideLoading]
+    [orders, showLoading, hideLoading]
   );
 
   const setAskida = useCallback(
@@ -574,10 +625,12 @@ export default function ErpApp() {
     setExpForm({
       tarih: todayStr(),
       kat: settings.expCats[0] ?? "",
+      subkat: "",
       acik: "",
       tutar: "",
       fatno: "",
     });
+    setExpNewSubkat("");
     setExpFile(null);
     setFileLabel("Tıkla veya sürükle (PDF, JPG, PNG)");
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -598,10 +651,12 @@ export default function ErpApp() {
       setExpForm({
         tarih: toInputDateValue(e.tarih) || todayStr(),
         kat: e.kat || settings.expCats[0] || "",
+        subkat: e.subkat || "",
         acik: e.acik || "",
         tutar: e.tutar ? String(e.tutar) : "",
         fatno: e.fatno || "",
       });
+      setExpNewSubkat("");
       setExpFile(null);
       setFileLabel(
         e.dosya
@@ -636,15 +691,41 @@ export default function ErpApp() {
     }
   };
 
+  const ensureExpSubkat = useCallback(
+    async (kat: string, subkat: string): Promise<ErpSettings> => {
+      const v = subkat.trim();
+      if (!v || !kat) return settings;
+      const list = expSubCatsFor(settings, kat);
+      if (list.includes(v)) return settings;
+      const expSubCats = {
+        ...(settings.expSubCats ?? {}),
+        [kat]: [...list, v],
+      };
+      const next = { ...settings, expSubCats };
+      const saved = await saveErpSettings(next);
+      setSettings(saved);
+      return saved;
+    },
+    [settings]
+  );
+
   const saveExpense = useCallback(async () => {
-    const { tarih, kat, acik, tutar, fatno } = expForm;
+    const { tarih, kat, subkat, acik, tutar, fatno } = expForm;
     if (!tarih || !+tutar || !acik.trim()) {
       alert("Tarih, açıklama ve tutar zorunlu!");
       return;
     }
+    let finalSubkat = subkat.trim();
+    if (finalSubkat === "__new__") {
+      finalSubkat = expNewSubkat.trim();
+    }
+    if (finalSubkat) {
+      await ensureExpSubkat(kat, finalSubkat);
+    }
     const form = new FormData();
     form.append("tarih", tarih);
     form.append("kat", kat);
+    form.append("subkat", finalSubkat);
     form.append("acik", acik.trim());
     form.append("tutar", String(+tutar));
     form.append("fatno", fatno.trim());
@@ -664,7 +745,16 @@ export default function ErpApp() {
     } finally {
       hideLoading();
     }
-  }, [expForm, expFile, expEditId, showLoading, hideLoading, closeExpModal]);
+  }, [
+    expForm,
+    expNewSubkat,
+    expFile,
+    expEditId,
+    ensureExpSubkat,
+    showLoading,
+    hideLoading,
+    closeExpModal,
+  ]);
 
   const delExpense = useCallback(
     async (id: number) => {
@@ -720,16 +810,114 @@ export default function ErpApp() {
       setNewExpCat("");
       return;
     }
-    const next = { ...settings, expCats: [...settings.expCats, v] };
+    const expSubCats = { ...(settings.expSubCats ?? {}), [v]: [] };
+    const next = { ...settings, expCats: [...settings.expCats, v], expSubCats };
     setNewExpCat("");
     void persistSettings(next);
   }, [newExpCat, settings, persistSettings]);
 
+  const addExpSubCat = useCallback(
+    (parentKat: string) => {
+      const v = (newExpSubCatByParent[parentKat] ?? "").trim();
+      if (!v) return;
+      const list = expSubCatsFor(settings, parentKat);
+      if (list.includes(v)) {
+        setNewExpSubCatByParent((prev) => ({ ...prev, [parentKat]: "" }));
+        return;
+      }
+      const expSubCats = {
+        ...(settings.expSubCats ?? {}),
+        [parentKat]: [...list, v],
+      };
+      setNewExpSubCatByParent((prev) => ({ ...prev, [parentKat]: "" }));
+      void persistSettings({ ...settings, expSubCats });
+    },
+    [newExpSubCatByParent, settings, persistSettings]
+  );
+
+  const delExpSubCat = useCallback(
+    (parentKat: string, idx: number) => {
+      const list = [...expSubCatsFor(settings, parentKat)];
+      list.splice(idx, 1);
+      const expSubCats = { ...(settings.expSubCats ?? {}), [parentKat]: list };
+      void persistSettings({ ...settings, expSubCats });
+    },
+    [settings, persistSettings]
+  );
+
+  const saveRecurring = useCallback(async () => {
+    const { kat, subkat, acik, tutar, freq, startDate, endDate } = recForm;
+    if (!kat || !acik.trim() || !+tutar || !startDate || !endDate) {
+      alert("Kategori, açıklama, tutar ve tarih aralığı zorunlu!");
+      return;
+    }
+    if (startDate > endDate) {
+      alert("Bitiş tarihi başlangıçtan önce olamaz.");
+      return;
+    }
+    const finalSubkat = subkat.trim();
+    if (finalSubkat) await ensureExpSubkat(kat, finalSubkat);
+    showLoading("Tekrarlayan gider kaydediliyor...");
+    try {
+      const { rule, expenses: nextExpenses } = await createErpRecurring({
+        kat,
+        subkat: finalSubkat,
+        acik: acik.trim(),
+        tutar: +tutar,
+        freq,
+        startDate,
+        endDate,
+      });
+      setRecurringExpenses((prev) => [rule, ...prev]);
+      setExpenses(nextExpenses);
+      setRecForm(emptyRecurringForm(kat, acik.trim()));
+    } catch (e) {
+      alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+    } finally {
+      hideLoading();
+    }
+  }, [recForm, ensureExpSubkat, showLoading, hideLoading]);
+
+  const removeRecurring = useCallback(
+    async (id: number) => {
+      if (!confirm("Bu tekrarlayan gider kuralını silmek istiyor musunuz?")) return;
+      showLoading("Siliniyor...");
+      try {
+        await deleteErpRecurring(id);
+        setRecurringExpenses((prev) => prev.filter((r) => r.id !== id));
+      } catch (e) {
+        alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+      } finally {
+        hideLoading();
+      }
+    },
+    [showLoading, hideLoading]
+  );
+
+  const toggleRecurringActive = useCallback(
+    async (id: number, active: boolean) => {
+      showLoading("Güncelleniyor...");
+      try {
+        const { rule, expenses: nextExpenses } = await toggleErpRecurringActive(id, active);
+        setRecurringExpenses((prev) => prev.map((r) => (r.id === id ? rule : r)));
+        setExpenses(nextExpenses);
+      } catch (e) {
+        alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+      } finally {
+        hideLoading();
+      }
+    },
+    [showLoading, hideLoading]
+  );
+
   const delExpCat = useCallback(
     (idx: number) => {
       if (settings.expCats.length <= 1) return;
+      const removed = settings.expCats[idx];
       const expCats = settings.expCats.filter((_, i) => i !== idx);
-      void persistSettings({ ...settings, expCats });
+      const expSubCats = { ...(settings.expSubCats ?? {}) };
+      delete expSubCats[removed];
+      void persistSettings({ ...settings, expCats, expSubCats });
     },
     [settings, persistSettings]
   );
@@ -1187,7 +1375,7 @@ Saygılarımla`;
               ) : syncOk ? (
                 <>
                   <span className="sync-dot" />
-                  Bağlı
+                  Bağlı · v{APP_VERSION}
                 </>
               ) : (
                 <>
@@ -1424,15 +1612,14 @@ Saygılarımla`;
                         <th>Müşteri</th>
                         <th>Kategori</th>
                         <th>Bitiş</th>
-                        <th>Tahsilat</th>
-                        <th>Kalan</th>
+                        <th>Kapora</th>
+                        <th>Toplam</th>
                         <th>Durum</th>
                       </tr>
                     </thead>
                     <tbody id="d-orders">
                       {orders.slice(0, 6).map((o) => {
                         const st = getOrderStatus(o);
-                        const kalan = orderKalan(o);
                         return (
                           <tr key={o.id}>
                             <td style={{ fontSize: 11, color: "var(--text3)" }}>
@@ -1448,16 +1635,9 @@ Saygılarımla`;
                             </td>
                             <td style={{ fontSize: 12 }}>{fmtDate(o.bitis)}</td>
                             <td style={{ color: "var(--green)", fontWeight: 500 }}>
-                              {fmtM(o.tahsilat)}
+                              {fmtM(o.kapora)}
                             </td>
-                            <td
-                              style={{
-                                color: kalan > 0 ? "var(--amber)" : "var(--text3)",
-                                fontWeight: kalan > 0 ? 500 : undefined,
-                              }}
-                            >
-                              {kalan > 0 ? fmtM(kalan) : "—"}
-                            </td>
+                            <td style={{ fontWeight: 500 }}>{fmtM(o.toplam)}</td>
                             <td>
                               <span className={`badge ${STATUS_COLORS[st]}`}>
                                 {STATUS_LABELS[st]}
@@ -1540,10 +1720,10 @@ Saygılarımla`;
                           Kategori{sortIndicator("cat")}
                         </th>
                         <th
-                          className={`sortable${orderSort.key === "bilgi" ? " sorted" : ""}`}
-                          onClick={() => toggleOrderSort("bilgi")}
+                          className={`sortable${orderSort.key === "not_icerik" ? " sorted" : ""}`}
+                          onClick={() => toggleOrderSort("not_icerik")}
                         >
-                          Özel Bilgi{sortIndicator("bilgi")}
+                          Sipariş İçeriği{sortIndicator("not_icerik")}
                         </th>
                         <th
                           className={`sortable${orderSort.key === "kapora" ? " sorted" : ""}`}
@@ -1552,16 +1732,10 @@ Saygılarımla`;
                           Kapora{sortIndicator("kapora")}
                         </th>
                         <th
-                          className={`sortable${orderSort.key === "tahsilat" ? " sorted" : ""}`}
-                          onClick={() => toggleOrderSort("tahsilat")}
+                          className={`sortable${orderSort.key === "toplam" ? " sorted" : ""}`}
+                          onClick={() => toggleOrderSort("toplam")}
                         >
-                          Tahsilat{sortIndicator("tahsilat")}
-                        </th>
-                        <th
-                          className={`sortable${orderSort.key === "kalan" ? " sorted" : ""}`}
-                          onClick={() => toggleOrderSort("kalan")}
-                        >
-                          Kalan{sortIndicator("kalan")}
+                          Toplam Bedel{sortIndicator("toplam")}
                         </th>
                         <th
                           className={`sortable${orderSort.key === "ad" ? " sorted" : ""}`}
@@ -1582,9 +1756,9 @@ Saygılarımla`;
                       {sortedOrders.length ? (
                         sortedOrders.map((o) => {
                           const st = getOrderStatus(o);
-                          const kalan = orderKalan(o);
-                          const bilgiTxt = o.bilgi
-                            ? o.bilgi.slice(0, 40) + (o.bilgi.length > 40 ? "…" : "")
+                          const icerikTxt = o.not_icerik
+                            ? o.not_icerik.slice(0, 40) +
+                              (o.not_icerik.length > 40 ? "…" : "")
                             : "—";
                           return (
                             <tr key={o.id}>
@@ -1613,22 +1787,12 @@ Saygılarımla`;
                                   textOverflow: "ellipsis",
                                   whiteSpace: "nowrap",
                                 }}
-                                title={o.bilgi || ""}
+                                title={o.not_icerik || ""}
                               >
-                                {bilgiTxt}
+                                {icerikTxt}
                               </td>
                               <td>{fmtM(o.kapora)}</td>
-                              <td style={{ color: "var(--green)", fontWeight: 500 }}>
-                                {fmtM(o.tahsilat)}
-                              </td>
-                              <td
-                                style={{
-                                  color: kalan > 0 ? "var(--amber)" : "var(--text3)",
-                                  fontWeight: kalan > 0 ? 500 : undefined,
-                                }}
-                              >
-                                {kalan > 0 ? fmtM(kalan) : "✓"}
-                              </td>
+                              <td style={{ fontWeight: 500 }}>{fmtM(o.toplam)}</td>
                               <td className="b">
                                 <span
                                   dangerouslySetInnerHTML={{
@@ -1764,6 +1928,170 @@ Saygılarımla`;
                   </div>
                 </div>
               </div>
+              <div className="card" style={{ marginBottom: 14 }}>
+                <div className="card-title">Tekrarlayan Giderler</div>
+                <p className="hint" style={{ marginBottom: 12 }}>
+                  Kira, maaş, elektrik gibi düzenli giderleri tanımlayın. Bugünden itibaren seçilen
+                  aralıkta otomatik gider satırı oluşturulur (geçmiş aylar elle girilmiş sayılır).
+                </p>
+                <div className="fg c3">
+                  <div>
+                    <div className="fl">Kategori</div>
+                    <select
+                      value={recForm.kat}
+                      onChange={(e) =>
+                        setRecForm((f) => ({ ...f, kat: e.target.value, subkat: "" }))
+                      }
+                    >
+                      {buildCatOptions(settings.expCats, recForm.kat)}
+                    </select>
+                  </div>
+                  <div>
+                    <div className="fl">Alt Kategori</div>
+                    <select
+                      value={recForm.subkat}
+                      onChange={(e) =>
+                        setRecForm((f) => ({ ...f, subkat: e.target.value }))
+                      }
+                    >
+                      <option value="">—</option>
+                      {expSubCatsFor(settings, recForm.kat).map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <div className="fl">Periyot</div>
+                    <select
+                      value={recForm.freq}
+                      onChange={(e) =>
+                        setRecForm((f) => ({
+                          ...f,
+                          freq: e.target.value as "monthly" | "weekly",
+                        }))
+                      }
+                    >
+                      <option value="monthly">Aylık</option>
+                      <option value="weekly">Haftalık</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="fg c2">
+                  <div>
+                    <div className="fl">Açıklama</div>
+                    <input
+                      placeholder="Örn. Ofis kirası"
+                      value={recForm.acik}
+                      onChange={(e) =>
+                        setRecForm((f) => ({ ...f, acik: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <div className="fl">Tutar (₺)</div>
+                    <input
+                      type="number"
+                      placeholder="50000"
+                      value={recForm.tutar}
+                      onChange={(e) =>
+                        setRecForm((f) => ({ ...f, tutar: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="fg c2">
+                  <div>
+                    <div className="fl">Başlangıç</div>
+                    <input
+                      type="date"
+                      value={recForm.startDate}
+                      onChange={(e) =>
+                        setRecForm((f) => ({ ...f, startDate: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <div className="fl">Bitiş</div>
+                    <input
+                      type="date"
+                      value={recForm.endDate}
+                      onChange={(e) =>
+                        setRecForm((f) => ({ ...f, endDate: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+                  <button type="button" className="btn sm primary" onClick={() => void saveRecurring()}>
+                    + Tekrarlayan Gider Ekle
+                  </button>
+                </div>
+                {recurringExpenses.length ? (
+                  <div className="tbl-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Kategori</th>
+                          <th>Açıklama</th>
+                          <th>Tutar</th>
+                          <th>Periyot</th>
+                          <th>Aralık</th>
+                          <th>Durum</th>
+                          <th>İşlem</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recurringExpenses.map((r) => (
+                          <tr key={r.id}>
+                            <td>
+                              {escHtml(r.kat)}
+                              {r.subkat ? (
+                                <span style={{ color: "var(--text3)", fontSize: 11 }}>
+                                  {" "}
+                                  / {escHtml(r.subkat)}
+                                </span>
+                              ) : null}
+                            </td>
+                            <td>{escHtml(r.acik)}</td>
+                            <td>{fmtM(r.tutar)}</td>
+                            <td>{r.freq === "weekly" ? "Haftalık" : "Aylık"}</td>
+                            <td style={{ fontSize: 12, color: "var(--text3)" }}>
+                              {fmtDate(r.startDate)} – {fmtDate(r.endDate)}
+                            </td>
+                            <td>
+                              <span className={`badge ${r.active ? "green" : "amber"}`}>
+                                {r.active ? "Aktif" : "Pasif"}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                                <button
+                                  type="button"
+                                  className="btn sm"
+                                  onClick={() => void toggleRecurringActive(r.id, !r.active)}
+                                >
+                                  {r.active ? "Durdur" : "Aktifleştir"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn sm danger"
+                                  onClick={() => void removeRecurring(r.id)}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="empty">Henüz tekrarlayan gider tanımı yok</div>
+                )}
+              </div>
               <div
                 style={{
                   display: "flex",
@@ -1830,6 +2158,9 @@ Saygılarımla`;
                             <td>
                               <span className="badge blue" style={{ fontSize: 10 }}>
                                 {escHtml(e.kat)}
+                                {e.subkat ? (
+                                  <span style={{ opacity: 0.85 }}> / {escHtml(e.subkat)}</span>
+                                ) : null}
                               </span>
                             </td>
                             <td className="b">{escHtml(e.acik)}</td>
@@ -2146,16 +2477,68 @@ Saygılarımla`;
                   </div>
                   <div className="tag-list" id="t-explist">
                     {settings.expCats.map((c, i) => (
-                      <div className="tag-row" key={c + i}>
-                        <span>{escHtml(c)}</span>
-                        <button
-                          type="button"
-                          className="btn sm danger"
-                          disabled={settings.expCats.length <= 1}
-                          onClick={() => delExpCat(i)}
-                        >
-                          ✕
-                        </button>
+                      <div key={c + i} style={{ marginBottom: 10 }}>
+                        <div className="tag-row">
+                          <span>{escHtml(c)}</span>
+                          <button
+                            type="button"
+                            className="btn sm danger"
+                            disabled={settings.expCats.length <= 1}
+                            onClick={() => delExpCat(i)}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <div style={{ paddingLeft: 12, marginTop: 6 }}>
+                          {expSubCatsFor(settings, c).length ? (
+                            expSubCatsFor(settings, c).map((sub, si) => (
+                              <div
+                                key={sub + si}
+                                className="tag-row"
+                                style={{ marginBottom: 4, fontSize: 12 }}
+                              >
+                                <span style={{ color: "var(--text2)" }}>
+                                  {"↳ "}
+                                  {escHtml(sub)}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="btn sm danger"
+                                  onClick={() => delExpSubCat(c, si)}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ))
+                          ) : (
+                            <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 4 }}>
+                              Alt kategori yok
+                            </div>
+                          )}
+                          <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                            <input
+                              placeholder="Alt kategori ekle..."
+                              value={newExpSubCatByParent[c] ?? ""}
+                              onChange={(e) =>
+                                setNewExpSubCatByParent((prev) => ({
+                                  ...prev,
+                                  [c]: e.target.value,
+                                }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") addExpSubCat(c);
+                              }}
+                              style={{ flex: 1, fontSize: 12 }}
+                            />
+                            <button
+                              type="button"
+                              className="btn sm"
+                              onClick={() => addExpSubCat(c)}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2309,21 +2692,6 @@ Saygılarımla`;
               />
             </div>
           </div>
-          <div className="fg c2">
-            <div>
-              <div className="fl">Mevcut Tahsilat (₺)</div>
-              <input
-                type="number"
-                id="f-tahsilat"
-                placeholder="boş = kapora kadar"
-                value={orderForm.tahsilat}
-                onChange={(e) =>
-                  setOrderForm((f) => ({ ...f, tahsilat: e.target.value }))
-                }
-              />
-            </div>
-            <div />
-          </div>
           <div className="fg">
             <div>
               <div className="fl">Sipariş İçeriği</div>
@@ -2420,12 +2788,43 @@ Saygılarımla`;
                 id="e-kat"
                 value={expForm.kat}
                 onChange={(e) =>
-                  setExpForm((f) => ({ ...f, kat: e.target.value }))
+                  setExpForm((f) => ({ ...f, kat: e.target.value, subkat: "" }))
                 }
               >
                 {buildCatOptions(settings.expCats, expForm.kat)}
               </select>
             </div>
+          </div>
+          <div className="fg c2">
+            <div>
+              <div className="fl">Alt Kategori</div>
+              <select
+                value={expForm.subkat}
+                onChange={(e) =>
+                  setExpForm((f) => ({ ...f, subkat: e.target.value }))
+                }
+              >
+                <option value="">— Seçin —</option>
+                {expSubCatsFor(settings, expForm.kat).map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+                <option value="__new__">+ Yeni alt kategori…</option>
+              </select>
+            </div>
+            {expForm.subkat === "__new__" ? (
+              <div>
+                <div className="fl">Yeni Alt Kategori Adı</div>
+                <input
+                  placeholder="Örn. Polyester"
+                  value={expNewSubkat}
+                  onChange={(e) => setExpNewSubkat(e.target.value)}
+                />
+              </div>
+            ) : (
+              <div />
+            )}
           </div>
           <div className="fg">
             <div>

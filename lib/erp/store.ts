@@ -1,7 +1,8 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { kvGetJson, kvSetJson, isKvAvailable } from "@/lib/kv-adapter";
-import type { ErpData, ErpExpense, ErpOrder, ErpSettings } from "./types";
+import type { ErpData, ErpExpense, ErpOrder, ErpRecurringExpense, ErpSettings } from "./types";
+import { applyRecurringExpenses } from "./recurring";
 import {
   type ErpImportMode,
   type ErpImportPayload,
@@ -15,14 +16,16 @@ const DATA_DIR = path.join(process.cwd(), "lib", "data");
 const ORDERS_FILE = path.join(DATA_DIR, "erp-orders.json");
 const EXPENSES_FILE = path.join(DATA_DIR, "erp-expenses.json");
 const SETTINGS_FILE = path.join(DATA_DIR, "erp-settings.json");
+const RECURRING_FILE = path.join(DATA_DIR, "erp-recurring.json");
 
 const KV_ORDERS = "luxury_gallery:erp_orders";
 const KV_EXPENSES = "luxury_gallery:erp_expenses";
 const KV_SETTINGS = "luxury_gallery:erp_settings";
+const KV_RECURRING = "luxury_gallery:erp_recurring";
 const KV_NEXT_ID = "luxury_gallery:erp_next_id";
 
 function defaultSettings(): ErpSettings {
-  return { orderCats: [...DEF_ORDER_CATS], expCats: [...DEF_EXP_CATS] };
+  return { orderCats: [...DEF_ORDER_CATS], expCats: [...DEF_EXP_CATS], expSubCats: {} };
 }
 
 async function readJsonFile<T>(filePath: string, fallback: T): Promise<T> {
@@ -73,12 +76,34 @@ function normalizeExpense(raw: unknown): ErpExpense | null {
     id,
     tarih: String(e.tarih ?? ""),
     kat: String(e.kat ?? ""),
+    subkat: e.subkat != null ? String(e.subkat) : "",
     acik: String(e.acik ?? ""),
     tutar: Number(e.tutar) || 0,
     fatno: String(e.fatno ?? ""),
     dosya: e.dosya != null ? String(e.dosya) : null,
     dosya_url: e.dosya_url != null ? String(e.dosya_url) : null,
+    recurringId: typeof e.recurringId === "number" ? e.recurringId : undefined,
     created_at: typeof e.created_at === "string" ? e.created_at : new Date().toISOString(),
+  };
+}
+
+function normalizeRecurring(raw: unknown): ErpRecurringExpense | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const id = typeof r.id === "number" ? r.id : Number(r.id);
+  if (!Number.isFinite(id)) return null;
+  const freq = r.freq === "weekly" ? "weekly" : "monthly";
+  return {
+    id,
+    kat: String(r.kat ?? ""),
+    subkat: r.subkat != null ? String(r.subkat) : "",
+    acik: String(r.acik ?? ""),
+    tutar: Number(r.tutar) || 0,
+    freq,
+    startDate: String(r.startDate ?? ""),
+    endDate: String(r.endDate ?? ""),
+    active: r.active !== false,
+    created_at: typeof r.created_at === "string" ? r.created_at : new Date().toISOString(),
   };
 }
 
@@ -91,9 +116,19 @@ function normalizeSettings(raw: unknown): ErpSettings {
   const expCats = Array.isArray(s.expCats)
     ? s.expCats.map(String).filter(Boolean)
     : [...DEF_EXP_CATS];
+  const expSubCats =
+    s.expSubCats && typeof s.expSubCats === "object" && !Array.isArray(s.expSubCats)
+      ? Object.fromEntries(
+          Object.entries(s.expSubCats as Record<string, unknown>).map(([k, v]) => [
+            String(k),
+            Array.isArray(v) ? v.map(String).filter(Boolean) : [],
+          ])
+        )
+      : {};
   return {
     orderCats: orderCats.length ? orderCats : [...DEF_ORDER_CATS],
     expCats: expCats.length ? expCats : [...DEF_EXP_CATS],
+    expSubCats,
   };
 }
 
@@ -167,19 +202,61 @@ async function nextId(): Promise<number> {
   return id;
 }
 
+async function readRecurring(): Promise<ErpRecurringExpense[]> {
+  const kv = await kvGetJson<ErpRecurringExpense[]>(KV_RECURRING);
+  if (Array.isArray(kv)) {
+    return kv.map(normalizeRecurring).filter((x): x is ErpRecurringExpense => x !== null);
+  }
+  const file = await readJsonFile<unknown[]>(RECURRING_FILE, []);
+  const list = file.map(normalizeRecurring).filter((x): x is ErpRecurringExpense => x !== null);
+  if (await isKvAvailable()) await kvSetJson(KV_RECURRING, list);
+  return list;
+}
+
+async function writeRecurring(rules: ErpRecurringExpense[]): Promise<void> {
+  if (await isKvAvailable()) {
+    await kvSetJson(KV_RECURRING, rules);
+    return;
+  }
+  await writeJsonFile(RECURRING_FILE, rules);
+}
+
+async function syncRecurringExpenses(expenses: ErpExpense[]): Promise<ErpExpense[]> {
+  const rules = await readRecurring();
+  let idSeq = 0;
+  const peekMax =
+    expenses.reduce((m, e) => Math.max(m, e.id), 0) +
+    rules.reduce((m, r) => Math.max(m, r.id), 0);
+  const kvNext = await kvGetJson<number>(KV_NEXT_ID);
+  let cursor =
+    typeof kvNext === "number" && kvNext > 0 ? kvNext : peekMax;
+  const result = applyRecurringExpenses(expenses, rules, () => {
+    cursor += 1;
+    idSeq = cursor;
+    return cursor;
+  });
+  if (result.created > 0) {
+    await writeExpenses(result.expenses);
+    if (await isKvAvailable()) await kvSetJson(KV_NEXT_ID, idSeq);
+  }
+  return result.expenses;
+}
+
 export async function readErpData(): Promise<ErpData> {
-  const [orders, expenses, settings] = await Promise.all([
+  const [orders, rawExpenses, settings, recurringExpenses] = await Promise.all([
     readOrders(),
     readExpenses(),
     readSettings(),
+    readRecurring(),
   ]);
+  const expenses = await syncRecurringExpenses(rawExpenses);
   orders.sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
   expenses.sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
-  return { orders, expenses, settings };
+  return { orders, expenses, settings, recurringExpenses };
 }
 
 export async function createOrder(
@@ -248,6 +325,43 @@ export async function deleteExpense(id: number): Promise<boolean> {
   const next = expenses.filter((e) => e.id !== id);
   if (next.length === expenses.length) return false;
   await writeExpenses(next);
+  return true;
+}
+
+export async function createRecurringExpense(
+  input: Omit<ErpRecurringExpense, "id" | "created_at" | "active"> & { active?: boolean }
+): Promise<ErpRecurringExpense> {
+  const rules = await readRecurring();
+  const rule: ErpRecurringExpense = {
+    ...input,
+    active: input.active !== false,
+    id: await nextId(),
+    created_at: new Date().toISOString(),
+  };
+  rules.unshift(rule);
+  await writeRecurring(rules);
+  await syncRecurringExpenses(await readExpenses());
+  return rule;
+}
+
+export async function updateRecurringExpense(
+  id: number,
+  patch: Partial<Omit<ErpRecurringExpense, "id" | "created_at">>
+): Promise<ErpRecurringExpense | null> {
+  const rules = await readRecurring();
+  const idx = rules.findIndex((r) => r.id === id);
+  if (idx < 0) return null;
+  rules[idx] = { ...rules[idx], ...patch };
+  await writeRecurring(rules);
+  await syncRecurringExpenses(await readExpenses());
+  return rules[idx];
+}
+
+export async function deleteRecurringExpense(id: number): Promise<boolean> {
+  const rules = await readRecurring();
+  const next = rules.filter((r) => r.id !== id);
+  if (next.length === rules.length) return false;
+  await writeRecurring(next);
   return true;
 }
 

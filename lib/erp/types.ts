@@ -23,21 +23,45 @@ export interface ErpExpense {
   id: number;
   tarih: string;
   kat: string;
+  /** Alt kategori (örn. Hammadde → Polyester). */
+  subkat?: string;
   acik: string;
   tutar: number;
   fatno: string;
   dosya: string | null;
   dosya_url?: string | null;
+  /** Tekrarlayan kuraldan otomatik oluşturulduysa kural id. */
+  recurringId?: number;
+  created_at: string;
+}
+
+export type ErpRecurringFreq = "monthly" | "weekly";
+
+export interface ErpRecurringExpense {
+  id: number;
+  kat: string;
+  subkat?: string;
+  acik: string;
+  tutar: number;
+  freq: ErpRecurringFreq;
+  /** YYYY-MM-DD */
+  startDate: string;
+  /** YYYY-MM-DD */
+  endDate: string;
+  active: boolean;
   created_at: string;
 }
 
 export interface ErpSettings {
   orderCats: string[];
   expCats: string[];
+  /** Gider kategorisi → alt kategori listesi */
+  expSubCats?: Record<string, string[]>;
 }
 
 export interface ErpData {
   orders: ErpOrder[];
   expenses: ErpExpense[];
   settings: ErpSettings;
+  recurringExpenses: ErpRecurringExpense[];
 }

@@ -15,6 +15,7 @@ import {
   flushSessionLog,
 } from "@/lib/session-log-client";
 import { useGalleryCategoryNavigation } from "@/hooks/useGalleryCategoryNavigation";
+import { artworkPreviewUrls } from "@/lib/image-url-utils";
 
 const UI = getGalleryUI("en");
 
@@ -298,15 +299,11 @@ function InternationalGalleryPageContent() {
           const cat = typeof a.category === "string" ? a.category : "";
           if (!cat) continue;
           if (a.mediaType && a.mediaType !== "image") continue;
-          const url =
-            typeof (a as ArtworkFull & { thumbnailUrl?: string }).thumbnailUrl === "string" &&
-            (a as ArtworkFull & { thumbnailUrl?: string }).thumbnailUrl
-              ? (a as ArtworkFull & { thumbnailUrl?: string }).thumbnailUrl!
-              : typeof a.imageUrl === "string"
-                ? a.imageUrl
-                : "";
-          if (!url) continue;
-          (imageByCategory[cat] ??= []).push(url);
+          for (const url of artworkPreviewUrls(a)) {
+            const list = imageByCategory[cat] ?? [];
+            if (!list.includes(url)) list.push(url);
+            imageByCategory[cat] = list;
+          }
         }
         const pickRandom = (cat: string): string | undefined => {
           const list = imageByCategory[cat] ?? [];
@@ -317,7 +314,7 @@ function InternationalGalleryPageContent() {
         const pickSample = (cat: string): string[] | undefined => {
           const list = imageByCategory[cat] ?? [];
           if (list.length === 0) return undefined;
-          const shuffled = [...list].sort(() => Math.random() - 0.5);
+          const shuffled = Array.from(new Set(list)).sort(() => Math.random() - 0.5);
           return shuffled.slice(0, 10);
         };
 

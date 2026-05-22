@@ -21,8 +21,12 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 
   if (body?.toggleDone === true) {
     const existing = (await readErpData()).orders.find((o) => o.id === id);
-    const newDurum = existing?.durum === "biten" ? "bekleyen" : "biten";
-    const order = await updateOrder(id, { durum: newDurum });
+    if (!existing) return NextResponse.json({ error: "Bulunamadı" }, { status: 404 });
+    const closing = existing.durum !== "biten";
+    const patch = closing
+      ? { durum: "biten" as const, tahsilat: +existing.toplam || 0 }
+      : { durum: "bekleyen" as const, tahsilat: +existing.kapora || 0 };
+    const order = await updateOrder(id, patch);
     if (!order) return NextResponse.json({ error: "Bulunamadı" }, { status: 404 });
     return NextResponse.json({ order });
   }

@@ -44,6 +44,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 
     const tarih = String(form.get("tarih") ?? "").trim();
     const kat = String(form.get("kat") ?? "").trim();
+    const subkat = String(form.get("subkat") ?? "").trim();
     const acik = String(form.get("acik") ?? "").trim();
     const tutar = Number(form.get("tutar")) || 0;
     const fatno = String(form.get("fatno") ?? "").trim();
@@ -61,7 +62,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       dosya = uploaded.name;
       dosya_url = uploaded.url;
     }
-    patch = { tarih, kat, acik, tutar, fatno, dosya, dosya_url };
+    patch = { tarih, kat, subkat, acik, tutar, fatno, dosya, dosya_url };
   } else {
     let body: Record<string, unknown>;
     try {
@@ -73,6 +74,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     patch = {};
     if (typeof body.tarih === "string") patch.tarih = body.tarih.trim();
     if (typeof body.kat === "string") patch.kat = body.kat.trim();
+    if (typeof body.subkat === "string") patch.subkat = body.subkat.trim();
     if (typeof body.acik === "string") patch.acik = body.acik.trim();
     if (body.tutar !== undefined) patch.tutar = Number(body.tutar) || 0;
     if (typeof body.fatno === "string") patch.fatno = body.fatno.trim();

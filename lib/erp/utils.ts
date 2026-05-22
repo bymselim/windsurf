@@ -167,10 +167,9 @@ export type OrderSortKey =
   | "tarih"
   | "gun"
   | "cat"
-  | "bilgi"
+  | "not_icerik"
   | "kapora"
-  | "tahsilat"
-  | "kalan"
+  | "toplam"
   | "ad"
   | "bitis";
 
@@ -189,14 +188,12 @@ export function compareOrders(
       return daysLeft(a.bitis) - daysLeft(b.bitis);
     case "cat":
       return (a.cat || "").localeCompare(b.cat || "", "tr");
-    case "bilgi":
-      return (a.bilgi || "").localeCompare(b.bilgi || "", "tr");
+    case "not_icerik":
+      return (a.not_icerik || "").localeCompare(b.not_icerik || "", "tr");
     case "kapora":
       return (+a.kapora || 0) - (+b.kapora || 0);
-    case "tahsilat":
-      return (+a.tahsilat || 0) - (+b.tahsilat || 0);
-    case "kalan":
-      return orderKalan(a) - orderKalan(b);
+    case "toplam":
+      return (+a.toplam || 0) - (+b.toplam || 0);
     case "ad": {
       const na = `${a.ad} ${a.soyad}`.trim();
       const nb = `${b.ad} ${b.soyad}`.trim();

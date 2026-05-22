@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
   let acik = "";
   let tutar = 0;
   let fatno = "";
+  let subkat = "";
   let dosya: string | null = null;
   let dosya_url: string | null = null;
 
@@ -23,6 +24,7 @@ export async function POST(request: NextRequest) {
     const form = await request.formData();
     tarih = String(form.get("tarih") ?? "").trim();
     kat = String(form.get("kat") ?? "").trim();
+    subkat = String(form.get("subkat") ?? "").trim();
     acik = String(form.get("acik") ?? "").trim();
     tutar = Number(form.get("tutar")) || 0;
     fatno = String(form.get("fatno") ?? "").trim();
@@ -36,6 +38,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     tarih = String(body?.tarih ?? "").trim();
     kat = String(body?.kat ?? "").trim();
+    subkat = String(body?.subkat ?? "").trim();
     acik = String(body?.acik ?? "").trim();
     tutar = Number(body?.tutar) || 0;
     fatno = String(body?.fatno ?? "").trim();
@@ -53,6 +56,7 @@ export async function POST(request: NextRequest) {
   const expense = await createExpense({
     tarih,
     kat,
+    subkat,
     acik,
     tutar,
     fatno,

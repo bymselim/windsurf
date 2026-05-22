@@ -50,29 +50,56 @@ export async function GET(request: NextRequest) {
     process.env.NEXT_PUBLIC_APP_URL ??
     "http://localhost:3000";
 
-  const dead: Array<{ id: string; titleTR: string; imageUrl: string; reason?: string }> = [];
+  const dead: Array<{
+    id: string;
+    titleTR: string;
+    imageUrl: string;
+    reason?: string;
+    field?: "image" | "thumbnail";
+  }> = [];
   const ok: Array<{ id: string; titleTR: string; imageUrl: string }> = [];
 
-  for (const item of entries) {
-    const imageUrl = toPublicUrl(item.filename);
-    const isAbsolute = isAbsoluteUrl(item.filename);
+  async function checkStoredUrl(stored: string): Promise<{ ok: boolean; publicUrl: string }> {
+    const publicUrl = toPublicUrl(stored);
+    if (isAbsoluteUrl(stored)) {
+      const reachable = await checkUrlReachable(publicUrl);
+      return { ok: reachable, publicUrl };
+    }
+    const fullUrl = publicUrl.startsWith("http")
+      ? publicUrl
+      : `${baseUrl}${publicUrl.startsWith("/") ? "" : "/"}${publicUrl}`;
+    const reachable = await checkUrlReachable(fullUrl);
+    return { ok: reachable, publicUrl: fullUrl };
+  }
 
-    if (isAbsolute) {
-      const reachable = await checkUrlReachable(imageUrl);
-      if (!reachable) {
-        dead.push({ id: item.id, titleTR: item.titleTR || item.id, imageUrl, reason: "URL unreachable (HEAD failed)" });
-      } else {
-        ok.push({ id: item.id, titleTR: item.titleTR || item.id, imageUrl });
-      }
-      continue;
+  for (const item of entries) {
+    const title = item.titleTR || item.id;
+    const main = await checkStoredUrl(item.filename);
+    if (!main.ok) {
+      dead.push({
+        id: item.id,
+        titleTR: title,
+        imageUrl: main.publicUrl,
+        field: "image",
+        reason: "Ana görsel URL erişilemiyor",
+      });
+    } else {
+      ok.push({ id: item.id, titleTR: title, imageUrl: main.publicUrl });
     }
 
-    const fullUrl = imageUrl.startsWith("http") ? imageUrl : `${baseUrl}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`;
-    const reachable = await checkUrlReachable(fullUrl);
-    if (!reachable) {
-      dead.push({ id: item.id, titleTR: item.titleTR || item.id, imageUrl: fullUrl, reason: "Relative path unreachable" });
-    } else {
-      ok.push({ id: item.id, titleTR: item.titleTR || item.id, imageUrl: fullUrl });
+    const thumbStored =
+      typeof item.thumbnailFilename === "string" ? item.thumbnailFilename.trim() : "";
+    if (thumbStored && thumbStored !== item.filename) {
+      const thumb = await checkStoredUrl(thumbStored);
+      if (!thumb.ok) {
+        dead.push({
+          id: item.id,
+          titleTR: title,
+          imageUrl: thumb.publicUrl,
+          field: "thumbnail",
+          reason: "Thumbnail URL erişilemiyor (galeri önizlemesi bozulabilir)",
+        });
+      }
     }
   }
 

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FiLayers } from "react-icons/fi";
 import Image from "next/image";
+import { isExternalImageUrl } from "@/lib/image-url-utils";
 
 export interface CategoryItem {
   value: string;
@@ -54,12 +55,37 @@ function RotatingImage({
   sizes: string;
   priority: boolean;
 }) {
+  const [broken, setBroken] = useState<Set<string>>(() => new Set());
   const [index, setIndex] = useState(0);
   const [prevIndex, setPrevIndex] = useState<number | null>(null);
   const [phase, setPhase] = useState<0 | 1>(1);
 
+  const validImages = useMemo(
+    () => images.filter((u) => u && !broken.has(u)),
+    [images, broken]
+  );
+
   useEffect(() => {
-    if (!images || images.length <= 1) return;
+    setBroken(new Set());
+    setIndex(0);
+    setPrevIndex(null);
+    setPhase(1);
+  }, [images.join("|")]);
+
+  useEffect(() => {
+    if (index >= validImages.length) setIndex(0);
+  }, [index, validImages.length]);
+
+  const markBroken = useCallback((src: string) => {
+    setBroken((prev) => {
+      const next = new Set(prev);
+      next.add(src);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!validImages || validImages.length <= 1) return;
 
     let intervalId: number | null = null;
     let fadeTimeoutId: number | null = null;
@@ -70,7 +96,7 @@ function RotatingImage({
       setPhase(0);
       setIndex((i) => {
         setPrevIndex(i);
-        return (i + 1) % images.length;
+        return (i + 1) % validImages.length;
       });
       if (rafId) window.cancelAnimationFrame(rafId);
       rafId = window.requestAnimationFrame(() => setPhase(1));
@@ -90,15 +116,24 @@ function RotatingImage({
       if (rafId) window.cancelAnimationFrame(rafId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [images.join("|"), offsetMs, rotateMs, fadeMs]);
+  }, [validImages.join("|"), offsetMs, rotateMs, fadeMs]);
 
-  const currentSrc = images[index];
-  const prevSrc = prevIndex != null ? images[prevIndex] : null;
+  if (validImages.length === 0) return null;
+
+  const currentSrc = validImages[index % validImages.length];
+  const prevSrc =
+    prevIndex != null && validImages[prevIndex % validImages.length]
+      ? validImages[prevIndex % validImages.length]
+      : null;
+  const imgProps = (src: string) => ({
+    unoptimized: isExternalImageUrl(src),
+    onError: () => markBroken(src),
+  });
 
   return (
     <>
       <div className="absolute inset-0 bg-zinc-900" />
-      {prevSrc ? (
+      {prevSrc && prevSrc !== currentSrc ? (
         <Image
           key={`prev-${prevSrc}`}
           src={prevSrc}
@@ -109,6 +144,7 @@ function RotatingImage({
           sizes={sizes}
           priority={false}
           loading="lazy"
+          {...imgProps(prevSrc)}
         />
       ) : null}
       <Image
@@ -124,6 +160,7 @@ function RotatingImage({
         sizes={sizes}
         priority={priority}
         loading={priority ? "eager" : "lazy"}
+        {...imgProps(currentSrc)}
       />
     </>
   );

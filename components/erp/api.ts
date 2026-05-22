@@ -1,6 +1,6 @@
 import { getAdminAuthHeaders } from "@/lib/admin-auth-client";
 import type { ErpImportMode, ErpImportResult } from "@/lib/erp/import";
-import type { ErpData, ErpExpense, ErpOrder, ErpSettings } from "@/lib/erp/types";
+import type { ErpData, ErpExpense, ErpOrder, ErpRecurringExpense, ErpSettings } from "@/lib/erp/types";
 
 function headers(json = true): HeadersInit {
   const h: Record<string, string> = { ...getAdminAuthHeaders() };
@@ -128,4 +128,45 @@ export async function saveErpSettings(settings: ErpSettings): Promise<ErpSetting
   const json = await res.json();
   if (!res.ok) throw new Error(json?.error ?? "Ayarlar kaydedilemedi");
   return json.settings;
+}
+
+export async function createErpRecurring(
+  payload: Record<string, unknown>
+): Promise<{ rule: ErpRecurringExpense; expenses: ErpExpense[] }> {
+  const res = await fetch("/api/admin/erp/recurring", {
+    method: "POST",
+    credentials: "include",
+    headers: headers(),
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? "Kayıt başarısız");
+  return json;
+}
+
+export async function deleteErpRecurring(id: number): Promise<void> {
+  const res = await fetch(`/api/admin/erp/recurring/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: headers(),
+  });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json?.error ?? "Silinemedi");
+  }
+}
+
+export async function toggleErpRecurringActive(
+  id: number,
+  active: boolean
+): Promise<{ rule: ErpRecurringExpense; expenses: ErpExpense[] }> {
+  const res = await fetch(`/api/admin/erp/recurring/${id}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: headers(),
+    body: JSON.stringify({ active }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? "Güncelleme başarısız");
+  return json;
 }

@@ -8,6 +8,8 @@
  *   npx tsx scripts/migrate-blob-to-r2.ts --category=Stone --dry-run
  *   npx tsx scripts/migrate-blob-to-r2.ts --category=Stone
  *   npx tsx scripts/migrate-blob-to-r2.ts --all --limit=20
+ *   npx tsx scripts/migrate-blob-to-r2.ts --migrate-categories [--dry-run]
+ *   (Blob 404 ise aynı kategorideki R2 eser URL’si önizlemeye yazılır.)
  *
  * Not: Aynı Blob URL birden fazla eserde geçerse tek indirme / tek R2 nesnesi (idempotent).
  */
@@ -21,6 +23,11 @@ import {
   writeArtworksToFile,
   type ArtworkJson,
 } from "../lib/artworks-io";
+import {
+  readCategoriesFromFile,
+  writeCategoriesToFile,
+  type CategoryJson,
+} from "../lib/categories-io";
 
 const R2_KEYS = [
   "R2_ACCOUNT_ID",
@@ -147,7 +154,8 @@ const migratedCache = new Map<string, string>();
 async function migrateOneUrl(
   oldUrl: string,
   category: string,
-  dryRun: boolean
+  dryRun: boolean,
+  keyPrefix = "migrated/artworks"
 ): Promise<string> {
   if (!isVercelBlobUrl(oldUrl)) return oldUrl;
   if (isAlreadyR2(oldUrl)) return oldUrl;
@@ -160,19 +168,143 @@ async function migrateOneUrl(
   const hash16 = createHash("sha256").update(oldUrl).digest("hex").slice(0, 16);
 
   if (dryRun) {
-    const previewKey = `migrated/artworks/${catSeg}/${hash16}<ext>`;
+    const previewKey = `${keyPrefix}/${catSeg}/${hash16}<ext>`;
     console.log(`  [dry-run] would migrate: ${oldUrl.slice(0, 72)}... -> ${previewKey}`);
     return oldUrl;
   }
 
   const { buffer, contentType } = await fetchBlob(oldUrl);
   const ext = extFromUrlOrType(oldUrl, contentType);
-  const objectKey = `migrated/artworks/${catSeg}/${hash16}${ext}`;
+  const objectKey = `${keyPrefix}/${catSeg}/${hash16}${ext}`;
 
   const { url: newUrl } = await uploadPublicExactKey(objectKey, buffer, contentType ?? undefined);
   migratedCache.set(oldUrl, newUrl);
   console.log(`  OK ${hash16}${ext} (${(buffer.length / 1024).toFixed(1)} KB)`);
   return newUrl;
+}
+
+function normCategoryKey(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/_/g, "-");
+}
+
+function blobFolderFromUrl(url: string): string | null {
+  const m = url.match(/\/artworks\/([^/]+)\//i);
+  return m ? normCategoryKey(m[1]) : null;
+}
+
+function isR2ImageUrl(url: string): boolean {
+  if (isAlreadyR2(url)) return true;
+  try {
+    return new URL(url).hostname.includes("r2.dev");
+  } catch {
+    return false;
+  }
+}
+
+function artworkPreviewUrl(e: ArtworkJson): string | null {
+  const thumb = e.thumbnailFilename?.trim();
+  const main = e.filename?.trim();
+  if (thumb && isR2ImageUrl(thumb)) return thumb;
+  if (main && isR2ImageUrl(main)) return main;
+  return null;
+}
+
+function pickR2PreviewFromArtworks(
+  categoryName: string,
+  entries: ArtworkJson[],
+  oldBlobUrl?: string
+): string | null {
+  const catKey = normCategoryKey(categoryName);
+  const blobKey = oldBlobUrl ? blobFolderFromUrl(oldBlobUrl) : null;
+
+  for (const e of entries) {
+    const url = artworkPreviewUrl(e);
+    if (!url) continue;
+    const artKey = normCategoryKey(e.category || "");
+    if (artKey === catKey || artKey === blobKey) return url;
+  }
+  return null;
+}
+
+async function migrateCategoryPreviews(dryRun: boolean): Promise<void> {
+  const [categories, artworks] = await Promise.all([
+    readCategoriesFromFile(),
+    readArtworksFromFile(),
+  ]);
+  let blobCount = 0;
+  for (const c of categories) {
+    if (c.previewImageUrl && isVercelBlobUrl(c.previewImageUrl)) blobCount++;
+  }
+
+  console.log(`Kategori sayısı: ${categories.length}`);
+  console.log(`Blob preview içeren kategori: ${blobCount}${dryRun ? " [DRY-RUN]" : ""}`);
+
+  if (blobCount === 0) {
+    console.log("Taşınacak kategori önizlemesi yok.");
+    return;
+  }
+
+  let data: CategoryJson[] = [...categories];
+  let updated = 0;
+  let fromArtwork = 0;
+
+  for (let i = 0; i < data.length; i++) {
+    const c = data[i];
+    const old = c.previewImageUrl;
+    if (!old || !isVercelBlobUrl(old)) continue;
+
+    console.log(`\n→ kategori "${c.name}"`);
+    let next: string | null = null;
+    let usedArtworkFallback = false;
+    try {
+      next = await migrateOneUrl(old, c.name, dryRun, "migrated/category-previews");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`  HATA: ${msg}`);
+      if (/\b404\b/.test(msg)) {
+        const fromArt = pickR2PreviewFromArtworks(c.name, artworks, old);
+        if (fromArt) {
+          next = fromArt;
+          usedArtworkFallback = true;
+          console.log(`  Blob silinmiş (404); R2 eser önizlemesi kullanılacak.`);
+        } else {
+          console.error(`  Bu kategoride R2 eser bulunamadı — önizleme elle seçilmeli.`);
+        }
+      }
+    }
+
+    if (dryRun) {
+      if (next && next !== old) {
+        console.log(
+          usedArtworkFallback
+            ? `  [dry-run] Redis'e yazılacak: eserden R2 URL`
+            : `  [dry-run] Blob indirilip R2'ye taşınacak`
+        );
+      }
+      continue;
+    }
+
+    if (next && next !== old) {
+      data[i] = { ...c, previewImageUrl: next };
+      await writeCategoriesToFile(data);
+      updated++;
+      if (usedArtworkFallback) fromArtwork++;
+      console.log(`  Kategori kaydı güncellendi (${updated}).`);
+    }
+  }
+
+  console.log("");
+  if (dryRun) {
+    console.log("Bitti. DRY-RUN: kategori kayıtları yazılmadı.");
+  } else {
+    console.log(
+      `Bitti. Güncellenen kategori: ${updated}${fromArtwork > 0 ? ` (${fromArtwork} tanesi Blob 404 → eserden R2)` : ""}.`
+    );
+  }
 }
 
 function parseArgs(): {
@@ -181,6 +313,7 @@ function parseArgs(): {
   dryRun: boolean;
   limit: number | null;
   listCategories: boolean;
+  migrateCategories: boolean;
 } {
   const argv = process.argv.slice(2);
   let category: string | null = null;
@@ -188,11 +321,13 @@ function parseArgs(): {
   let dryRun = false;
   let limit: number | null = null;
   let listCategories = false;
+  let migrateCategories = false;
 
   for (const a of argv) {
     if (a === "--all") all = true;
     else if (a === "--dry-run") dryRun = true;
     else if (a === "--list-categories") listCategories = true;
+    else if (a === "--migrate-categories") migrateCategories = true;
     else if (a.startsWith("--category=")) category = a.slice("--category=".length).trim() || null;
     else if (a.startsWith("--limit=")) {
       const n = parseInt(a.slice("--limit=".length), 10);
@@ -200,7 +335,7 @@ function parseArgs(): {
     }
   }
 
-  return { category, all, dryRun, limit, listCategories };
+  return { category, all, dryRun, limit, listCategories, migrateCategories };
 }
 
 async function main(): Promise<void> {
@@ -217,14 +352,32 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const { category, all, dryRun, limit, listCategories } = parseArgs();
+  const { category, all, dryRun, limit, listCategories, migrateCategories } = parseArgs();
+
+  function dataSourceLabel(): string {
+    if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+      return "Vercel KV (KV_REST_API_URL)";
+    }
+    if (process.env.REDIS_URL?.trim()) {
+      return "Redis/KV (REDIS_URL)";
+    }
+    return "Yerel lib/data/artworks.json (REDIS_URL ve KV yok — canlı site verisi DEĞİL)";
+  }
+
+  if (migrateCategories) {
+    console.log(`Veri kaynağı: ${dataSourceLabel()}`);
+    await migrateCategoryPreviews(dryRun);
+    return;
+  }
 
   const entries = await readArtworksFromFile();
 
   if (listCategories) {
-    const dataSource = process.env.REDIS_URL?.trim()
-      ? "KV/Redis (REDIS_URL tanımlı — canlı veri)"
-      : "Dosya veya boş KV (REDIS_URL yoksa genelde lib/data/artworks.json)";
+    const categories = await readCategoriesFromFile();
+    let catBlob = 0;
+    for (const c of categories) {
+      if (c.previewImageUrl && isVercelBlobUrl(c.previewImageUrl)) catBlob++;
+    }
 
     let blobRows = 0;
     const set = new Set<string>();
@@ -241,8 +394,9 @@ async function main(): Promise<void> {
     const list = Array.from(set).sort();
 
     console.log(`Okunan eser sayısı: ${entries.length}`);
-    console.log(`Veri kaynağı: ${dataSource}`);
+    console.log(`Veri kaynağı: ${dataSourceLabel()}`);
     console.log(`Blob URL içeren eser sayısı: ${blobRows}`);
+    console.log(`Blob preview içeren kategori sayısı: ${catBlob} / ${categories.length}`);
     console.log("");
     console.log("Blob URL içeren eserlerin kategorileri:");
     for (const c of list) console.log(`  - ${c}`);
@@ -252,9 +406,13 @@ async function main(): Promise<void> {
       console.log(
         "\nNot: Hiç eser okunamadı. REDIS_URL canlı ortamdan kopyalı mı kontrol et; yoksa sadece yerel JSON kullanılıyor olabilir."
       );
-    } else if (blobRows === 0) {
+    } else if (blobRows === 0 && catBlob === 0) {
       console.log(
         "\nNot: Bu veri kümesinde Vercel Blob adresi yok (zaten R2 / göreli yol / sadece dosya adı olabilir). Taşıma gerekmiyor olabilir."
+      );
+    } else if (blobRows === 0 && catBlob > 0) {
+      console.log(
+        "\nNot: Eserler R2'de; kategori kartlarındaki Blob önizlemeleri için:\n  npx tsx scripts/migrate-blob-to-r2.ts --migrate-categories --dry-run\n  npx tsx scripts/migrate-blob-to-r2.ts --migrate-categories"
       );
     }
     return;
@@ -286,12 +444,23 @@ async function main(): Promise<void> {
 
   const capped = limit != null ? workList.slice(0, limit) : workList;
 
+  console.log(`Veri kaynağı: ${dataSourceLabel()}`);
+  console.log(`Okunan eser sayısı: ${entries.length}`);
   console.log(
     `Hedef: ${all ? "TÜM kategoriler" : `kategori "${category}"`} | Blob taşıması gereken eser: ${workList.length} (bu koşuda işlenecek: ${capped.length})${dryRun ? " [DRY-RUN]" : ""}`
   );
 
   if (capped.length === 0) {
     console.log("Taşınacak Blob URL yok.");
+    if (entries.length > 0 && !process.env.REDIS_URL?.trim() && !process.env.KV_REST_API_URL) {
+      console.log("");
+      console.log(
+        "Muhtemel neden: Komut yerel JSON okudu; canlı sitedeki Blob URL'ler Vercel KV'de."
+      );
+      console.log(
+        "Çözüm: Vercel → Project → Settings → Environment Variables içinden REDIS_URL (veya KV_REST_API_URL + KV_REST_API_TOKEN) değerlerini .env.local'e kopyalayın, sonra tekrar çalıştırın."
+      );
+    }
     return;
   }
 

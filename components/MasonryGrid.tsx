@@ -6,6 +6,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import type { Artwork } from "@/lib/types";
 import { displayTitle, isVideoArtwork } from "@/lib/artwork-utils";
+import { isExternalImageUrl } from "@/lib/image-url-utils";
 
 type MasonryGridProps = {
   artworks: Artwork[];
@@ -21,6 +22,8 @@ const breakpointColumns = {
 
 export function MasonryGrid({ artworks, category, onSelect }: MasonryGridProps) {
   const [brokenIds, setBrokenIds] = useState<Set<string>>(new Set());
+  /** Thumbnail kırılırsa tam görsele düş */
+  const [gridSrcById, setGridSrcById] = useState<Record<string, string>>({});
 
   const markBroken = useCallback((id: string) => {
     setBrokenIds((prev) => {
@@ -29,6 +32,20 @@ export function MasonryGrid({ artworks, category, onSelect }: MasonryGridProps) 
       return next;
     });
   }, []);
+
+  const onGridImageError = useCallback(
+    (artwork: Artwork) => {
+      const thumb = artwork.thumbnailUrl;
+      const full = artwork.imageUrl;
+      const current = gridSrcById[artwork.id] ?? thumb ?? full;
+      if (thumb && full && current === thumb && thumb !== full) {
+        setGridSrcById((prev) => ({ ...prev, [artwork.id]: full }));
+        return;
+      }
+      markBroken(artwork.id);
+    },
+    [gridSrcById, markBroken]
+  );
 
   const filtered = useMemo(() => {
     if (category === "All") return artworks;
@@ -44,7 +61,8 @@ export function MasonryGrid({ artworks, category, onSelect }: MasonryGridProps) 
       >
         {filtered.map((artwork, index) => {
           const isBroken = brokenIds.has(artwork.id);
-          const gridImageUrl = artwork.thumbnailUrl || artwork.imageUrl;
+          const gridImageUrl =
+            gridSrcById[artwork.id] ?? artwork.thumbnailUrl ?? artwork.imageUrl;
           const isPriority = index < 8;
           return (
           <motion.div
@@ -84,7 +102,8 @@ export function MasonryGrid({ artworks, category, onSelect }: MasonryGridProps) 
                     className="object-cover transition duration-300 group-hover:scale-105"
                     priority={isPriority}
                     loading={isPriority ? "eager" : "lazy"}
-                    onError={() => markBroken(artwork.id)}
+                    unoptimized={isExternalImageUrl(gridImageUrl)}
+                    onError={() => onGridImageError(artwork)}
                   />
                 )}
               </div>
