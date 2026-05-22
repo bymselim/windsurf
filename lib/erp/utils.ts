@@ -71,6 +71,16 @@ export function todayStr(): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Dün (yerel takvim) YYYY-MM-DD. */
+export function yesterdayStr(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 /** Tarihten YYYY-MM ay anahtarı; ISO ve DD.MM.YYYY destekler. */
 export function dateMonthKey(tarih: string | null | undefined): string {
   const s = String(tarih ?? "").trim();

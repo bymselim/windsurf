@@ -19,7 +19,10 @@ import {
   deleteErpOrder,
   deleteErpRecurring,
   fetchErpData,
+  fetchErpEmailSettings,
+  saveErpEmailSettings,
   saveErpSettings,
+  sendErpEmailTest,
   toggleErpOrderDone,
   toggleErpRecurringActive,
   updateErpExpense,
@@ -27,6 +30,8 @@ import {
 } from "@/components/erp/api";
 import { ErpImportPanel } from "@/components/erp/ErpImportPanel";
 import { APP_VERSION } from "@/lib/app-version";
+import type { ErpEmailSectionKey, ErpEmailSettings } from "@/lib/erp/email-types";
+import { ERP_EMAIL_SECTION_LABELS } from "@/lib/erp/email-types";
 import type { ErpExpense, ErpOrder, ErpRecurringExpense, ErpSettings } from "@/lib/erp/types";
 import {
   addWorkdays,
@@ -344,6 +349,9 @@ export default function ErpApp() {
   const [newOrderCat, setNewOrderCat] = useState("");
   const [newExpCat, setNewExpCat] = useState("");
   const [newExpSubCatByParent, setNewExpSubCatByParent] = useState<Record<string, string>>({});
+  const [emailSettings, setEmailSettings] = useState<ErpEmailSettings | null>(null);
+  const [emailSmtpOk, setEmailSmtpOk] = useState<boolean | null>(null);
+  const [emailSmtpHint, setEmailSmtpHint] = useState("");
   const [emailBody, setEmailBody] = useState("");
 
   const topbarDate = useMemo(
@@ -416,6 +424,67 @@ export default function ErpApp() {
   const catFilterOptions = useMemo(() => {
     return Array.from(new Set(orders.map((o) => o.cat).filter(Boolean))).sort();
   }, [orders]);
+
+  useEffect(() => {
+    if (tab !== "tanimlamalar") return;
+    fetchErpEmailSettings()
+      .then((r) => {
+        setEmailSettings(r.settings);
+        setEmailSmtpOk(r.smtpConfigured);
+        setEmailSmtpHint(r.smtpHint);
+      })
+      .catch(() => {
+        setEmailSettings(null);
+        setEmailSmtpOk(false);
+      });
+  }, [tab]);
+
+  const saveEmailSettings = useCallback(async () => {
+    if (!emailSettings) return;
+    showLoading("Kaydediliyor...");
+    try {
+      const saved = await saveErpEmailSettings(emailSettings);
+      setEmailSettings(saved);
+      alert("E-posta ayarları kaydedildi.");
+    } catch (e) {
+      alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+    } finally {
+      hideLoading();
+    }
+  }, [emailSettings, showLoading, hideLoading]);
+
+  const testEmail = useCallback(
+    async (kind: "daily" | "monthly") => {
+      if (!emailSettings?.toEmail) {
+        alert("Önce alıcı e-posta adresini girin.");
+        return;
+      }
+      showLoading("Test maili gönderiliyor...");
+      try {
+        await sendErpEmailTest(kind, emailSettings.toEmail);
+        alert(`Test maili gönderildi (${kind === "daily" ? "günlük" : "ay sonu"}).`);
+      } catch (e) {
+        alert("Hata: " + (e instanceof Error ? e.message : "Gönderilemedi"));
+      } finally {
+        hideLoading();
+      }
+    },
+    [emailSettings, showLoading, hideLoading]
+  );
+
+  const toggleEmailSection = useCallback((key: ErpEmailSectionKey) => {
+    setEmailSettings((prev) => {
+      if (!prev) return prev;
+      if (key === "monthlyReport") {
+        return { ...prev, monthlyReportEnabled: !prev.monthlyReportEnabled };
+      }
+      const has = prev.dailySections.includes(key);
+      const dailySections = has
+        ? prev.dailySections.filter((k) => k !== key)
+        : [...prev.dailySections, key];
+      return { ...prev, dailySections };
+    });
+  }, []);
 
   const filteredOrders = useMemo(() => {
     const q = sSearch.toLowerCase();
@@ -2543,6 +2612,136 @@ Saygılarımla`;
                     ))}
                   </div>
                 </div>
+              </div>
+              <div className="card" style={{ marginTop: 14 }}>
+                <div className="card-title">✉ E-posta Bildirimleri</div>
+                <p className="hint" style={{ marginBottom: 12 }}>
+                  Her sabah 07:00 (TR) günlük özet; ayın 1&apos;inde bir önceki ayın raporu
+                  gönderilir. Gmail için Vercel ortam değişkenlerine SMTP bilgilerini ekleyin.
+                </p>
+                {emailSettings ? (
+                  <>
+                    <div className="fg c2" style={{ marginBottom: 12 }}>
+                      <div>
+                        <div className="fl">Alıcı e-posta</div>
+                        <input
+                          type="email"
+                          placeholder="ornek@gmail.com"
+                          value={emailSettings.toEmail}
+                          onChange={(e) =>
+                            setEmailSettings((s) =>
+                              s ? { ...s, toEmail: e.target.value } : s
+                            )
+                          }
+                        />
+                      </div>
+                      <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            cursor: "pointer",
+                            fontSize: 13,
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={emailSettings.enabled}
+                            onChange={(e) =>
+                              setEmailSettings((s) =>
+                                s ? { ...s, enabled: e.target.checked } : s
+                              )
+                            }
+                          />
+                          Otomatik mail açık
+                        </label>
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: 12 }}>
+                      <div className="fl" style={{ marginBottom: 8 }}>
+                        Günlük mailde hangi bölümler olsun?
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {(
+                          ["dueOrders", "yesterdayOrders", "yesterdayExpenses"] as ErpEmailSectionKey[]
+                        ).map((key) => (
+                          <label
+                            key={key}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              fontSize: 13,
+                              cursor: "pointer",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={emailSettings.dailySections.includes(key)}
+                              onChange={() => toggleEmailSection(key)}
+                            />
+                            {ERP_EMAIL_SECTION_LABELS[key]}
+                          </label>
+                        ))}
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            fontSize: 13,
+                            cursor: "pointer",
+                            marginTop: 4,
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={emailSettings.monthlyReportEnabled}
+                            onChange={() => toggleEmailSection("monthlyReport")}
+                          />
+                          {ERP_EMAIL_SECTION_LABELS.monthlyReport}
+                        </label>
+                      </div>
+                    </div>
+                    <div
+                      className={`alert ${emailSmtpOk ? "info" : "warn"}`}
+                      style={{ marginBottom: 12, fontSize: 12 }}
+                    >
+                      {emailSmtpOk
+                        ? "✓ SMTP sunucu ayarları tanımlı."
+                        : `⚠ ${emailSmtpHint || "SMTP henüz yapılandırılmamış."}`}
+                      {!emailSmtpOk ? (
+                        <div style={{ marginTop: 8, lineHeight: 1.5 }}>
+                          Gmail: Google Hesap → Güvenlik → 2 adımlı doğrulama → Uygulama
+                          şifreleri. Vercel&apos;de:{" "}
+                          <code style={{ fontSize: 11 }}>
+                            SMTP_HOST=smtp.gmail.com SMTP_PORT=587 SMTP_USER=… SMTP_PASS=…
+                            CRON_SECRET=…
+                          </code>
+                        </div>
+                      ) : null}
+                    </div>
+                    {emailSettings.lastDailySent || emailSettings.lastMonthlySent ? (
+                      <p style={{ fontSize: 11, color: "var(--text3)", marginBottom: 10 }}>
+                        Son günlük: {emailSettings.lastDailySent || "—"} · Son ay raporu:{" "}
+                        {emailSettings.lastMonthlySent || "—"}
+                      </p>
+                    ) : null}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      <button type="button" className="btn sm primary" onClick={() => void saveEmailSettings()}>
+                        Kaydet
+                      </button>
+                      <button type="button" className="btn sm" onClick={() => void testEmail("daily")}>
+                        Test — Günlük
+                      </button>
+                      <button type="button" className="btn sm" onClick={() => void testEmail("monthly")}>
+                        Test — Ay sonu
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="empty">E-posta ayarları yükleniyor…</div>
+                )}
               </div>
               <ErpImportPanel
                 orderCount={orders.length}

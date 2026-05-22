@@ -1,6 +1,7 @@
 import { getAdminAuthHeaders } from "@/lib/admin-auth-client";
 import type { ErpImportMode, ErpImportResult } from "@/lib/erp/import";
 import type { ErpData, ErpExpense, ErpOrder, ErpRecurringExpense, ErpSettings } from "@/lib/erp/types";
+import type { ErpEmailSettings, ErpEmailSectionKey } from "@/lib/erp/email-types";
 
 function headers(json = true): HeadersInit {
   const h: Record<string, string> = { ...getAdminAuthHeaders() };
@@ -169,4 +170,48 @@ export async function toggleErpRecurringActive(
   const json = await res.json();
   if (!res.ok) throw new Error(json?.error ?? "Güncelleme başarısız");
   return json;
+}
+
+export async function fetchErpEmailSettings(): Promise<{
+  settings: ErpEmailSettings;
+  smtpConfigured: boolean;
+  smtpHint: string;
+  sectionLabels: Record<ErpEmailSectionKey, string>;
+  dailySectionKeys: ErpEmailSectionKey[];
+}> {
+  const res = await fetch("/api/admin/erp/email-settings", {
+    credentials: "include",
+    headers: headers(),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? "Yüklenemedi");
+  return json;
+}
+
+export async function saveErpEmailSettings(
+  settings: Partial<ErpEmailSettings>
+): Promise<ErpEmailSettings> {
+  const res = await fetch("/api/admin/erp/email-settings", {
+    method: "PUT",
+    credentials: "include",
+    headers: headers(),
+    body: JSON.stringify(settings),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? "Kaydedilemedi");
+  return json.settings;
+}
+
+export async function sendErpEmailTest(
+  kind: "daily" | "monthly",
+  toEmail?: string
+): Promise<void> {
+  const res = await fetch("/api/admin/erp/email-test", {
+    method: "POST",
+    credentials: "include",
+    headers: headers(),
+    body: JSON.stringify({ kind, toEmail }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? "Test maili gönderilemedi");
 }

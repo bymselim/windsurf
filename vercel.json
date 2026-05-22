@@ -5,6 +5,12 @@
   "installCommand": "npm ci",
   "devCommand": "npm run dev",
   "regions": ["fra1"],
+  "crons": [
+    {
+      "path": "/api/cron/erp-email",
+      "schedule": "0 4 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
