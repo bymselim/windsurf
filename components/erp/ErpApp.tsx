@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -30,6 +31,7 @@ import {
   updateErpRecurring,
 } from "@/components/erp/api";
 import { ErpImportPanel } from "@/components/erp/ErpImportPanel";
+import { clearAdminPassword } from "@/lib/admin-auth-client";
 import { APP_VERSION } from "@/lib/app-version";
 import type { ErpEmailSectionKey, ErpEmailSettings } from "@/lib/erp/email-types";
 import { ERP_EMAIL_SECTION_LABELS } from "@/lib/erp/email-types";
@@ -217,6 +219,104 @@ function renderBarChart(
   });
 }
 
+type ExpenseKatGroup = {
+  kat: string;
+  total: number;
+  subcats: { label: string; total: number }[];
+};
+
+function buildExpenseKatGroups(expenses: ErpExpense[]): ExpenseKatGroup[] {
+  const subMap: Record<string, Record<string, number>> = {};
+  const totals: Record<string, number> = {};
+  for (const e of expenses) {
+    const kat = e.kat?.trim() || "Diğer";
+    const sub = e.subkat?.trim() || "";
+    const amt = +e.tutar || 0;
+    totals[kat] = (totals[kat] || 0) + amt;
+    if (!subMap[kat]) subMap[kat] = {};
+    if (sub) subMap[kat][sub] = (subMap[kat][sub] || 0) + amt;
+  }
+  return Object.entries(totals)
+    .map(([kat, total]) => ({
+      kat,
+      total,
+      subcats: Object.entries(subMap[kat] || {})
+        .map(([label, t]) => ({ label, total: t }))
+        .sort((a, b) => b.total - a.total),
+    }))
+    .sort((a, b) => b.total - a.total);
+}
+
+function renderGroupedExpenseChart(groups: ExpenseKatGroup[], maxItems?: number): ReactNode {
+  if (!groups.length) return <div className="empty">Gider yok</div>;
+  const slice = maxItems ? groups.slice(0, maxItems) : groups;
+  const globalMax = Math.max(...slice.map((g) => g.total), 1);
+  let colorIdx = 0;
+  return slice.map((g) => {
+    const parentColor = COLS[colorIdx++ % COLS.length];
+    const pct = Math.round((g.total / globalMax) * 100);
+    return (
+      <div key={g.kat} className="exp-cat-group">
+        <div className="bar-row">
+          <div className="bar-label">{g.kat}</div>
+          <div className="bar-track">
+            <div
+              className="bar-fill"
+              style={{ width: `${pct}%`, background: parentColor }}
+            >
+              {pct > 18 ? fmtM(g.total) : ""}
+            </div>
+          </div>
+          <div className="bar-val">{fmtM(g.total)}</div>
+        </div>
+        {g.subcats.map((sub) => {
+          const subPct = Math.round((sub.total / globalMax) * 100);
+          return (
+            <div className="bar-row exp-sub-row" key={`${g.kat}-${sub.label}`}>
+              <div className="bar-label">{`↳ ${sub.label}`}</div>
+              <div className="bar-track">
+                <div
+                  className="bar-fill"
+                  style={{
+                    width: `${Math.max(subPct, 2)}%`,
+                    background: parentColor,
+                    opacity: 0.65,
+                  }}
+                />
+              </div>
+              <div className="bar-val">{fmtM(sub.total)}</div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  });
+}
+
+function ErpToggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <div className="erp-switch-row">
+      <span className="erp-switch-label">{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        className={`erp-switch${checked ? " on" : ""}`}
+        onClick={() => onChange(!checked)}
+      />
+    </div>
+  );
+}
+
 function renderProductCatRevenueChart(
   rows: { cat: string; ciro: number; adet: number }[]
 ): ReactNode {
@@ -308,6 +408,7 @@ function MonthBox({
 }
 
 export default function ErpApp() {
+  const router = useRouter();
   const [orders, setOrders] = useState<ErpOrder[]>([]);
   const [expenses, setExpenses] = useState<ErpExpense[]>([]);
   const [settings, setSettings] = useState<ErpSettings>({
@@ -433,6 +534,14 @@ export default function ErpApp() {
     setTab(name);
     setMobileNavOpen(false);
   }, []);
+
+  const handleLogout = useCallback(() => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("admin-authenticated");
+      clearAdminPassword();
+    }
+    router.replace("/admin/access-logs");
+  }, [router]);
 
   const catFilterOptions = useMemo(() => {
     return Array.from(new Set(orders.map((o) => o.cat).filter(Boolean))).sort();
@@ -1277,13 +1386,8 @@ Saygılarımla`;
       .filter((o) => isOrderDueTracked(o))
       .sort((a, b) => daysLeft(a.bitis) - daysLeft(b.bitis));
 
-    const expCats: Record<string, number> = {};
-    expenses.forEach((e) => {
-      const key = e.subkat?.trim() ? `${e.kat} / ${e.subkat.trim()}` : e.kat;
-      expCats[key] = (expCats[key] || 0) + (+e.tutar || 0);
-    });
-    const expCatEntries = (Object.entries(expCats) as [string, number][]).filter(
-      ([k]) => k.trim().localeCompare("Diğer", "tr", { sensitivity: "base" }) !== 0
+    const expKatGroups = buildExpenseKatGroups(expenses).filter(
+      (g) => g.kat.trim().localeCompare("Diğer", "tr", { sensitivity: "base" }) !== 0
     );
 
     const prodCats: Record<string, number> = {};
@@ -1314,7 +1418,7 @@ Saygılarımla`;
       },
       alerts,
       upcoming,
-      expCatEntries,
+      expKatGroups,
       prodCatRows,
     };
   }, [orders, expenses]);
@@ -1327,11 +1431,7 @@ Saygılarımla`;
       .filter((e) => isInMonth(e.tarih, thisM))
       .reduce((s, e) => s + (+e.tutar || 0), 0);
     const faturali = expenses.filter((e) => e.fatno || e.dosya).length;
-    const cats: Record<string, number> = {};
-    expenses.forEach((e) => {
-      const key = e.subkat?.trim() ? `${e.kat} / ${e.subkat.trim()}` : e.kat;
-      cats[key] = (cats[key] || 0) + (+e.tutar || 0);
-    });
+    const katGroups = buildExpenseKatGroups(expenses);
     const months: Record<string, number> = {};
     expenses.forEach((e) => {
       const m = dateMonthKey(e.tarih);
@@ -1339,7 +1439,7 @@ Saygılarımla`;
     });
     const monthEntries = Object.entries(months).sort().slice(-6) as [string, number][];
     const mMax = Math.max(...monthEntries.map(([, v]) => v), 1);
-    return { total, aylik, faturali, catEntries: Object.entries(cats) as [string, number][], monthEntries, mMax };
+    return { total, aylik, faturali, katGroups, monthEntries, mMax };
   }, [expenses]);
 
   /* ─── Reports computed ─── */
@@ -1511,6 +1611,13 @@ Saygılarımla`;
             {navBtn("giderler", "◎ Giderler")}
             {navBtn("raporlar", "◉ Raporlar")}
             {navBtn("tanimlamalar", "⚙ Tanımlamalar")}
+            <button
+              type="button"
+              className="nav-item erp-logout-btn"
+              onClick={handleLogout}
+            >
+              ⎋ Çıkış
+            </button>
           </nav>
         </aside>
 
@@ -1533,6 +1640,9 @@ Saygılarımla`;
               <Link href="/admin" className="erp-back-link">
                 ← Admin
               </Link>
+              <button type="button" className="btn sm danger" onClick={handleLogout}>
+                Çıkış
+              </button>
               <button type="button" className="btn sm primary" onClick={openOrderModal}>
                 + Sipariş
               </button>
@@ -1563,6 +1673,9 @@ Saygılarımla`;
             >
               ← Admin
             </Link>
+            <button type="button" className="nav-item erp-logout-btn" onClick={handleLogout}>
+              ⎋ Çıkış
+            </button>
           </nav>
 
           <div className="content">
@@ -1712,7 +1825,7 @@ Saygılarımla`;
                 <div className="card">
                   <div className="card-title">Gider Dağılımı</div>
                   <div className="bar-chart" id="d-exp-chart">
-                    {renderBarChart(dashboard.expCatEntries, { maxItems: 6 })}
+                    {renderGroupedExpenseChart(dashboard.expKatGroups, 6)}
                   </div>
                 </div>
               </div>
@@ -2022,7 +2135,7 @@ Saygılarımla`;
                 <div className="card" style={{ margin: 0 }}>
                   <div className="card-title">Kategoriye Göre</div>
                   <div className="bar-chart" id="g-cat-chart">
-                    {renderBarChart(expenseView.catEntries)}
+                    {renderGroupedExpenseChart(expenseView.katGroups)}
                   </div>
                 </div>
                 <div className="card" style={{ margin: 0 }}>
@@ -2689,88 +2802,47 @@ Saygılarımla`;
                 </p>
                 {emailSettings ? (
                   <>
-                    <div className="fg c2" style={{ marginBottom: 12 }}>
-                      <div>
-                        <div className="fl">Alıcı e-posta</div>
-                        <input
-                          type="email"
-                          placeholder="ornek@gmail.com"
-                          value={emailSettings.toEmail}
-                          onChange={(e) =>
-                            setEmailSettings((s) =>
-                              s ? { ...s, toEmail: e.target.value } : s
-                            )
-                          }
+                    <div className="fg" style={{ marginBottom: 12 }}>
+                      <div className="fl">Alıcı e-posta</div>
+                      <input
+                        type="email"
+                        placeholder="ornek@gmail.com"
+                        value={emailSettings.toEmail}
+                        onChange={(e) =>
+                          setEmailSettings((s) =>
+                            s ? { ...s, toEmail: e.target.value } : s
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="erp-switch-list" style={{ marginBottom: 12 }}>
+                      <ErpToggle
+                        label="Otomatik mail açık"
+                        checked={emailSettings.enabled}
+                        onChange={(enabled) =>
+                          setEmailSettings((s) => (s ? { ...s, enabled } : s))
+                        }
+                      />
+                      {(
+                        ["dueOrders", "yesterdayOrders", "yesterdayExpenses"] as ErpEmailSectionKey[]
+                      ).map((key) => (
+                        <ErpToggle
+                          key={key}
+                          label={ERP_EMAIL_SECTION_LABELS[key]}
+                          checked={emailSettings.dailySections.includes(key)}
+                          onChange={() => toggleEmailSection(key)}
                         />
-                      </div>
-                      <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
-                        <label
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            cursor: "pointer",
-                            fontSize: 13,
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={emailSettings.enabled}
-                            onChange={(e) =>
-                              setEmailSettings((s) =>
-                                s ? { ...s, enabled: e.target.checked } : s
-                              )
-                            }
-                          />
-                          Otomatik mail açık
-                        </label>
-                      </div>
+                      ))}
+                      <ErpToggle
+                        label={ERP_EMAIL_SECTION_LABELS.monthlyReport}
+                        checked={emailSettings.monthlyReportEnabled}
+                        onChange={() => toggleEmailSection("monthlyReport")}
+                      />
                     </div>
-                    <div style={{ marginBottom: 12 }}>
-                      <div className="fl" style={{ marginBottom: 8 }}>
-                        Günlük mailde hangi bölümler olsun?
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        {(
-                          ["dueOrders", "yesterdayOrders", "yesterdayExpenses"] as ErpEmailSectionKey[]
-                        ).map((key) => (
-                          <label
-                            key={key}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                              fontSize: 13,
-                              cursor: "pointer",
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={emailSettings.dailySections.includes(key)}
-                              onChange={() => toggleEmailSection(key)}
-                            />
-                            {ERP_EMAIL_SECTION_LABELS[key]}
-                          </label>
-                        ))}
-                        <label
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            fontSize: 13,
-                            cursor: "pointer",
-                            marginTop: 4,
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={emailSettings.monthlyReportEnabled}
-                            onChange={() => toggleEmailSection("monthlyReport")}
-                          />
-                          {ERP_EMAIL_SECTION_LABELS.monthlyReport}
-                        </label>
-                      </div>
-                    </div>
+                    <p className="hint" style={{ marginBottom: 12, fontSize: 11 }}>
+                      Bitime yakın siparişler bölümünde müşteri telefonu ve özet göstergeler
+                      (Bekleyen, Tahsilat, Ciro vb.) yer alır.
+                    </p>
                     <div
                       className={`alert ${emailSmtpOk ? "info" : "warn"}`}
                       style={{ marginBottom: 12, fontSize: 12 }}

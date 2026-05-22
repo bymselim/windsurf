@@ -33,9 +33,24 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  if (pathname === "/erp" || pathname.startsWith("/erp/")) {
+    const url = request.nextUrl.clone();
+    url.pathname = pathname.replace(/^\/erp/i, "/ERP");
+    return NextResponse.rewrite(url);
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/gallery", "/gallery/:path*", "/turkish/gallery", "/turkish/gallery/:path*", "/international/gallery", "/international/gallery/:path*"],
+  matcher: [
+    "/gallery",
+    "/gallery/:path*",
+    "/turkish/gallery",
+    "/turkish/gallery/:path*",
+    "/international/gallery",
+    "/international/gallery/:path*",
+    "/erp",
+    "/erp/:path*",
+  ],
 };

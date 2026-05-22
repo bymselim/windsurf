@@ -4,7 +4,7 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: "*",
-      disallow: ["/c", "/c/", "/admin/", "/vadmin/", "/api/", "/ERP", "/ERP/"],
+      disallow: ["/c", "/c/", "/admin/", "/vadmin/", "/api/", "/ERP", "/ERP/", "/erp", "/erp/"],
     },
   };
 }

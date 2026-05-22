@@ -16,6 +16,9 @@ import {
   fmtM,
   getOrderStatus,
   isOrderDueTracked,
+  computeAlacak,
+  computeTahsilat,
+  computeToplamCiro,
   todayStr,
   yesterdayStr,
 } from "./utils";
@@ -36,14 +39,64 @@ function formatDaysLeft(o: ErpOrder): string {
 
 function orderLine(o: ErpOrder, includeDays: boolean): string {
   const name = `${o.ad} ${o.soyad}`.trim();
+  const tel = o.tel?.trim();
   const icerik = (o.not_icerik || o.bilgi || "—").replace(/\s+/g, " ").trim();
   const parts = [
     includeDays ? formatDaysLeft(o) : null,
     name,
+    tel ? `Tel: ${tel}` : null,
     icerik,
     fmtM(o.toplam),
   ].filter(Boolean);
   return `  • ${parts.join(" · ")}`;
+}
+
+function orderListItemHtml(o: ErpOrder, includeDays: boolean): string {
+  const name = `${o.ad} ${o.soyad}`.trim();
+  const tel = o.tel?.trim();
+  const icerik = (o.not_icerik || "—").replace(/</g, "&lt;");
+  const telPart = tel ? ` · Tel: ${tel.replace(/</g, "&lt;")}` : "";
+  const daysPart = includeDays ? `<strong>${formatDaysLeft(o)}</strong> — ` : "";
+  return `<li>${daysPart}${name}${telPart} — ${icerik} — <strong>${fmtM(o.toplam)}</strong></li>`;
+}
+
+function buildDashboardMetricsBlock(orders: ErpOrder[], expenses: ErpExpense[]): {
+  text: string;
+  html: string;
+} {
+  const biten = orders.filter((o) => getOrderStatus(o) === "biten");
+  const bekleyen = orders.filter((o) => getOrderStatus(o) === "bekleyen");
+  const geciken = orders.filter((o) => getOrderStatus(o) === "geciken");
+  const askida = orders.filter((o) => getOrderStatus(o) === "askida");
+  const bitenAdet = orders
+    .filter((o) => o.durum === "biten")
+    .reduce((s, o) => s + (+o.adet || 0), 0);
+  const bekleyenAdet = orders
+    .filter((o) => isOrderDueTracked(o))
+    .reduce((s, o) => s + (+o.adet || 0), 0);
+  const rows: [string, string][] = [
+    ["Bekleyen", String(bekleyen.length)],
+    ["Tamamlanan", String(biten.length)],
+    ["Geciken", String(geciken.length)],
+    ["Askıda", String(askida.length)],
+    ["Toplam Adet", String(bitenAdet + bekleyenAdet)],
+    ["Tahsilat", fmtM(computeTahsilat(orders))],
+    ["Alacak", fmtM(computeAlacak(orders))],
+    ["Toplam Gider", fmtM(expenses.reduce((s, e) => s + (+e.tutar || 0), 0))],
+    ["Toplam Ciro", fmtM(computeToplamCiro(orders))],
+  ];
+  const title = "Özet Göstergeler";
+  const text = `${title}\n${rows.map(([l, v]) => `  ${l}: ${v}`).join("\n")}`;
+  const html = `<h2 style="margin:24px 0 8px;font-size:16px;">${title}</h2>
+    <table style="border-collapse:collapse;width:100%;max-width:420px;">
+      ${rows
+        .map(
+          ([l, v]) =>
+            `<tr><td style="padding:4px 12px 4px 0;color:#555;">${l}</td><td style="padding:4px 0;font-weight:600;">${v}</td></tr>`
+        )
+        .join("")}
+    </table>`;
+  return { text, html };
 }
 
 function expenseLine(e: ErpExpense): string {
@@ -119,17 +172,13 @@ export function buildDailyDigestText(input: DailyDigestInput): {
       .filter((o) => isOrderDueTracked(o))
       .sort((a, b) => daysLeft(a.bitis) - daysLeft(b.bitis));
     const lines = due.length ? due.map((o) => orderLine(o, true)) : ["  (Kayıt yok)"];
+    const metrics = buildDashboardMetricsBlock(input.orders, input.expenses);
     add(
       "dueOrders",
-      `${sectionTitle("dueOrders")}\n${lines.join("\n")}`,
+      `${sectionTitle("dueOrders")}\n${lines.join("\n")}\n\n${metrics.text}`,
       due.length
-        ? `<ul style="margin:0;padding-left:18px;">${due
-            .map(
-              (o) =>
-                `<li><strong>${formatDaysLeft(o)}</strong> — ${`${o.ad} ${o.soyad}`.trim()} — ${(o.not_icerik || "—").replace(/</g, "&lt;")} — <strong>${fmtM(o.toplam)}</strong></li>`
-            )
-            .join("")}</ul>`
-        : `<p style="color:#666;">Kayıt yok</p>`,
+        ? `<ul style="margin:0;padding-left:18px;">${due.map((o) => orderListItemHtml(o, true)).join("")}</ul>${metrics.html}`
+        : `<p style="color:#666;">Kayıt yok</p>${metrics.html}`,
       true
     );
   }
@@ -142,10 +191,7 @@ export function buildDailyDigestText(input: DailyDigestInput): {
       `${sectionTitle("yesterdayOrders")} (${fmtDate(yday)})\n${lines.join("\n")}`,
       list.length
         ? `<ul style="margin:0;padding-left:18px;">${list
-            .map(
-              (o) =>
-                `<li>${`${o.ad} ${o.soyad}`.trim()} — ${(o.not_icerik || "—").replace(/</g, "&lt;")} — <strong>${fmtM(o.toplam)}</strong></li>`
-            )
+            .map((o) => orderListItemHtml(o, false))
             .join("")}</ul>`
         : `<p style="color:#666;">Kayıt yok</p>`,
       true

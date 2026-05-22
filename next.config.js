@@ -25,6 +25,8 @@ const nextConfig = {
       { source: "/c/:path*", headers: [{ key: "X-Robots-Tag", value: noIndex }] },
       { source: "/ERP", headers: [{ key: "X-Robots-Tag", value: noIndex }] },
       { source: "/ERP/:path*", headers: [{ key: "X-Robots-Tag", value: noIndex }] },
+      { source: "/erp", headers: [{ key: "X-Robots-Tag", value: noIndex }] },
+      { source: "/erp/:path*", headers: [{ key: "X-Robots-Tag", value: noIndex }] },
     ];
   },
 };
