@@ -1,8 +1,17 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { kvGetJson, kvSetJson, isKvAvailable } from "@/lib/kv-adapter";
-import type { ErpData, ErpExpense, ErpOrder, ErpRecurringExpense, ErpSettings } from "./types";
+import type {
+  ErpData,
+  ErpExpense,
+  ErpOrder,
+  ErpRecurringExpense,
+  ErpSettings,
+  ErpTodo,
+  ErpTodoRecurring,
+} from "./types";
 import { applyRecurringExpenses, removeFutureRecurringExpenses } from "./recurring";
+import { applyTodoRecurring } from "./todo-recurring";
 import {
   type ErpImportMode,
   type ErpImportPayload,
@@ -17,11 +26,15 @@ const ORDERS_FILE = path.join(DATA_DIR, "erp-orders.json");
 const EXPENSES_FILE = path.join(DATA_DIR, "erp-expenses.json");
 const SETTINGS_FILE = path.join(DATA_DIR, "erp-settings.json");
 const RECURRING_FILE = path.join(DATA_DIR, "erp-recurring.json");
+const TODOS_FILE = path.join(DATA_DIR, "erp-todos.json");
+const TODO_RECURRING_FILE = path.join(DATA_DIR, "erp-todo-recurring.json");
 
 const KV_ORDERS = "luxury_gallery:erp_orders";
 const KV_EXPENSES = "luxury_gallery:erp_expenses";
 const KV_SETTINGS = "luxury_gallery:erp_settings";
 const KV_RECURRING = "luxury_gallery:erp_recurring";
+const KV_TODOS = "luxury_gallery:erp_todos";
+const KV_TODO_RECURRING = "luxury_gallery:erp_todo_recurring";
 const KV_NEXT_ID = "luxury_gallery:erp_next_id";
 
 function defaultSettings(): ErpSettings {
@@ -104,6 +117,73 @@ function normalizeRecurring(raw: unknown): ErpRecurringExpense | null {
     endDate: String(r.endDate ?? ""),
     active: r.active !== false,
     created_at: typeof r.created_at === "string" ? r.created_at : new Date().toISOString(),
+  };
+}
+
+function normalizeTodo(raw: unknown): ErpTodo | null {
+  if (!raw || typeof raw !== "object") return null;
+  const t = raw as Record<string, unknown>;
+  const id = typeof t.id === "number" ? t.id : Number(t.id);
+  if (!Number.isFinite(id)) return null;
+  const title = String(t.title ?? "").trim();
+  if (!title) return null;
+  const status = t.status === "biten" ? "biten" : "bekleyen";
+  return {
+    id,
+    title,
+    note: String(t.note ?? ""),
+    status,
+    sortOrder: Number.isFinite(Number(t.sortOrder)) ? Number(t.sortOrder) : id,
+    createdAt:
+      typeof t.createdAt === "string"
+        ? t.createdAt
+        : typeof t.created_at === "string"
+          ? t.created_at
+          : new Date().toISOString(),
+    completedAt:
+      typeof t.completedAt === "string"
+        ? t.completedAt
+        : status === "biten"
+          ? new Date().toISOString()
+          : undefined,
+    recurringId: typeof t.recurringId === "number" ? t.recurringId : undefined,
+    periodKey: typeof t.periodKey === "string" ? t.periodKey : undefined,
+    dueDate: typeof t.dueDate === "string" ? t.dueDate : undefined,
+  };
+}
+
+function normalizeTodoRecurring(raw: unknown): ErpTodoRecurring | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const id = typeof r.id === "number" ? r.id : Number(r.id);
+  if (!Number.isFinite(id)) return null;
+  const title = String(r.title ?? "").trim();
+  if (!title) return null;
+  const freq = r.freq === "weekly" ? "weekly" : "monthly";
+  const dayOfWeek =
+    r.dayOfWeek !== undefined && r.dayOfWeek !== ""
+      ? Math.min(6, Math.max(0, Number(r.dayOfWeek)))
+      : undefined;
+  const dayOfMonth =
+    r.dayOfMonth !== undefined && r.dayOfMonth !== ""
+      ? Math.min(31, Math.max(1, Number(r.dayOfMonth)))
+      : undefined;
+  return {
+    id,
+    title,
+    note: String(r.note ?? ""),
+    active: r.active !== false,
+    freq,
+    dayOfWeek: freq === "weekly" ? (dayOfWeek ?? 5) : undefined,
+    dayOfMonth: freq === "monthly" ? (dayOfMonth ?? 1) : undefined,
+    startDate: String(r.startDate ?? ""),
+    endDate: r.endDate ? String(r.endDate) : undefined,
+    createdAt:
+      typeof r.createdAt === "string"
+        ? r.createdAt
+        : typeof r.created_at === "string"
+          ? r.created_at
+          : new Date().toISOString(),
   };
 }
 
@@ -192,14 +272,80 @@ async function nextId(): Promise<number> {
   const kvNext = await kvGetJson<number>(KV_NEXT_ID);
   let current = typeof kvNext === "number" && kvNext > 0 ? kvNext : 0;
   if (!current) {
-    const [orders, expenses] = await Promise.all([readOrders(), readExpenses()]);
+    const [orders, expenses, todos, todoRules] = await Promise.all([
+      readOrders(),
+      readExpenses(),
+      readTodosRaw(),
+      readTodoRecurring(),
+    ]);
     const maxOrder = orders.reduce((m, o) => Math.max(m, o.id), 0);
     const maxExp = expenses.reduce((m, e) => Math.max(m, e.id), 0);
-    current = Math.max(maxOrder, maxExp, 0);
+    const maxTodo = todos.reduce((m, t) => Math.max(m, t.id), 0);
+    const maxTodoRule = todoRules.reduce((m, r) => Math.max(m, r.id), 0);
+    current = Math.max(maxOrder, maxExp, maxTodo, maxTodoRule, 0);
   }
   const id = current + 1;
   if (await isKvAvailable()) await kvSetJson(KV_NEXT_ID, id);
   return id;
+}
+
+async function readTodosRaw(): Promise<ErpTodo[]> {
+  const kv = await kvGetJson<ErpTodo[]>(KV_TODOS);
+  if (Array.isArray(kv)) {
+    return kv.map(normalizeTodo).filter((x): x is ErpTodo => x !== null);
+  }
+  const file = await readJsonFile<unknown[]>(TODOS_FILE, []);
+  const list = file.map(normalizeTodo).filter((x): x is ErpTodo => x !== null);
+  if (await isKvAvailable()) await kvSetJson(KV_TODOS, list);
+  return list;
+}
+
+async function writeTodos(todos: ErpTodo[]): Promise<void> {
+  if (await isKvAvailable()) {
+    await kvSetJson(KV_TODOS, todos);
+    return;
+  }
+  await writeJsonFile(TODOS_FILE, todos);
+}
+
+async function readTodoRecurring(): Promise<ErpTodoRecurring[]> {
+  const kv = await kvGetJson<ErpTodoRecurring[]>(KV_TODO_RECURRING);
+  if (Array.isArray(kv)) {
+    return kv.map(normalizeTodoRecurring).filter((x): x is ErpTodoRecurring => x !== null);
+  }
+  const file = await readJsonFile<unknown[]>(TODO_RECURRING_FILE, []);
+  const list = file.map(normalizeTodoRecurring).filter((x): x is ErpTodoRecurring => x !== null);
+  if (await isKvAvailable()) await kvSetJson(KV_TODO_RECURRING, list);
+  return list;
+}
+
+async function writeTodoRecurring(rules: ErpTodoRecurring[]): Promise<void> {
+  if (await isKvAvailable()) {
+    await kvSetJson(KV_TODO_RECURRING, rules);
+    return;
+  }
+  await writeJsonFile(TODO_RECURRING_FILE, rules);
+}
+
+async function syncTodoRecurring(todos: ErpTodo[]): Promise<ErpTodo[]> {
+  const rules = await readTodoRecurring();
+  let cursor = 0;
+  const peekMax =
+    todos.reduce((m, t) => Math.max(m, t.id), 0) +
+    rules.reduce((m, r) => Math.max(m, r.id), 0);
+  const kvNext = await kvGetJson<number>(KV_NEXT_ID);
+  cursor = typeof kvNext === "number" && kvNext > 0 ? kvNext : peekMax;
+  let idSeq = cursor;
+  const result = applyTodoRecurring(todos, rules, () => {
+    cursor += 1;
+    idSeq = cursor;
+    return cursor;
+  });
+  if (result.created > 0) {
+    await writeTodos(result.todos);
+    if (await isKvAvailable()) await kvSetJson(KV_NEXT_ID, idSeq);
+  }
+  return result.todos;
 }
 
 async function readRecurring(): Promise<ErpRecurringExpense[]> {
@@ -244,20 +390,29 @@ async function syncRecurringExpenses(expenses: ErpExpense[]): Promise<ErpExpense
 }
 
 export async function readErpData(): Promise<ErpData> {
-  const [orders, rawExpenses, settings, recurringExpenses] = await Promise.all([
-    readOrders(),
-    readExpenses(),
-    readSettings(),
-    readRecurring(),
-  ]);
+  const [orders, rawExpenses, settings, recurringExpenses, rawTodos, recurringTodos] =
+    await Promise.all([
+      readOrders(),
+      readExpenses(),
+      readSettings(),
+      readRecurring(),
+      readTodosRaw(),
+      readTodoRecurring(),
+    ]);
   const expenses = await syncRecurringExpenses(rawExpenses);
+  const todos = await syncTodoRecurring(rawTodos);
   orders.sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
   expenses.sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
-  return { orders, expenses, settings, recurringExpenses };
+  todos.sort((a, b) => {
+    if (a.status !== b.status) return a.status === "bekleyen" ? -1 : 1;
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+  return { orders, expenses, settings, recurringExpenses, todos, recurringTodos };
 }
 
 export async function createOrder(
@@ -363,6 +518,126 @@ export async function deleteRecurringExpense(id: number): Promise<boolean> {
   const next = rules.filter((r) => r.id !== id);
   if (next.length === rules.length) return false;
   await writeRecurring(next);
+  return true;
+}
+
+export async function createTodo(
+  input: Omit<ErpTodo, "id" | "createdAt" | "status" | "sortOrder"> & {
+    status?: ErpTodo["status"];
+    sortOrder?: number;
+  }
+): Promise<ErpTodo> {
+  const todos = await readTodosRaw();
+  const pendingSort = todos
+    .filter((t) => t.status === "bekleyen")
+    .map((t) => t.sortOrder);
+  const minSort = pendingSort.length ? Math.min(...pendingSort) : 0;
+  const todo: ErpTodo = {
+    title: input.title,
+    note: input.note ?? "",
+    recurringId: input.recurringId,
+    periodKey: input.periodKey,
+    dueDate: input.dueDate,
+    completedAt: input.completedAt,
+    id: await nextId(),
+    status: input.status ?? "bekleyen",
+    sortOrder: input.sortOrder ?? minSort - 1,
+    createdAt: new Date().toISOString(),
+  };
+  todos.unshift(todo);
+  await writeTodos(todos);
+  return todo;
+}
+
+export async function updateTodo(
+  id: number,
+  patch: Partial<Omit<ErpTodo, "id" | "createdAt">>
+): Promise<ErpTodo | null> {
+  const todos = await readTodosRaw();
+  const idx = todos.findIndex((t) => t.id === id);
+  if (idx < 0) return null;
+  const next: ErpTodo = { ...todos[idx], ...patch };
+  if (patch.status === "bekleyen" || ("completedAt" in patch && patch.completedAt == null)) {
+    delete next.completedAt;
+  }
+  todos[idx] = next;
+  await writeTodos(todos);
+  return todos[idx];
+}
+
+export async function deleteTodo(id: number): Promise<boolean> {
+  const todos = await readTodosRaw();
+  const next = todos.filter((t) => t.id !== id);
+  if (next.length === todos.length) return false;
+  await writeTodos(next);
+  return true;
+}
+
+export async function reorderTodo(
+  id: number,
+  direction: "up" | "down"
+): Promise<ErpTodo[] | null> {
+  const todos = await readTodosRaw();
+  const pending = todos
+    .filter((t) => t.status === "bekleyen")
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+  const idx = pending.findIndex((t) => t.id === id);
+  if (idx < 0) return null;
+  const swapWith = direction === "up" ? idx - 1 : idx + 1;
+  if (swapWith < 0 || swapWith >= pending.length) return todos;
+
+  const a = pending[idx];
+  const b = pending[swapWith];
+  const orderA = a.sortOrder;
+  const orderB = b.sortOrder;
+  const map = new Map(todos.map((t) => [t.id, { ...t }]));
+  const ta = map.get(a.id)!;
+  const tb = map.get(b.id)!;
+  if (orderA === orderB) {
+    ta.sortOrder = direction === "up" ? orderA - 1 : orderA + 1;
+  } else {
+    ta.sortOrder = orderB;
+    tb.sortOrder = orderA;
+  }
+  const next = Array.from(map.values());
+  await writeTodos(next);
+  return next;
+}
+
+export async function createTodoRecurring(
+  input: Omit<ErpTodoRecurring, "id" | "createdAt" | "active"> & { active?: boolean }
+): Promise<ErpTodoRecurring> {
+  const rules = await readTodoRecurring();
+  const rule: ErpTodoRecurring = {
+    ...input,
+    active: input.active !== false,
+    id: await nextId(),
+    createdAt: new Date().toISOString(),
+  };
+  rules.unshift(rule);
+  await writeTodoRecurring(rules);
+  await syncTodoRecurring(await readTodosRaw());
+  return rule;
+}
+
+export async function updateTodoRecurring(
+  id: number,
+  patch: Partial<Omit<ErpTodoRecurring, "id" | "createdAt">>
+): Promise<ErpTodoRecurring | null> {
+  const rules = await readTodoRecurring();
+  const idx = rules.findIndex((r) => r.id === id);
+  if (idx < 0) return null;
+  rules[idx] = { ...rules[idx], ...patch };
+  await writeTodoRecurring(rules);
+  await syncTodoRecurring(await readTodosRaw());
+  return rules[idx];
+}
+
+export async function deleteTodoRecurring(id: number): Promise<boolean> {
+  const rules = await readTodoRecurring();
+  const next = rules.filter((r) => r.id !== id);
+  if (next.length === rules.length) return false;
+  await writeTodoRecurring(next);
   return true;
 }
 

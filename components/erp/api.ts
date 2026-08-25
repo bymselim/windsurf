@@ -1,6 +1,14 @@
 import { getAdminAuthHeaders } from "@/lib/admin-auth-client";
 import type { ErpImportMode, ErpImportResult } from "@/lib/erp/import";
-import type { ErpData, ErpExpense, ErpOrder, ErpRecurringExpense, ErpSettings } from "@/lib/erp/types";
+import type {
+  ErpData,
+  ErpExpense,
+  ErpOrder,
+  ErpRecurringExpense,
+  ErpSettings,
+  ErpTodo,
+  ErpTodoRecurring,
+} from "@/lib/erp/types";
 import type { ErpEmailSettings, ErpEmailSectionKey } from "@/lib/erp/email-types";
 
 function headers(json = true): HeadersInit {
@@ -229,4 +237,114 @@ export async function sendErpEmailTest(
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json?.error ?? "Test maili gönderilemedi");
+}
+
+export async function createErpTodo(payload: {
+  title: string;
+  note?: string;
+}): Promise<{ todo: ErpTodo; todos: ErpTodo[] }> {
+  const res = await fetch("/api/admin/erp/todos", {
+    method: "POST",
+    credentials: "include",
+    headers: headers(),
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? "Kayıt başarısız");
+  return json;
+}
+
+export async function updateErpTodo(
+  id: number,
+  payload: Record<string, unknown>
+): Promise<{ todo: ErpTodo; todos: ErpTodo[] }> {
+  const res = await fetch(`/api/admin/erp/todos/${id}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: headers(),
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? "Güncelleme başarısız");
+  return json;
+}
+
+export async function toggleErpTodoDone(
+  id: number
+): Promise<{ todo: ErpTodo; todos: ErpTodo[] }> {
+  return updateErpTodo(id, { toggleDone: true });
+}
+
+export async function reorderErpTodo(
+  id: number,
+  direction: "up" | "down"
+): Promise<{ todos: ErpTodo[] }> {
+  const res = await fetch(`/api/admin/erp/todos/${id}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: headers(),
+    body: JSON.stringify({ reorder: direction }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? "Sıralama başarısız");
+  return json;
+}
+
+export async function deleteErpTodo(id: number): Promise<void> {
+  const res = await fetch(`/api/admin/erp/todos/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: headers(),
+  });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json?.error ?? "Silinemedi");
+  }
+}
+
+export async function createErpTodoRecurring(payload: Record<string, unknown>): Promise<{
+  rule: ErpTodoRecurring;
+  todos: ErpTodo[];
+  recurringTodos: ErpTodoRecurring[];
+}> {
+  const res = await fetch("/api/admin/erp/todo-recurring", {
+    method: "POST",
+    credentials: "include",
+    headers: headers(),
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? "Kayıt başarısız");
+  return json;
+}
+
+export async function updateErpTodoRecurring(
+  id: number,
+  payload: Record<string, unknown>
+): Promise<{
+  rule: ErpTodoRecurring;
+  todos: ErpTodo[];
+  recurringTodos: ErpTodoRecurring[];
+}> {
+  const res = await fetch(`/api/admin/erp/todo-recurring/${id}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: headers(),
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? "Güncelleme başarısız");
+  return json;
+}
+
+export async function deleteErpTodoRecurring(id: number): Promise<void> {
+  const res = await fetch(`/api/admin/erp/todo-recurring/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: headers(),
+  });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json?.error ?? "Silinemedi");
+  }
 }

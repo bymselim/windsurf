@@ -4,6 +4,7 @@ export const ERP_EMAIL_SECTION_LABELS = {
   dueOrders: "Bitime yakın siparişler",
   yesterdayOrders: "Dün alınan siparişler",
   yesterdayExpenses: "Dün yapılan giderler",
+  pendingTodos: "Bekleyen yapılacaklar",
   monthlyReport: "Ay sonu raporu (ayrı e-posta)",
 } as const;
 
@@ -13,6 +14,7 @@ export const ERP_DAILY_SECTION_KEYS: ErpEmailSectionKey[] = [
   "dueOrders",
   "yesterdayOrders",
   "yesterdayExpenses",
+  "pendingTodos",
 ];
 
 export interface ErpEmailSettings {

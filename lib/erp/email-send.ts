@@ -54,6 +54,7 @@ export async function runErpScheduledEmails(options?: {
       const digest = buildDailyDigestText({
         orders: data.orders,
         expenses: data.expenses,
+        todos: data.todos,
         sections: dailySections,
       });
       await sendMail({
@@ -113,6 +114,7 @@ export async function sendErpTestDaily(toEmail: string): Promise<void> {
   const digest = buildDailyDigestText({
     orders: data.orders,
     expenses: data.expenses,
+    todos: data.todos,
     sections: settings.dailySections.filter((s) => s !== "monthlyReport"),
   });
   await sendMail({

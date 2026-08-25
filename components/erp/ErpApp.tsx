@@ -31,11 +31,19 @@ import {
   updateErpRecurring,
 } from "@/components/erp/api";
 import { ErpImportPanel } from "@/components/erp/ErpImportPanel";
+import { TodosPanel } from "@/components/erp/TodosPanel";
 import { clearAdminPassword } from "@/lib/admin-auth-client";
 import { APP_VERSION } from "@/lib/app-version";
 import type { ErpEmailSectionKey, ErpEmailSettings } from "@/lib/erp/email-types";
 import { ERP_EMAIL_SECTION_LABELS } from "@/lib/erp/email-types";
-import type { ErpExpense, ErpOrder, ErpRecurringExpense, ErpSettings } from "@/lib/erp/types";
+import type {
+  ErpExpense,
+  ErpOrder,
+  ErpRecurringExpense,
+  ErpSettings,
+  ErpTodo,
+  ErpTodoRecurring,
+} from "@/lib/erp/types";
 import {
   addWorkdays,
   assignOrderNums,
@@ -78,11 +86,18 @@ const TITLES: Record<Tab, string> = {
   dashboard: "Dashboard",
   siparisler: "Siparişler",
   giderler: "Giderler",
+  yapilacaklar: "Yapılacaklar",
   raporlar: "Raporlar",
   tanimlamalar: "Tanımlamalar",
 };
 
-type Tab = "dashboard" | "siparisler" | "giderler" | "raporlar" | "tanimlamalar";
+type Tab =
+  | "dashboard"
+  | "siparisler"
+  | "giderler"
+  | "yapilacaklar"
+  | "raporlar"
+  | "tanimlamalar";
 
 type OrderForm = {
   ad: string;
@@ -386,6 +401,8 @@ export default function ErpApp() {
     expSubCats: {},
   });
   const [recurringExpenses, setRecurringExpenses] = useState<ErpRecurringExpense[]>([]);
+  const [todos, setTodos] = useState<ErpTodo[]>([]);
+  const [recurringTodos, setRecurringTodos] = useState<ErpTodoRecurring[]>([]);
   const [tab, setTab] = useState<Tab>("dashboard");
   const [loading, setLoading] = useState(true);
   const [loadingMsg, setLoadingMsg] = useState("Yükleniyor...");
@@ -468,11 +485,15 @@ export default function ErpApp() {
       expenses: ErpExpense[];
       settings: ErpSettings;
       recurringExpenses?: ErpRecurringExpense[];
+      todos?: ErpTodo[];
+      recurringTodos?: ErpTodoRecurring[];
     }) => {
       setOrders(data.orders);
       setExpenses(data.expenses);
       setSettings(data.settings);
       setRecurringExpenses(data.recurringExpenses ?? []);
+      setTodos(data.todos ?? []);
+      setRecurringTodos(data.recurringTodos ?? []);
       setSyncOk(true);
     },
     []
@@ -1578,6 +1599,7 @@ Saygılarımla`;
             {navBtn("dashboard", "◈ Dashboard")}
             {navBtn("siparisler", "▦ Siparişler")}
             {navBtn("giderler", "◎ Giderler")}
+            {navBtn("yapilacaklar", "☑ Yapılacaklar")}
             {navBtn("raporlar", "◉ Raporlar")}
             {navBtn("tanimlamalar", "⚙ Tanımlamalar")}
             <button
@@ -1633,6 +1655,7 @@ Saygılarımla`;
             {navBtn("dashboard", "◈ Dashboard", () => setMobileNavOpen(false))}
             {navBtn("siparisler", "▦ Siparişler", () => setMobileNavOpen(false))}
             {navBtn("giderler", "◎ Giderler", () => setMobileNavOpen(false))}
+            {navBtn("yapilacaklar", "☑ Yapılacaklar", () => setMobileNavOpen(false))}
             {navBtn("raporlar", "◉ Raporlar", () => setMobileNavOpen(false))}
             {navBtn("tanimlamalar", "⚙ Tanımlamalar", () => setMobileNavOpen(false))}
             <Link
@@ -2433,6 +2456,23 @@ Saygılarımla`;
                   </table>
                 </div>
               </div>
+            </div>
+
+            {/* YAPILACAKLAR */}
+            <div
+              className={`page${tab === "yapilacaklar" ? " active" : ""}`}
+              id="page-yapilacaklar"
+            >
+              <TodosPanel
+                todos={todos}
+                recurringTodos={recurringTodos}
+                onTodosChange={setTodos}
+                onRecurringChange={setRecurringTodos}
+                onBusy={(busy, msg) => {
+                  if (busy) showLoading(msg || "İşleniyor...");
+                  else hideLoading();
+                }}
+              />
             </div>
 
             {/* RAPORLAR */}

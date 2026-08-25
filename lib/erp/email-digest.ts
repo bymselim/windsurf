@@ -1,4 +1,4 @@
-import type { ErpExpense, ErpOrder } from "./types";
+import type { ErpExpense, ErpOrder, ErpTodo } from "./types";
 import type { ErpEmailSectionKey } from "./email-types";
 import { ERP_EMAIL_SECTION_LABELS } from "./email-types";
 import {
@@ -134,6 +134,7 @@ function snapshotToText(s: ErpReportSnapshot, ym: string): string {
 export interface DailyDigestInput {
   orders: ErpOrder[];
   expenses: ErpExpense[];
+  todos?: ErpTodo[];
   sections: ErpEmailSectionKey[];
   referenceDate?: string;
 }
@@ -209,6 +210,34 @@ export function buildDailyDigestText(input: DailyDigestInput): {
             .map((e) => `<li>${expenseLine(e).replace(/^  • /, "").replace(/</g, "&lt;")}</li>`)
             .join("")}</ul>`
         : `<p style="color:#666;">Kayıt yok</p>`,
+      true
+    );
+  }
+
+  if (input.sections.includes("pendingTodos")) {
+    const pending = (input.todos ?? [])
+      .filter((t) => t.status === "bekleyen")
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+    const todoLine = (t: ErpTodo) => {
+      const note = (t.note || "").replace(/\s+/g, " ").trim().slice(0, 80);
+      const due = t.dueDate ? ` · vade ${fmtDate(t.dueDate)}` : "";
+      return `  • ${t.title}${due}${note ? ` — ${note}` : ""}`;
+    };
+    const lines = pending.length ? pending.map(todoLine) : ["  (Bekleyen yok)"];
+    add(
+      "pendingTodos",
+      `${sectionTitle("pendingTodos")}\n${lines.join("\n")}`,
+      pending.length
+        ? `<ul style="margin:0;padding-left:18px;">${pending
+            .map((t) => {
+              const note = (t.note || "").replace(/</g, "&lt;").slice(0, 80);
+              const due = t.dueDate ? ` · vade ${fmtDate(t.dueDate)}` : "";
+              return `<li><strong>${t.title.replace(/</g, "&lt;")}</strong>${due}${
+                note ? ` — ${note}` : ""
+              }</li>`;
+            })
+            .join("")}</ul>`
+        : `<p style="color:#666;">Bekleyen yok</p>`,
       true
     );
   }
