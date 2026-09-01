@@ -54,10 +54,13 @@ export function openWhatsAppShare(o: ErpOrder): void {
 function buildLabelHtml(o: ErpOrder): string {
   const name = orderFullName(o);
   const tel = o.tel?.trim() || "—";
+  const eser = orderEserBilgisi(o);
+  const adetNote = o.adet > 1 ? `${o.adet} adet` : "";
+  const eserDisplay = [adetNote, eser !== "—" ? eser : ""].filter(Boolean).join(" · ") || "—";
   const adres = (o.adres ?? "").trim() || "—";
   const maps = sanitizeMapsUrl(o.mapsUrl ?? "");
   const qrSrc = maps
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data=${encodeURIComponent(maps)}`
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=0&data=${encodeURIComponent(maps)}`
     : "";
 
   return `<!DOCTYPE html>
@@ -66,74 +69,86 @@ function buildLabelHtml(o: ErpOrder): string {
 <meta charset="utf-8"/>
 <title>Kargo Etiketi — ${escapeHtml(name)}</title>
 <style>
-  @page { size: A4; margin: 18mm; }
+  @page { size: A4; margin: 14mm; }
   * { box-sizing: border-box; }
+  html, body {
+    height: auto;
+    margin: 0;
+    padding: 0;
+  }
   body {
     font-family: "Helvetica Neue", Arial, sans-serif;
     color: #111;
-    margin: 0;
     padding: 0;
   }
   .label {
     border: 2px solid #222;
     border-radius: 6px;
-    padding: 28px 32px;
-    min-height: 180mm;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
+    padding: 22px 28px;
+    width: 100%;
+    max-width: 100%;
+    page-break-inside: avoid;
   }
   .name {
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 700;
     letter-spacing: 0.02em;
-    margin: 0 0 20px;
+    margin: 0 0 16px;
     line-height: 1.2;
     text-transform: uppercase;
   }
   .row {
-    margin-bottom: 18px;
-    font-size: 16px;
-    line-height: 1.5;
+    margin-bottom: 14px;
+    line-height: 1.45;
+  }
+  .row:last-child {
+    margin-bottom: 0;
   }
   .row .k {
     display: block;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: #555;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
   }
   .row .v {
-    font-size: 18px;
+    font-size: 16px;
     white-space: pre-wrap;
     word-break: break-word;
   }
+  .eser .v {
+    font-size: 17px;
+    line-height: 1.4;
+  }
   .adres .v {
-    font-size: 20px;
-    line-height: 1.45;
+    font-size: 18px;
+    line-height: 1.4;
   }
   .maps {
-    margin-top: auto;
-    padding-top: 24px;
+    margin-top: 16px;
+    padding-top: 16px;
     border-top: 1px dashed #ccc;
     display: flex;
     align-items: flex-start;
-    gap: 20px;
+    gap: 16px;
   }
   .maps img {
-    width: 120px;
-    height: 120px;
+    width: 96px;
+    height: 96px;
     flex-shrink: 0;
   }
   .maps .link {
-    font-size: 12px;
+    font-size: 11px;
     color: #333;
     word-break: break-all;
+    line-height: 1.35;
   }
   @media print {
+    html, body { height: auto; overflow: visible; }
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .label { break-inside: avoid; page-break-inside: avoid; }
   }
 </style>
 </head>
@@ -143,6 +158,10 @@ function buildLabelHtml(o: ErpOrder): string {
     <div class="row">
       <span class="k">Telefon</span>
       <span class="v">${escapeHtml(tel)}</span>
+    </div>
+    <div class="row eser">
+      <span class="k">Eser</span>
+      <span class="v">${escapeHtml(eserDisplay)}</span>
     </div>
     <div class="row adres">
       <span class="k">Teslimat Adresi</span>

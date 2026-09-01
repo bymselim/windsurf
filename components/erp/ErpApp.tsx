@@ -47,6 +47,7 @@ import type {
 } from "@/lib/erp/types";
 import {
   openWhatsAppShare,
+  orderEserBilgisi,
   printShippingLabel,
 } from "@/lib/erp/shipping-label";
 import {
@@ -1402,6 +1403,55 @@ Saygılarımla`;
     return <span style={{ fontSize: 12, color: "var(--text2)" }}>{dl} gün</span>;
   };
 
+  const renderOrderActions = (o: ErpOrder, st: ReturnType<typeof getOrderStatus>) => (
+    <>
+      <button
+        type="button"
+        className="btn sm"
+        title="Etiket yazdır"
+        onClick={() => printShippingLabel(o)}
+      >
+        🖨
+      </button>
+      <button
+        type="button"
+        className="btn sm success"
+        title="WhatsApp ile paylaş"
+        onClick={() => openWhatsAppShare(o)}
+      >
+        WA
+      </button>
+      <button type="button" className="btn sm" onClick={() => editOrder(o.id)}>
+        ✏
+      </button>
+      <button
+        type="button"
+        className="btn sm"
+        onClick={() => void toggleDone(o.id)}
+        title={st === "biten" ? "Bekleyene al" : "Tamamlandı"}
+      >
+        {st === "biten" ? "↺" : "✓"}
+      </button>
+      <button
+        type="button"
+        className={`btn sm${st === "askida" ? " primary" : ""}`}
+        onClick={() => void setAskida(o.id)}
+        title={
+          st === "askida" ? "Askıdan çıkar" : "Askıya al (teslim/ödeme beklenmiyor)"
+        }
+      >
+        ⏸
+      </button>
+      <button
+        type="button"
+        className="btn sm danger"
+        onClick={() => void delOrder(o.id)}
+      >
+        ✕
+      </button>
+    </>
+  );
+
   const buildCatOptions = (arr: string[], selected: string) => {
     const list = selected && !arr.includes(selected) ? [selected, ...arr] : arr;
     return list.map((c) => (
@@ -2000,7 +2050,7 @@ Saygılarımla`;
                 </span>
               </div>
               <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-                <div className="tbl-wrap">
+                <div className="tbl-wrap order-desktop-table">
                   <table>
                     <thead>
                       <tr>
@@ -2130,56 +2180,7 @@ Saygılarımla`;
                                 {fmtDate(o.bitis)}
                               </td>
                               <td style={{ whiteSpace: "nowrap" }} className="order-actions">
-                                <button
-                                  type="button"
-                                  className="btn sm"
-                                  title="Etiket yazdır"
-                                  onClick={() => printShippingLabel(o)}
-                                >
-                                  🖨
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn sm success"
-                                  title="WhatsApp ile paylaş"
-                                  onClick={() => openWhatsAppShare(o)}
-                                >
-                                  WA
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn sm"
-                                  onClick={() => editOrder(o.id)}
-                                >
-                                  ✏
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn sm"
-                                  onClick={() => void toggleDone(o.id)}
-                                  title={st === "biten" ? "Bekleyene al" : "Tamamlandı"}
-                                >
-                                  {st === "biten" ? "↺" : "✓"}
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`btn sm${st === "askida" ? " primary" : ""}`}
-                                  onClick={() => void setAskida(o.id)}
-                                  title={
-                                    st === "askida"
-                                      ? "Askıdan çıkar"
-                                      : "Askıya al (teslim/ödeme beklenmiyor)"
-                                  }
-                                >
-                                  ⏸
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn sm danger"
-                                  onClick={() => void delOrder(o.id)}
-                                >
-                                  ✕
-                                </button>
+                                {renderOrderActions(o, st)}
                               </td>
                             </tr>
                           );
@@ -2193,6 +2194,62 @@ Saygılarımla`;
                       )}
                     </tbody>
                   </table>
+                </div>
+                <div className="order-mobile-list">
+                  {sortedOrders.length ? (
+                    sortedOrders.map((o) => {
+                      const st = getOrderStatus(o);
+                      const eser = orderEserBilgisi(o);
+                      return (
+                        <div key={o.id} className="order-card">
+                          <div className="order-card-head">
+                            <span className="order-card-date">{fmtDate(o.tarih)}</span>
+                            <span className="order-card-meta">
+                              <span className={`dot ${STATUS_COLORS[st]}`} />
+                              #{getNum(o.id)}
+                              <span className={`badge ${STATUS_COLORS[st]}`}>
+                                {STATUS_LABELS[st]}
+                              </span>
+                            </span>
+                          </div>
+                          <div className="order-card-name">
+                            <span dangerouslySetInnerHTML={{ __html: escHtml(o.ad) }} />{" "}
+                            <span dangerouslySetInnerHTML={{ __html: escHtml(o.soyad) }} />
+                          </div>
+                          <div className="order-card-eser">
+                            {o.cat ? (
+                              <span className="badge blue" style={{ fontSize: 10 }}>
+                                {o.cat}
+                              </span>
+                            ) : null}{" "}
+                            {eser !== "—" ? eser : o.tur || "—"}
+                          </div>
+                          <div className="order-card-balance">
+                            <div>
+                              <span className="k">Kapora</span>
+                              <span className="v">{fmtM(o.kapora)}</span>
+                            </div>
+                            <div>
+                              <span className="k">Toplam</span>
+                              <span className="v amber">{fmtM(o.toplam)}</span>
+                            </div>
+                            <div>
+                              <span className="k">Kalan</span>
+                              <span className="v red">{fmtM(orderKalanBakiye(o))}</span>
+                            </div>
+                          </div>
+                          <div className="order-card-foot">
+                            <div className="order-card-actions order-actions">
+                              {renderOrderActions(o, st)}
+                            </div>
+                            <div className="order-card-days">{daysLeftBadge(o)}</div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="empty">Sipariş bulunamadı.</div>
+                  )}
                 </div>
               </div>
             </div>
