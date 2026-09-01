@@ -33,7 +33,7 @@ import {
 } from "@/components/erp/api";
 import { ErpImportPanel } from "@/components/erp/ErpImportPanel";
 import { TodosPanel } from "@/components/erp/TodosPanel";
-import { AdminAuthError, logoutAdminSession } from "@/lib/admin-auth-client";
+import { AdminAuthError, alertUnlessAdminAuthError, logoutAdminSession } from "@/lib/admin-auth-client";
 import { APP_VERSION } from "@/lib/app-version";
 import type { ErpEmailSectionKey, ErpEmailSettings } from "@/lib/erp/email-types";
 import { ERP_EMAIL_SECTION_LABELS } from "@/lib/erp/email-types";
@@ -568,7 +568,7 @@ export default function ErpApp() {
       setEmailSettings(saved);
       alert("E-posta ayarları kaydedildi.");
     } catch (e) {
-      alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+      alertUnlessAdminAuthError(e);
     } finally {
       hideLoading();
     }
@@ -587,7 +587,7 @@ export default function ErpApp() {
           kind === "daily" ? "günlük" : kind === "monthly" ? "ay sonu" : "haftalık yedek";
         alert(`Test maili gönderildi (${label}).`);
       } catch (e) {
-        alert("Hata: " + (e instanceof Error ? e.message : "Gönderilemedi"));
+        alertUnlessAdminAuthError(e, "Gönderilemedi");
       } finally {
         hideLoading();
       }
@@ -757,7 +757,7 @@ export default function ErpApp() {
       }
       setOrderModalOpen(false);
     } catch (e) {
-      alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+      alertUnlessAdminAuthError(e);
     } finally {
       hideLoading();
     }
@@ -778,7 +778,7 @@ export default function ErpApp() {
         const updated = await toggleErpOrderDone(id);
         setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
       } catch (e) {
-        alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+        alertUnlessAdminAuthError(e);
       } finally {
         hideLoading();
       }
@@ -796,7 +796,7 @@ export default function ErpApp() {
         const updated = await updateErpOrder(id, { durum: nextDurum });
         setOrders((prev) => prev.map((x) => (x.id === id ? updated : x)));
       } catch (e) {
-        alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+        alertUnlessAdminAuthError(e);
       } finally {
         hideLoading();
       }
@@ -812,7 +812,7 @@ export default function ErpApp() {
         await deleteErpOrder(id);
         setOrders((prev) => prev.filter((o) => o.id !== id));
       } catch (e) {
-        alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+        alertUnlessAdminAuthError(e);
       } finally {
         hideLoading();
       }
@@ -941,7 +941,7 @@ export default function ErpApp() {
       }
       closeExpModal();
     } catch (e) {
-      alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+      alertUnlessAdminAuthError(e);
     } finally {
       hideLoading();
     }
@@ -965,7 +965,7 @@ export default function ErpApp() {
         setExpenses((prev) => prev.filter((e) => e.id !== id));
         setSelectedExpenseIds((prev) => prev.filter((x) => x !== id));
       } catch (e) {
-        alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+        alertUnlessAdminAuthError(e);
       } finally {
         hideLoading();
       }
@@ -1004,7 +1004,7 @@ export default function ErpApp() {
       setSelectedExpenseIds([]);
       if (removed === 0) alert("Silinecek kayıt bulunamadı.");
     } catch (e) {
-      alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+      alertUnlessAdminAuthError(e);
     } finally {
       hideLoading();
     }
@@ -1026,7 +1026,7 @@ export default function ErpApp() {
       setExpenses([]);
       setSelectedExpenseIds([]);
     } catch (e) {
-      alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+      alertUnlessAdminAuthError(e);
     } finally {
       hideLoading();
     }
@@ -1038,7 +1038,7 @@ export default function ErpApp() {
         const saved = await saveErpSettings(next);
         setSettings(saved);
       } catch (e) {
-        alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+        alertUnlessAdminAuthError(e);
       }
     },
     []
@@ -1146,7 +1146,7 @@ export default function ErpApp() {
         setRecForm(emptyRecurringForm(kat, acik.trim()));
       }
     } catch (e) {
-      alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+      alertUnlessAdminAuthError(e);
     } finally {
       hideLoading();
     }
@@ -1178,7 +1178,7 @@ export default function ErpApp() {
         await deleteErpRecurring(id);
         setRecurringExpenses((prev) => prev.filter((r) => r.id !== id));
       } catch (e) {
-        alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+        alertUnlessAdminAuthError(e);
       } finally {
         hideLoading();
       }
@@ -1194,7 +1194,7 @@ export default function ErpApp() {
         setRecurringExpenses((prev) => prev.map((r) => (r.id === id ? rule : r)));
         setExpenses(nextExpenses);
       } catch (e) {
-        alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+        alertUnlessAdminAuthError(e);
       } finally {
         hideLoading();
       }
@@ -2187,7 +2187,7 @@ Saygılarımla`;
                         })
                       ) : (
                         <tr>
-                          <td colSpan={13} className="empty">
+                          <td colSpan={11} className="empty">
                             Sipariş bulunamadı.
                           </td>
                         </tr>

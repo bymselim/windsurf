@@ -14,6 +14,15 @@ export class AdminAuthError extends Error {
   }
 }
 
+/** Oturum süresi dolduysa sessizce çık; aksi halde alert göster. */
+export function alertUnlessAdminAuthError(
+  e: unknown,
+  fallback = "Bilinmeyen hata"
+): void {
+  if (e instanceof AdminAuthError) return;
+  alert("Hata: " + (e instanceof Error ? e.message : fallback));
+}
+
 export function setAdminPassword(password: string): void {
   if (typeof window === "undefined") return;
   sessionStorage.setItem(PASSWORD_KEY, password);

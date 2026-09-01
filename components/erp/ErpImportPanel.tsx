@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { importErpJson } from "@/components/erp/api";
+import { alertUnlessAdminAuthError } from "@/lib/admin-auth-client";
 import type { ErpData } from "@/lib/erp/types";
 
 type Props = {
@@ -64,7 +65,7 @@ export function ErpImportPanel({
       setFiles([]);
       setFileLabel("JSON/CSV dosyası seçin veya sürükleyin (birden fazla olabilir)");
     } catch (e) {
-      alert(e instanceof Error ? e.message : "İçe aktarma başarısız");
+      alertUnlessAdminAuthError(e, "İçe aktarma başarısız");
     } finally {
       onLoaded();
     }

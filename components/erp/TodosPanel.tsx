@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { alertUnlessAdminAuthError } from "@/lib/admin-auth-client";
 import {
   createErpTodo,
   createErpTodoRecurring,
@@ -142,7 +143,7 @@ export function TodosPanel({
     try {
       await fn();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "İşlem başarısız");
+      alertUnlessAdminAuthError(e, "İşlem başarısız");
     } finally {
       onBusy?.(false);
     }
