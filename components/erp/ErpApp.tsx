@@ -78,6 +78,7 @@ import {
   isInMonth,
   monthStr,
   orderKalanBakiye,
+  orderListShowsKalan,
   toInputDateValue,
   type ExpenseSortKey,
   type OrderSortKey,
@@ -2082,7 +2083,7 @@ Saygılarımla`;
                               {fmtM(o.toplam)}
                             </td>
                             <td style={{ color: "var(--red)", fontWeight: 500 }}>
-                              {fmtM(orderKalanBakiye(o))}
+                              {orderListShowsKalan(o) ? fmtM(orderKalanBakiye(o)) : "—"}
                             </td>
                             <td>
                               <span className={`badge ${STATUS_COLORS[st]}`}>
@@ -2243,7 +2244,9 @@ Saygılarımla`;
                                 {fmtM(o.toplam)}
                               </td>
                               <td style={{ color: "var(--red)", fontWeight: 500 }}>
-                                {fmtM(orderKalanBakiye(o))}
+                                {orderListShowsKalan(o)
+                                  ? fmtM(orderKalanBakiye(o))
+                                  : "—"}
                               </td>
                               <td className="b">
                                 <span
@@ -2311,7 +2314,9 @@ Saygılarımla`;
                             ) : null}{" "}
                             {eser !== "—" ? eser : o.tur || "—"}
                           </div>
-                          <div className="order-card-balance">
+                          <div
+                            className={`order-card-balance${orderListShowsKalan(o) ? "" : " settled"}`}
+                          >
                             <div>
                               <span className="k">Kapora</span>
                               <span className="v">{fmtM(o.kapora)}</span>
@@ -2320,10 +2325,12 @@ Saygılarımla`;
                               <span className="k">Toplam</span>
                               <span className="v amber">{fmtM(o.toplam)}</span>
                             </div>
-                            <div>
-                              <span className="k">Kalan</span>
-                              <span className="v red">{fmtM(orderKalanBakiye(o))}</span>
-                            </div>
+                            {orderListShowsKalan(o) ? (
+                              <div>
+                                <span className="k">Kalan</span>
+                                <span className="v red">{fmtM(orderKalanBakiye(o))}</span>
+                              </div>
+                            ) : null}
                           </div>
                           <div className="order-card-foot">
                             <div className="order-card-actions order-actions">

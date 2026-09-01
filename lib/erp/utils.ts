@@ -222,6 +222,11 @@ export function orderKalanBakiye(o: ErpOrder): number {
   return v > 0 ? v : 0;
 }
 
+/** Tamamlanan siparişlerde kalan sütunu gösterilmez. */
+export function orderListShowsKalan(o: ErpOrder): boolean {
+  return getOrderStatus(o) !== "biten";
+}
+
 /** Sipariş listesindeki kalan bakiye (yalnızca pozitif; vadeli alacak). */
 export function orderKalan(o: ErpOrder): number {
   const v = (+o.toplam || 0) - (+o.tahsilat || 0);

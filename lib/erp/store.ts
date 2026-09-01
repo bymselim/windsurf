@@ -12,6 +12,7 @@ import type {
 } from "./types";
 import { applyRecurringExpenses, removeFutureRecurringExpenses } from "./recurring";
 import { applyTodoRecurring } from "./todo-recurring";
+import { applyOrderTodoReminders } from "./order-todo-reminders";
 import {
   type ErpImportMode,
   type ErpImportPayload,
@@ -350,6 +351,29 @@ async function syncTodoRecurring(todos: ErpTodo[]): Promise<ErpTodo[]> {
   return result.todos;
 }
 
+async function syncOrderTodoReminders(
+  todos: ErpTodo[],
+  orders: ErpOrder[]
+): Promise<ErpTodo[]> {
+  let cursor = 0;
+  const peekMax =
+    todos.reduce((m, t) => Math.max(m, t.id), 0) +
+    orders.reduce((m, o) => Math.max(m, o.id), 0);
+  const kvNext = await kvGetJson<number>(KV_NEXT_ID);
+  cursor = typeof kvNext === "number" && kvNext > 0 ? kvNext : peekMax;
+  let idSeq = cursor;
+  const result = applyOrderTodoReminders(todos, orders, () => {
+    cursor += 1;
+    idSeq = cursor;
+    return cursor;
+  });
+  if (result.created > 0) {
+    await writeTodos(result.todos);
+    if (await isKvAvailable()) await kvSetJson(KV_NEXT_ID, idSeq);
+  }
+  return result.todos;
+}
+
 async function readRecurring(): Promise<ErpRecurringExpense[]> {
   const kv = await kvGetJson<ErpRecurringExpense[]>(KV_RECURRING);
   if (Array.isArray(kv)) {
@@ -402,7 +426,8 @@ export async function readErpData(): Promise<ErpData> {
       readTodoRecurring(),
     ]);
   const expenses = await syncRecurringExpenses(rawExpenses);
-  const todos = await syncTodoRecurring(rawTodos);
+  let todos = await syncTodoRecurring(rawTodos);
+  todos = await syncOrderTodoReminders(todos, orders);
   orders.sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
