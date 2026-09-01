@@ -41,15 +41,17 @@ export function buildWhatsAppShareText(o: ErpOrder): string {
 
 export function openWhatsAppShare(o: ErpOrder): void {
   const text = buildWhatsAppShareText(o);
-  window.open(
-    `https://wa.me/?text=${encodeURIComponent(text)}`,
-    "_blank",
-    "noopener,noreferrer"
-  );
+  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  // Mobilde window.open sık engellenir; aynı sekmede açmak daha güvenilir.
+  if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    window.location.href = url;
+    return;
+  }
+  const w = window.open(url, "_blank", "noopener,noreferrer");
+  if (!w) window.location.href = url;
 }
 
-/** A4 kargo etiketi — tarayıcıdan PDF olarak kaydedilebilir. */
-export function printShippingLabel(o: ErpOrder): void {
+function buildLabelHtml(o: ErpOrder): string {
   const name = orderFullName(o);
   const tel = o.tel?.trim() || "—";
   const adres = (o.adres ?? "").trim() || "—";
@@ -58,7 +60,7 @@ export function printShippingLabel(o: ErpOrder): void {
     ? `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data=${encodeURIComponent(maps)}`
     : "";
 
-  const html = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="utf-8"/>
@@ -149,7 +151,7 @@ export function printShippingLabel(o: ErpOrder): void {
     ${
       maps
         ? `<div class="maps">
-      <img src="${qrSrc}" alt="Konum QR"/>
+      <img id="qr" src="${qrSrc}" alt="Konum QR"/>
       <div>
         <span class="k">Google Maps Konumu</span>
         <div class="link">${escapeHtml(maps)}</div>
@@ -158,21 +160,56 @@ export function printShippingLabel(o: ErpOrder): void {
         : ""
     }
   </div>
-  <script>
-    window.onload = function() {
-      setTimeout(function() { window.print(); }, 400);
-    };
-  </script>
 </body>
 </html>`;
+}
 
-  const w = window.open("", "_blank", "noopener,noreferrer,width=800,height=900");
-  if (!w) {
-    alert("Açılır pencere engellendi. Tarayıcıda pop-up izni verin.");
+/** A4 kargo etiketi — tarayıcıdan PDF olarak kaydedilebilir. */
+export function printShippingLabel(o: ErpOrder): void {
+  const html = buildLabelHtml(o);
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute(
+    "style",
+    "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden"
+  );
+  iframe.setAttribute("title", "Kargo etiketi yazdır");
+  document.body.appendChild(iframe);
+
+  const win = iframe.contentWindow;
+  const doc = iframe.contentDocument ?? win?.document;
+  if (!win || !doc) {
+    iframe.remove();
+    alert("Yazdırma başlatılamadı.");
     return;
   }
-  w.document.write(html);
-  w.document.close();
+
+  const cleanup = () => {
+    setTimeout(() => iframe.remove(), 1500);
+  };
+
+  const triggerPrint = () => {
+    try {
+      win.focus();
+      win.print();
+    } catch {
+      alert("Yazdırma başlatılamadı.");
+    } finally {
+      cleanup();
+    }
+  };
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  const qr = doc.getElementById("qr") as HTMLImageElement | null;
+  if (qr && !qr.complete) {
+    qr.onload = () => setTimeout(triggerPrint, 150);
+    qr.onerror = () => setTimeout(triggerPrint, 150);
+    return;
+  }
+
+  setTimeout(triggerPrint, 300);
 }
 
 function escapeHtml(s: string): string {
