@@ -41,7 +41,6 @@ import type { ErpEmailSectionKey, ErpEmailSettings } from "@/lib/erp/email-types
 import { ERP_EMAIL_SECTION_LABELS } from "@/lib/erp/email-types";
 import {
   ERP_LABEL_FIELD_LABELS,
-  ERP_LABEL_FIELD_ORDER,
   defaultErpLabelSettings,
   type ErpLabelFieldKey,
   type ErpLabelSettings,
@@ -318,6 +317,30 @@ function ErpToggle({
         onClick={() => onChange(!checked)}
       />
     </div>
+  );
+}
+
+function LabelCellSwitch({
+  checked,
+  disabled,
+  onChange,
+  title,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (v: boolean) => void;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={title}
+      disabled={disabled}
+      className={`label-cell-switch${checked ? " on" : ""}`}
+      onClick={() => onChange(!checked)}
+    />
   );
 }
 
@@ -640,6 +663,18 @@ export default function ErpApp() {
     },
     []
   );
+
+  const moveLabelField = useCallback((key: ErpLabelFieldKey, dir: "up" | "down") => {
+    setLabelSettings((prev) => {
+      const order = [...prev.fieldOrder];
+      const i = order.indexOf(key);
+      if (i < 0) return prev;
+      const j = dir === "up" ? i - 1 : i + 1;
+      if (j < 0 || j >= order.length) return prev;
+      [order[i], order[j]] = [order[j], order[i]];
+      return { ...prev, fieldOrder: order };
+    });
+  }, []);
 
   const saveLabelSettings = useCallback(async () => {
     showLoading("Kaydediliyor...");
@@ -3134,35 +3169,51 @@ Saygılarımla`;
                 </div>
                 <div className="label-field-table">
                   <div className="label-field-head">
+                    <span>Sıra</span>
                     <span>Alan</span>
                     <span>Göster</span>
                     <span>Başlık</span>
                     <span>Punto (pt)</span>
                   </div>
-                  {ERP_LABEL_FIELD_ORDER.map((key) => {
+                  {labelSettings.fieldOrder.map((key, idx) => {
                     const f = labelSettings.fields[key];
                     return (
                       <div className="label-field-row" key={key}>
+                        <div className="label-field-order">
+                          <button
+                            type="button"
+                            className="btn sm"
+                            disabled={idx === 0}
+                            title="Yukarı"
+                            onClick={() => moveLabelField(key, "up")}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            className="btn sm"
+                            disabled={idx === labelSettings.fieldOrder.length - 1}
+                            title="Aşağı"
+                            onClick={() => moveLabelField(key, "down")}
+                          >
+                            ↓
+                          </button>
+                        </div>
                         <span className="label-field-name">{ERP_LABEL_FIELD_LABELS[key]}</span>
-                        <input
-                          type="checkbox"
+                        <LabelCellSwitch
                           checked={f.enabled}
-                          onChange={(e) =>
-                            updateLabelField(key, { enabled: e.target.checked })
-                          }
-                          aria-label={`${ERP_LABEL_FIELD_LABELS[key]} göster`}
+                          title={`${ERP_LABEL_FIELD_LABELS[key]} göster`}
+                          onChange={(enabled) => updateLabelField(key, { enabled })}
                         />
-                        <input
-                          type="checkbox"
+                        <LabelCellSwitch
                           checked={f.showLabel}
                           disabled={!f.enabled}
-                          onChange={(e) =>
-                            updateLabelField(key, { showLabel: e.target.checked })
-                          }
-                          aria-label={`${ERP_LABEL_FIELD_LABELS[key]} başlık`}
+                          title={`${ERP_LABEL_FIELD_LABELS[key]} başlık`}
+                          onChange={(showLabel) => updateLabelField(key, { showLabel })}
                         />
                         <input
                           type="number"
+                          className="label-field-pt"
                           min={6}
                           max={72}
                           value={f.fontSizePt}
@@ -3177,6 +3228,10 @@ Saygılarımla`;
                     );
                   })}
                 </div>
+                <p className="hint" style={{ marginTop: 10, fontSize: 11 }}>
+                  Eser bilgisinde kategori ve tür gösterilir; dahili sipariş notu (not_icerik)
+                  etikete basılmaz.
+                </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
                   <button
                     type="button"

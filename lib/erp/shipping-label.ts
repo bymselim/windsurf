@@ -16,6 +16,12 @@ export function orderEserBilgisi(o: ErpOrder): string {
   return parts.join(" · ") || "—";
 }
 
+/** Kargo etiketinde — dahili not (not_icerik) basılmaz. */
+export function orderEserLabelText(o: ErpOrder): string {
+  const parts = [o.cat, o.tur, o.bilgi].filter(Boolean);
+  return parts.join(" · ") || "—";
+}
+
 function normalizeMapsUrl(raw: string): string {
   const s = raw.trim();
   if (!s) return "";
@@ -70,7 +76,7 @@ export const SAMPLE_LABEL_ORDER: ErpOrder = {
   toplam: 15000,
   kapora: 5000,
   tahsilat: 5000,
-  not_icerik: "Özel sipariş notu",
+  not_icerik: "",
   bilgi: "",
   adres: "Test Deneme Sk. Konum Adresi No.4 İstanbul",
   mapsUrl: "https://maps.google.com/",
@@ -83,7 +89,7 @@ export type LabelPrintContext = {
 };
 
 function eserDisplay(o: ErpOrder): string {
-  const eser = orderEserBilgisi(o);
+  const eser = orderEserLabelText(o);
   const adetNote = o.adet > 1 ? `${o.adet} adet` : "";
   return [adetNote, eser !== "—" ? eser : ""].filter(Boolean).join(" · ") || "—";
 }
@@ -146,7 +152,8 @@ export function buildLabelHtml(
   };
 
   const blocks: string[] = [];
-  for (const key of ERP_LABEL_FIELD_ORDER) {
+  const order = settings.fieldOrder?.length ? settings.fieldOrder : [...ERP_LABEL_FIELD_ORDER];
+  for (const key of order) {
     const cfg = settings.fields[key];
     if (key === "mapsLink" && !maps) continue;
     if (key === "mapsQr" && !maps) continue;

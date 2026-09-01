@@ -37,6 +37,8 @@ export interface ErpLabelSettings {
   showBorder: boolean;
   labelPaddingMm: number;
   fields: Record<ErpLabelFieldKey, ErpLabelFieldConfig>;
+  /** Etikette alanların dikey sırası */
+  fieldOrder: ErpLabelFieldKey[];
 }
 
 function field(
@@ -62,7 +64,21 @@ export function defaultErpLabelSettings(): ErpLabelSettings {
       mapsQr: field(true, 11, true),
       siparisNo: field(false, 12),
     },
+    fieldOrder: [...ERP_LABEL_FIELD_ORDER],
   };
+}
+
+function normalizeFieldOrder(raw: unknown): ErpLabelFieldKey[] {
+  const base = [...ERP_LABEL_FIELD_ORDER];
+  if (!Array.isArray(raw)) return base;
+  const order = raw.filter(
+    (k): k is ErpLabelFieldKey =>
+      typeof k === "string" && (ERP_LABEL_FIELD_ORDER as string[]).includes(k)
+  );
+  for (const k of ERP_LABEL_FIELD_ORDER) {
+    if (!order.includes(k)) order.push(k);
+  }
+  return order;
 }
 
 function clampPt(n: number, fallback: number): number {
@@ -107,5 +123,6 @@ export function normalizeErpLabelSettings(raw: unknown): ErpLabelSettings {
       ? Math.min(24, Math.max(4, padding))
       : base.labelPaddingMm,
     fields,
+    fieldOrder: normalizeFieldOrder(r.fieldOrder),
   };
 }

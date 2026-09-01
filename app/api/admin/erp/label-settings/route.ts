@@ -34,6 +34,7 @@ export async function PUT(request: NextRequest) {
       ...current.fields,
       ...(body?.fields && typeof body.fields === "object" ? body.fields : {}),
     },
+    fieldOrder: Array.isArray(body?.fieldOrder) ? body.fieldOrder : current.fieldOrder,
   });
   const saved = await saveErpLabelSettings(next);
   return NextResponse.json({ settings: saved });
