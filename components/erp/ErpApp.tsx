@@ -22,7 +22,9 @@ import {
   deleteErpRecurring,
   fetchErpData,
   fetchErpEmailSettings,
+  fetchErpLabelSettings,
   saveErpEmailSettings,
+  saveErpLabelSettings,
   saveErpSettings,
   sendErpEmailTest,
   toggleErpOrderDone,
@@ -37,6 +39,13 @@ import { AdminAuthError, alertUnlessAdminAuthError, logoutAdminSession } from "@
 import { APP_VERSION } from "@/lib/app-version";
 import type { ErpEmailSectionKey, ErpEmailSettings } from "@/lib/erp/email-types";
 import { ERP_EMAIL_SECTION_LABELS } from "@/lib/erp/email-types";
+import {
+  ERP_LABEL_FIELD_LABELS,
+  ERP_LABEL_FIELD_ORDER,
+  defaultErpLabelSettings,
+  type ErpLabelFieldKey,
+  type ErpLabelSettings,
+} from "@/lib/erp/label-types";
 import type {
   ErpExpense,
   ErpOrder,
@@ -48,6 +57,7 @@ import type {
 import {
   openWhatsAppShare,
   orderEserBilgisi,
+  printLabelPreview,
   printShippingLabel,
 } from "@/lib/erp/shipping-label";
 import {
@@ -460,6 +470,9 @@ export default function ErpApp() {
   const [newExpCat, setNewExpCat] = useState("");
   const [newExpSubCatByParent, setNewExpSubCatByParent] = useState<Record<string, string>>({});
   const [emailSettings, setEmailSettings] = useState<ErpEmailSettings | null>(null);
+  const [labelSettings, setLabelSettings] = useState<ErpLabelSettings>(
+    defaultErpLabelSettings()
+  );
   const [emailSmtpOk, setEmailSmtpOk] = useState<boolean | null>(null);
   const [emailSmtpHint, setEmailSmtpHint] = useState("");
   const [emailBody, setEmailBody] = useState("");
@@ -547,6 +560,12 @@ export default function ErpApp() {
   }, [orders]);
 
   useEffect(() => {
+    fetchErpLabelSettings()
+      .then((r) => setLabelSettings(r.settings))
+      .catch(() => setLabelSettings(defaultErpLabelSettings()));
+  }, []);
+
+  useEffect(() => {
     if (tab !== "tanimlamalar") return;
     fetchErpEmailSettings()
       .then((r) => {
@@ -608,6 +627,39 @@ export default function ErpApp() {
       return { ...prev, dailySections };
     });
   }, []);
+
+  const updateLabelField = useCallback(
+    (key: ErpLabelFieldKey, patch: Partial<ErpLabelSettings["fields"][ErpLabelFieldKey]>) => {
+      setLabelSettings((prev) => ({
+        ...prev,
+        fields: {
+          ...prev.fields,
+          [key]: { ...prev.fields[key], ...patch },
+        },
+      }));
+    },
+    []
+  );
+
+  const saveLabelSettings = useCallback(async () => {
+    showLoading("Kaydediliyor...");
+    try {
+      const saved = await saveErpLabelSettings(labelSettings);
+      setLabelSettings(saved);
+      alert("Etiket ayarları kaydedildi.");
+    } catch (e) {
+      alertUnlessAdminAuthError(e);
+    } finally {
+      hideLoading();
+    }
+  }, [labelSettings, showLoading, hideLoading]);
+
+  const printOrderLabel = useCallback(
+    (o: ErpOrder) => {
+      printShippingLabel(o, labelSettings, { orderNum: getNum(o.id) });
+    },
+    [labelSettings, getNum]
+  );
 
   const filteredOrders = useMemo(() => {
     const q = sSearch.toLowerCase();
@@ -1409,7 +1461,7 @@ Saygılarımla`;
         type="button"
         className="btn sm"
         title="Etiket yazdır"
-        onClick={() => printShippingLabel(o)}
+        onClick={() => printOrderLabel(o)}
       >
         🖨
       </button>
@@ -3016,6 +3068,130 @@ Saygılarımla`;
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+              <div className="card" style={{ marginTop: 14 }}>
+                <div className="card-title">🖨 Kargo Etiketi / PDF</div>
+                <p className="hint" style={{ marginBottom: 12 }}>
+                  Sipariş listesindeki yazdır butonu bu ayarları kullanır. Tarayıcıdan
+                  &quot;PDF olarak kaydet&quot; ile A4 çıktı alabilirsiniz.
+                </p>
+                <div className="fg c2" style={{ marginBottom: 14 }}>
+                  <div>
+                    <div className="fl">Sayfa yönü</div>
+                    <select
+                      value={labelSettings.orientation}
+                      onChange={(e) =>
+                        setLabelSettings((s) => ({
+                          ...s,
+                          orientation: e.target.value as "portrait" | "landscape",
+                        }))
+                      }
+                    >
+                      <option value="landscape">Yatay (A4 landscape)</option>
+                      <option value="portrait">Dikey (A4 portrait)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <div className="fl">Sayfa kenar boşluğu (mm)</div>
+                    <input
+                      type="number"
+                      min={4}
+                      max={30}
+                      value={labelSettings.pageMarginMm}
+                      onChange={(e) =>
+                        setLabelSettings((s) => ({
+                          ...s,
+                          pageMarginMm: +e.target.value || 12,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <div className="fl">Etiket iç boşluğu (mm)</div>
+                    <input
+                      type="number"
+                      min={4}
+                      max={24}
+                      value={labelSettings.labelPaddingMm}
+                      onChange={(e) =>
+                        setLabelSettings((s) => ({
+                          ...s,
+                          labelPaddingMm: +e.target.value || 8,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "flex-end" }}>
+                    <ErpToggle
+                      label="Çerçeve göster"
+                      checked={labelSettings.showBorder}
+                      onChange={(showBorder) =>
+                        setLabelSettings((s) => ({ ...s, showBorder }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="label-field-table">
+                  <div className="label-field-head">
+                    <span>Alan</span>
+                    <span>Göster</span>
+                    <span>Başlık</span>
+                    <span>Punto (pt)</span>
+                  </div>
+                  {ERP_LABEL_FIELD_ORDER.map((key) => {
+                    const f = labelSettings.fields[key];
+                    return (
+                      <div className="label-field-row" key={key}>
+                        <span className="label-field-name">{ERP_LABEL_FIELD_LABELS[key]}</span>
+                        <input
+                          type="checkbox"
+                          checked={f.enabled}
+                          onChange={(e) =>
+                            updateLabelField(key, { enabled: e.target.checked })
+                          }
+                          aria-label={`${ERP_LABEL_FIELD_LABELS[key]} göster`}
+                        />
+                        <input
+                          type="checkbox"
+                          checked={f.showLabel}
+                          disabled={!f.enabled}
+                          onChange={(e) =>
+                            updateLabelField(key, { showLabel: e.target.checked })
+                          }
+                          aria-label={`${ERP_LABEL_FIELD_LABELS[key]} başlık`}
+                        />
+                        <input
+                          type="number"
+                          min={6}
+                          max={72}
+                          value={f.fontSizePt}
+                          disabled={!f.enabled}
+                          onChange={(e) =>
+                            updateLabelField(key, {
+                              fontSizePt: +e.target.value || f.fontSizePt,
+                            })
+                          }
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
+                  <button
+                    type="button"
+                    className="btn sm primary"
+                    onClick={() => void saveLabelSettings()}
+                  >
+                    Kaydet
+                  </button>
+                  <button
+                    type="button"
+                    className="btn sm"
+                    onClick={() => printLabelPreview(labelSettings)}
+                  >
+                    Önizleme yazdır
+                  </button>
                 </div>
               </div>
               <div className="card" style={{ marginTop: 14 }}>

@@ -1,0 +1,28 @@
+---
+description: Bump app version in package.json before every git push
+alwaysApply: true
+---
+
+# Version bump before push
+
+This project displays its version in the ERP panel and admin UI via `lib/app-version.ts`, which reads `package.json` → `version`.
+
+## Required workflow
+
+Before **every** `git push` (and before creating a commit that will be pushed):
+
+1. Increment `version` in `package.json` (patch bump by default: `2.3.0` → `2.3.1`).
+2. Update the matching top-level `"version"` fields in `package-lock.json` (lines at root `"version"` and `packages[""].version`).
+3. Do **not** edit `lib/app-version.ts` — it imports from `package.json` automatically.
+4. Include the version bump in the same commit as the code changes, or as the final commit before push.
+
+## When to use minor/major
+
+- **Patch** (default): bug fixes, small UI tweaks, refactors — `x.y.Z+1`
+- **Minor**: new user-facing feature or tab — `x.Y+1.0`
+- **Major**: breaking changes — `X+1.0.0`
+
+## Never skip
+
+- Do not push without bumping the version, even for tiny fixes.
+- If multiple commits are made locally, bump once before the push that publishes them (version should reflect what is being deployed).

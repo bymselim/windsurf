@@ -1,4 +1,11 @@
 import type { ErpOrder } from "./types";
+import {
+  ERP_LABEL_FIELD_LABELS,
+  ERP_LABEL_FIELD_ORDER,
+  defaultErpLabelSettings,
+  type ErpLabelFieldKey,
+  type ErpLabelSettings,
+} from "./label-types";
 
 export function orderFullName(o: ErpOrder): string {
   return `${o.ad} ${o.soyad}`.trim();
@@ -42,7 +49,6 @@ export function buildWhatsAppShareText(o: ErpOrder): string {
 export function openWhatsAppShare(o: ErpOrder): void {
   const text = buildWhatsAppShareText(o);
   const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-  // Mobilde window.open sık engellenir; aynı sekmede açmak daha güvenilir.
   if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
     window.location.href = url;
     return;
@@ -51,100 +57,155 @@ export function openWhatsAppShare(o: ErpOrder): void {
   if (!w) window.location.href = url;
 }
 
-function buildLabelHtml(o: ErpOrder): string {
-  const name = orderFullName(o);
-  const tel = o.tel?.trim() || "—";
+export const SAMPLE_LABEL_ORDER: ErpOrder = {
+  id: 999,
+  ad: "Tuğba",
+  soyad: "Güraslan",
+  tel: "5322334577",
+  tarih: "2026-08-28",
+  bitis: "2026-09-27",
+  cat: "BALON",
+  tur: "3lü",
+  adet: 1,
+  toplam: 15000,
+  kapora: 5000,
+  tahsilat: 5000,
+  not_icerik: "Özel sipariş notu",
+  bilgi: "",
+  adres: "Test Deneme Sk. Konum Adresi No.4 İstanbul",
+  mapsUrl: "https://maps.google.com/",
+  durum: "bekleyen",
+  created_at: new Date().toISOString(),
+};
+
+export type LabelPrintContext = {
+  orderNum?: string | number;
+};
+
+function eserDisplay(o: ErpOrder): string {
   const eser = orderEserBilgisi(o);
   const adetNote = o.adet > 1 ? `${o.adet} adet` : "";
-  const eserDisplay = [adetNote, eser !== "—" ? eser : ""].filter(Boolean).join(" · ") || "—";
-  const adres = (o.adres ?? "").trim() || "—";
+  return [adetNote, eser !== "—" ? eser : ""].filter(Boolean).join(" · ") || "—";
+}
+
+function labelHeadingPt(valuePt: number): number {
+  return Math.max(8, Math.round(valuePt * 0.38));
+}
+
+function fieldBlock(
+  key: ErpLabelFieldKey,
+  cfg: ErpLabelSettings["fields"][ErpLabelFieldKey],
+  valueHtml: string,
+  extraClass = ""
+): string {
+  if (!cfg.enabled || !valueHtml) return "";
+  const label = ERP_LABEL_FIELD_LABELS[key];
+  const heading = labelHeadingPt(cfg.fontSizePt);
+  if (key === "adSoyad") {
+    return `<div class="field field-name${extraClass}">
+      ${cfg.showLabel ? `<span class="k" style="font-size:${heading}pt">${escapeHtml(label)}</span>` : ""}
+      <div class="v name-v" style="font-size:${cfg.fontSizePt}pt">${valueHtml}</div>
+    </div>`;
+  }
+  if (key === "mapsQr") {
+    return `<div class="field field-maps${extraClass}">${valueHtml}</div>`;
+  }
+  return `<div class="field${extraClass}">
+    ${cfg.showLabel ? `<span class="k" style="font-size:${heading}pt">${escapeHtml(label)}</span>` : ""}
+    <div class="v" style="font-size:${cfg.fontSizePt}pt">${valueHtml}</div>
+  </div>`;
+}
+
+export function buildLabelHtml(
+  o: ErpOrder,
+  settings: ErpLabelSettings = defaultErpLabelSettings(),
+  ctx: LabelPrintContext = {}
+): string {
   const maps = sanitizeMapsUrl(o.mapsUrl ?? "");
   const qrSrc = maps
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=0&data=${encodeURIComponent(maps)}`
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=0&data=${encodeURIComponent(maps)}`
     : "";
+  const qrPt = settings.fields.mapsQr.fontSizePt;
+  const qrPx = Math.round(Math.max(72, qrPt * 7));
+  const pageSize =
+    settings.orientation === "landscape" ? "A4 landscape" : "A4 portrait";
+  const borderCss = settings.showBorder
+    ? "border:2px solid #222;border-radius:6px;"
+    : "";
+
+  const values: Record<ErpLabelFieldKey, string> = {
+    adSoyad: escapeHtml(orderFullName(o)),
+    telefon: escapeHtml(o.tel?.trim() || "—"),
+    eser: escapeHtml(eserDisplay(o)),
+    adres: escapeHtml((o.adres ?? "").trim() || "—"),
+    mapsLink: maps ? escapeHtml(maps) : "",
+    mapsQr: maps
+      ? `<div class="maps-row"><img id="qr" src="${qrSrc}" alt="QR" style="width:${qrPx}px;height:${qrPx}px"/></div>`
+      : "",
+    siparisNo: ctx.orderNum != null && ctx.orderNum !== "" ? escapeHtml(String(ctx.orderNum)) : "",
+  };
+
+  const blocks: string[] = [];
+  for (const key of ERP_LABEL_FIELD_ORDER) {
+    const cfg = settings.fields[key];
+    if (key === "mapsLink" && !maps) continue;
+    if (key === "mapsQr" && !maps) continue;
+    const val = values[key];
+    if (!cfg.enabled) continue;
+    if (!val && key !== "telefon") continue;
+    const block = fieldBlock(key, cfg, val || "—", key === "adres" ? " field-adres" : "");
+    if (block) blocks.push(block);
+  }
 
   return `<!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="utf-8"/>
-<title>Kargo Etiketi — ${escapeHtml(name)}</title>
+<title>Kargo Etiketi — ${escapeHtml(orderFullName(o))}</title>
 <style>
-  @page { size: A4; margin: 14mm; }
+  @page { size: ${pageSize}; margin: ${settings.pageMarginMm}mm; }
   * { box-sizing: border-box; }
-  html, body {
-    height: auto;
-    margin: 0;
-    padding: 0;
-  }
+  html, body { height: auto; margin: 0; padding: 0; }
   body {
     font-family: "Helvetica Neue", Arial, sans-serif;
     color: #111;
-    padding: 0;
   }
   .label {
-    border: 2px solid #222;
-    border-radius: 6px;
-    padding: 22px 28px;
+    ${borderCss}
+    padding: ${settings.labelPaddingMm}mm;
     width: 100%;
     max-width: 100%;
     page-break-inside: avoid;
   }
-  .name {
-    font-size: 28px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    margin: 0 0 16px;
-    line-height: 1.2;
-    text-transform: uppercase;
-  }
-  .row {
-    margin-bottom: 14px;
-    line-height: 1.45;
-  }
-  .row:last-child {
-    margin-bottom: 0;
-  }
-  .row .k {
+  .field { margin-bottom: 4mm; line-height: 1.35; }
+  .field:last-child { margin-bottom: 0; }
+  .field .k {
     display: block;
-    font-size: 10px;
     font-weight: 600;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: #555;
-    margin-bottom: 3px;
+    margin-bottom: 1.5mm;
   }
-  .row .v {
-    font-size: 16px;
+  .field .v {
     white-space: pre-wrap;
     word-break: break-word;
+    font-weight: 500;
   }
-  .eser .v {
-    font-size: 17px;
-    line-height: 1.4;
+  .field-name .name-v {
+    font-weight: 700;
+    text-transform: uppercase;
+    line-height: 1.15;
   }
-  .adres .v {
-    font-size: 18px;
-    line-height: 1.4;
-  }
-  .maps {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px dashed #ccc;
+  .maps-row {
     display: flex;
     align-items: flex-start;
-    gap: 16px;
+    gap: 5mm;
+    margin-top: 2mm;
+    padding-top: 3mm;
+    border-top: 1px dashed #ccc;
   }
-  .maps img {
-    width: 96px;
-    height: 96px;
-    flex-shrink: 0;
-  }
-  .maps .link {
-    font-size: 11px;
-    color: #333;
-    word-break: break-all;
-    line-height: 1.35;
-  }
+  .link { color: #333; word-break: break-all; }
   @media print {
     html, body { height: auto; overflow: visible; }
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -154,38 +215,13 @@ function buildLabelHtml(o: ErpOrder): string {
 </head>
 <body>
   <div class="label">
-    <h1 class="name">${escapeHtml(name)}</h1>
-    <div class="row">
-      <span class="k">Telefon</span>
-      <span class="v">${escapeHtml(tel)}</span>
-    </div>
-    <div class="row eser">
-      <span class="k">Eser</span>
-      <span class="v">${escapeHtml(eserDisplay)}</span>
-    </div>
-    <div class="row adres">
-      <span class="k">Teslimat Adresi</span>
-      <span class="v">${escapeHtml(adres)}</span>
-    </div>
-    ${
-      maps
-        ? `<div class="maps">
-      <img id="qr" src="${qrSrc}" alt="Konum QR"/>
-      <div>
-        <span class="k">Google Maps Konumu</span>
-        <div class="link">${escapeHtml(maps)}</div>
-      </div>
-    </div>`
-        : ""
-    }
+    ${blocks.join("\n")}
   </div>
 </body>
 </html>`;
 }
 
-/** A4 kargo etiketi — tarayıcıdan PDF olarak kaydedilebilir. */
-export function printShippingLabel(o: ErpOrder): void {
-  const html = buildLabelHtml(o);
+function runLabelPrint(html: string): void {
   const iframe = document.createElement("iframe");
   iframe.setAttribute(
     "style",
@@ -229,6 +265,24 @@ export function printShippingLabel(o: ErpOrder): void {
   }
 
   setTimeout(triggerPrint, 300);
+}
+
+/** A4 kargo etiketi — tarayıcıdan PDF olarak kaydedilebilir. */
+export function printShippingLabel(
+  o: ErpOrder,
+  settings?: ErpLabelSettings,
+  ctx: LabelPrintContext = {}
+): void {
+  const html = buildLabelHtml(o, settings ?? defaultErpLabelSettings(), ctx);
+  runLabelPrint(html);
+}
+
+export function printLabelPreview(
+  settings: ErpLabelSettings,
+  sample: ErpOrder = SAMPLE_LABEL_ORDER
+): void {
+  const html = buildLabelHtml(sample, settings, { orderNum: 167 });
+  runLabelPrint(html);
 }
 
 function escapeHtml(s: string): string {

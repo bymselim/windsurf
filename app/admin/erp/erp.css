@@ -176,3 +176,15 @@ th.sortable.sorted{color:var(--blue)}
   .order-card-actions .btn{min-height:36px;min-width:36px}
 }
 
+.label-field-table{border:1px solid var(--border);border-radius:var(--rs);overflow:hidden}
+.label-field-head,.label-field-row{display:grid;grid-template-columns:1fr 56px 56px 72px;gap:8px;align-items:center;padding:8px 12px;font-size:12px}
+.label-field-head{background:var(--bg3);color:var(--text3);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.label-field-row{border-top:1px solid var(--border)}
+.label-field-row:nth-child(even){background:rgba(255,255,255,.02)}
+.label-field-name{color:var(--text);font-size:13px}
+.label-field-row input[type=number]{padding:6px 8px;font-size:12px;text-align:center}
+.label-field-row input[type=checkbox]{width:18px;height:18px;margin:0 auto;display:block;accent-color:var(--blue)}
+@media(max-width:768px){
+  .label-field-head,.label-field-row{grid-template-columns:1fr 44px 44px 64px;padding:8px}
+}
+

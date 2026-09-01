@@ -10,6 +10,7 @@ import type {
   ErpTodoRecurring,
 } from "@/lib/erp/types";
 import type { ErpEmailSettings, ErpEmailSectionKey } from "@/lib/erp/email-types";
+import type { ErpLabelSettings } from "@/lib/erp/label-types";
 
 function headers(json = true): HeadersInit {
   const h: Record<string, string> = { ...getAdminAuthHeaders() };
@@ -233,6 +234,32 @@ export async function sendErpEmailTest(
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json?.error ?? "Test maili gönderilemedi");
+}
+
+export async function fetchErpLabelSettings(): Promise<{
+  settings: ErpLabelSettings;
+  fieldLabels: Record<string, string>;
+  fieldOrder: string[];
+}> {
+  const res = await adminFetch("/api/admin/erp/label-settings", {
+    headers: headers(),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? "Etiket ayarları yüklenemedi");
+  return json;
+}
+
+export async function saveErpLabelSettings(
+  settings: ErpLabelSettings
+): Promise<ErpLabelSettings> {
+  const res = await adminFetch("/api/admin/erp/label-settings", {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify(settings),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? "Etiket ayarları kaydedilemedi");
+  return json.settings;
 }
 
 export async function createErpTodo(payload: {
