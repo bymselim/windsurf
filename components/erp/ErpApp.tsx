@@ -2343,296 +2343,70 @@ Saygılarımla`;
 
             {/* GİDERLER */}
             <div className={`page${tab === "giderler" ? " active" : ""}`} id="page-giderler">
-              <div className="metric-grid" id="g-metrics">
-                <div className="metric">
-                  <div className="metric-label">Toplam Gider</div>
-                  <div className="metric-value" style={{ color: "var(--red)" }}>
-                    {fmtM(expenseView.total)}
-                  </div>
-                </div>
-                <div className="metric">
-                  <div className="metric-label">Bu Ay</div>
-                  <div className="metric-value" style={{ color: "var(--amber)" }}>
-                    {fmtM(expenseView.aylik)}
-                  </div>
-                </div>
-                <div className="metric">
-                  <div className="metric-label">Faturalı</div>
-                  <div className="metric-value" style={{ color: "var(--blue)" }}>
-                    {expenseView.faturali}/{expenses.length}
-                  </div>
-                </div>
-                <div className="metric">
-                  <div className="metric-label">Ortalama</div>
-                  <div className="metric-value">
-                    {expenses.length ? fmtM(expenseView.total / expenses.length) : "—"}
-                  </div>
-                </div>
-              </div>
-              <div className="grid2" style={{ marginBottom: 14 }}>
-                <div className="card" style={{ margin: 0 }}>
-                  <div className="card-title">Kategoriye Göre</div>
-                  <div className="bar-chart" id="g-cat-chart">
-                    {renderGroupedExpenseChart(expenseView.katGroups)}
-                  </div>
-                </div>
-                <div className="card" style={{ margin: 0 }}>
-                  <div className="card-title">Aylık Trend</div>
-                  <div className="bar-chart" id="g-month-chart">
-                    {expenseView.monthEntries.length ? (
-                      expenseView.monthEntries.map(([m, v]) => (
-                        <div className="bar-row" key={m}>
-                          <div className="bar-label">
-                            {m.slice(5)}.{m.slice(2, 4)}
-                          </div>
-                          <div className="bar-track">
-                            <div
-                              className="bar-fill"
-                              style={{
-                                width: `${Math.round((v / expenseView.mMax) * 100)}%`,
-                                background: "#60a5fa",
-                              }}
-                            />
-                          </div>
-                          <div className="bar-val">{fmtM(v)}</div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="empty">Veri yok</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="card" style={{ marginBottom: 14 }}>
-                <div className="card-title">Tekrarlayan Giderler</div>
-                <p className="hint" style={{ marginBottom: 12 }}>
-                  Kira, maaş vb. düzenli giderler. Kayıt yalnızca ilgili gün geldiğinde gider
-                  listesine eklenir (gelecek aylar şimdiden görünmez). Bugünden önceki dönemleri
-                  elle girdiyseniz başlangıç tarihini bugün veya sonrası yapın.
-                </p>
-                <div className="fg c3">
-                  <div>
-                    <div className="fl">Kategori</div>
-                    <select
-                      value={recForm.kat}
-                      onChange={(e) =>
-                        setRecForm((f) => ({ ...f, kat: e.target.value, subkat: "" }))
-                      }
-                    >
-                      {buildCatOptions(settings.expCats, recForm.kat)}
-                    </select>
-                  </div>
-                  <div>
-                    <div className="fl">Alt Kategori</div>
-                    <select
-                      value={recForm.subkat}
-                      onChange={(e) =>
-                        setRecForm((f) => ({ ...f, subkat: e.target.value }))
-                      }
-                    >
-                      <option value="">—</option>
-                      {expSubCatsFor(settings, recForm.kat).map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <div className="fl">Periyot</div>
-                    <select
-                      value={recForm.freq}
-                      onChange={(e) =>
-                        setRecForm((f) => ({
-                          ...f,
-                          freq: e.target.value as "monthly" | "weekly",
-                        }))
-                      }
-                    >
-                      <option value="monthly">Aylık</option>
-                      <option value="weekly">Haftalık</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="fg c2">
-                  <div>
-                    <div className="fl">Açıklama</div>
-                    <input
-                      placeholder="Örn. Ofis kirası"
-                      value={recForm.acik}
-                      onChange={(e) =>
-                        setRecForm((f) => ({ ...f, acik: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <div className="fl">Tutar (₺)</div>
-                    <input
-                      type="number"
-                      placeholder="50000"
-                      value={recForm.tutar}
-                      onChange={(e) =>
-                        setRecForm((f) => ({ ...f, tutar: e.target.value }))
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="fg c2">
-                  <div>
-                    <div className="fl">Başlangıç</div>
-                    <input
-                      type="date"
-                      value={recForm.startDate}
-                      onChange={(e) =>
-                        setRecForm((f) => ({ ...f, startDate: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <div className="fl">Bitiş</div>
-                    <input
-                      type="date"
-                      value={recForm.endDate}
-                      onChange={(e) =>
-                        setRecForm((f) => ({ ...f, endDate: e.target.value }))
-                      }
-                    />
-                  </div>
-                </div>
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12 }}>
-                  {recEditId != null ? (
-                    <button type="button" className="btn sm" onClick={cancelRecurringEdit}>
-                      İptal
-                    </button>
-                  ) : null}
-                  <button type="button" className="btn sm primary" onClick={() => void saveRecurring()}>
-                    {recEditId != null ? "Güncelle" : "+ Tekrarlayan Gider Ekle"}
-                  </button>
-                </div>
-                {recurringExpenses.length ? (
-                  <div className="tbl-wrap">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Kategori</th>
-                          <th>Açıklama</th>
-                          <th>Tutar</th>
-                          <th>Periyot</th>
-                          <th>Aralık</th>
-                          <th>Durum</th>
-                          <th>İşlem</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {recurringExpenses.map((r) => (
-                          <tr key={r.id}>
-                            <td>
-                              {escHtml(r.kat)}
-                              {r.subkat ? (
-                                <span style={{ color: "var(--text3)", fontSize: 11 }}>
-                                  {" "}
-                                  / {escHtml(r.subkat)}
-                                </span>
-                              ) : null}
-                            </td>
-                            <td>{escHtml(r.acik)}</td>
-                            <td>{fmtM(r.tutar)}</td>
-                            <td>{r.freq === "weekly" ? "Haftalık" : "Aylık"}</td>
-                            <td style={{ fontSize: 12, color: "var(--text3)" }}>
-                              {fmtDate(r.startDate)} – {fmtDate(r.endDate)}
-                            </td>
-                            <td>
-                              <span className={`badge ${r.active ? "green" : "amber"}`}>
-                                {r.active ? "Aktif" : "Pasif"}
-                              </span>
-                            </td>
-                            <td>
-                              <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                                <button
-                                  type="button"
-                                  className="btn sm"
-                                  onClick={() => editRecurring(r)}
-                                >
-                                  Düzenle
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn sm"
-                                  onClick={() => void toggleRecurringActive(r.id, !r.active)}
-                                >
-                                  {r.active ? "Durdur" : "Aktifleştir"}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn sm danger"
-                                  onClick={() => void removeRecurring(r.id)}
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="empty">Henüz tekrarlayan gider tanımı yok</div>
-                )}
-              </div>
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  marginBottom: 10,
+                  marginBottom: 14,
                   flexWrap: "wrap",
-                  gap: 8,
+                  gap: 10,
                 }}
               >
-                <div style={{ fontSize: 14, fontWeight: 500 }}>
-                  Fatura / Gider Listesi
+                <button type="button" className="btn primary" onClick={openExpModal}>
+                  + Gider Ekle
+                </button>
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                  {sortedExpenses.length} kayıt
                   {selectedExpenseIds.length ? (
-                    <span style={{ fontSize: 12, color: "var(--amber)", marginLeft: 8 }}>
-                      ({selectedExpenseIds.length} seçili)
+                    <span style={{ color: "var(--amber)", marginLeft: 6 }}>
+                      · {selectedExpenseIds.length} seçili
                     </span>
                   ) : null}
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  <button type="button" className="btn sm" onClick={selectAllVisibleExpenses}>
-                    Tümünü seç
-                  </button>
-                  <button
-                    type="button"
-                    className="btn sm"
-                    onClick={clearExpenseSelection}
-                    disabled={!selectedExpenseIds.length}
-                  >
-                    Seçimi temizle
-                  </button>
-                  <button
-                    type="button"
-                    className="btn sm danger"
-                    onClick={() => void deleteSelectedExpenses()}
-                    disabled={!selectedExpenseIds.length}
-                  >
-                    Seçilenleri sil
-                  </button>
-                  <button
-                    type="button"
-                    className="btn sm danger"
-                    onClick={() => void deleteAllExpenses()}
-                    disabled={!expenses.length}
-                  >
-                    Tüm giderleri sil
-                  </button>
-                  <button type="button" className="btn sm success" onClick={prepareEmail}>
-                    ✉ Muhasebeye Gönder
-                  </button>
-                </div>
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginBottom: 10,
+                  flexWrap: "wrap",
+                  gap: 6,
+                }}
+              >
+                <button type="button" className="btn sm" onClick={selectAllVisibleExpenses}>
+                  Tümünü seç
+                </button>
+                <button
+                  type="button"
+                  className="btn sm"
+                  onClick={clearExpenseSelection}
+                  disabled={!selectedExpenseIds.length}
+                >
+                  Seçimi temizle
+                </button>
+                <button
+                  type="button"
+                  className="btn sm danger"
+                  onClick={() => void deleteSelectedExpenses()}
+                  disabled={!selectedExpenseIds.length}
+                >
+                  Seçilenleri sil
+                </button>
+                <button
+                  type="button"
+                  className="btn sm danger"
+                  onClick={() => void deleteAllExpenses()}
+                  disabled={!expenses.length}
+                >
+                  Tüm giderleri sil
+                </button>
+                <button type="button" className="btn sm success" onClick={prepareEmail}>
+                  ✉ Muhasebeye Gönder
+                </button>
               </div>
               <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-                <div className="tbl-wrap">
+                <div className="tbl-wrap expense-desktop-table">
                   <table>
                     <thead>
                       <tr>
@@ -2757,6 +2531,66 @@ Saygılarımla`;
                     </tbody>
                   </table>
                 </div>
+                <div className="expense-mobile-list">
+                  {sortedExpenses.length ? (
+                    sortedExpenses.map((e) => (
+                      <div
+                        key={e.id}
+                        className={`expense-card${selectedExpenseIds.includes(e.id) ? " selected" : ""}`}
+                      >
+                        <div className="expense-card-head">
+                          <label className="expense-card-check">
+                            <input
+                              type="checkbox"
+                              checked={selectedExpenseIds.includes(e.id)}
+                              onChange={() => toggleExpenseSelected(e.id)}
+                              aria-label={`Gider ${e.id} seç`}
+                            />
+                            <span className="expense-card-date">{fmtDate(e.tarih)}</span>
+                          </label>
+                          <span className="expense-card-amount">{fmtM(e.tutar)}</span>
+                        </div>
+                        <div className="expense-card-cat">
+                          <span className="badge blue" style={{ fontSize: 10 }}>
+                            {escHtml(e.kat)}
+                            {e.subkat ? (
+                              <span style={{ opacity: 0.85 }}> / {escHtml(e.subkat)}</span>
+                            ) : null}
+                          </span>
+                        </div>
+                        <div className="expense-card-desc">{escHtml(e.acik)}</div>
+                        <div className="expense-card-meta">
+                          {e.fatno ? (
+                            <span className="badge green">{escHtml(e.fatno)}</span>
+                          ) : (
+                            <span style={{ color: "var(--text3)", fontSize: 11 }}>Fatura yok</span>
+                          )}
+                          {e.dosya ? (
+                            <span className="badge green">📎 {escHtml(e.dosya)}</span>
+                          ) : null}
+                        </div>
+                        <div className="expense-card-actions">
+                          <button
+                            type="button"
+                            className="btn sm"
+                            onClick={() => openEditExpense(e)}
+                          >
+                            Düzenle
+                          </button>
+                          <button
+                            type="button"
+                            className="btn sm danger"
+                            onClick={() => void delExpense(e.id)}
+                          >
+                            Sil
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="empty">Gider yok</div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2803,6 +2637,69 @@ Saygılarımla`;
                   <option value="q3">Q3</option>
                   <option value="q4">Q4</option>
                 </select>
+              </div>
+              <div className="card" style={{ marginBottom: 14 }}>
+                <div className="card-title">Gider İstatistikleri</div>
+                <div className="metric-grid" id="r-exp-metrics">
+                  <div className="metric">
+                    <div className="metric-label">Toplam Gider</div>
+                    <div className="metric-value" style={{ color: "var(--red)" }}>
+                      {fmtM(expenseView.total)}
+                    </div>
+                  </div>
+                  <div className="metric">
+                    <div className="metric-label">Bu Ay</div>
+                    <div className="metric-value" style={{ color: "var(--amber)" }}>
+                      {fmtM(expenseView.aylik)}
+                    </div>
+                  </div>
+                  <div className="metric">
+                    <div className="metric-label">Faturalı</div>
+                    <div className="metric-value" style={{ color: "var(--blue)" }}>
+                      {expenseView.faturali}/{expenses.length}
+                    </div>
+                  </div>
+                  <div className="metric">
+                    <div className="metric-label">Ortalama</div>
+                    <div className="metric-value">
+                      {expenses.length ? fmtM(expenseView.total / expenses.length) : "—"}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid2" style={{ marginTop: 14 }}>
+                  <div>
+                    <div className="card-title">Kategoriye Göre Dağılım</div>
+                    <div className="bar-chart" id="r-exp-cat-chart">
+                      {renderGroupedExpenseChart(expenseView.katGroups)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="card-title">Aylık Gider Trendi</div>
+                    <div className="bar-chart" id="r-exp-month-chart">
+                      {expenseView.monthEntries.length ? (
+                        expenseView.monthEntries.map(([m, v]) => (
+                          <div className="bar-row" key={m}>
+                            <div className="bar-label">
+                              {m.slice(5)}.{m.slice(2, 4)}
+                            </div>
+                            <div className="bar-track">
+                              <div
+                                className="bar-fill"
+                                style={{
+                                  width: `${Math.round((v / expenseView.mMax) * 100)}%`,
+                                  background: "#60a5fa",
+                                }}
+                              />
+                            </div>
+                            <div className="bar-val">{fmtM(v)}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="empty">Veri yok</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="card" style={{ padding: 0, overflow: "hidden" }}>
                 <div className="report-section">Üretim & Sipariş</div>
@@ -3104,6 +3001,226 @@ Saygılarımla`;
                     ))}
                   </div>
                 </div>
+              </div>
+              <div className="card" style={{ marginTop: 14 }}>
+                <div className="card-title">Tekrarlayan Giderler</div>
+                <p className="hint" style={{ marginBottom: 12 }}>
+                  Kira, maaş vb. düzenli giderler. Kayıt yalnızca ilgili gün geldiğinde gider
+                  listesine eklenir. Başlangıç tarihini bugün veya sonrası yapın.
+                </p>
+                <div className="fg c3">
+                  <div>
+                    <div className="fl">Kategori</div>
+                    <select
+                      value={recForm.kat}
+                      onChange={(e) =>
+                        setRecForm((f) => ({ ...f, kat: e.target.value, subkat: "" }))
+                      }
+                    >
+                      {buildCatOptions(settings.expCats, recForm.kat)}
+                    </select>
+                  </div>
+                  <div>
+                    <div className="fl">Alt Kategori</div>
+                    <select
+                      value={recForm.subkat}
+                      onChange={(e) =>
+                        setRecForm((f) => ({ ...f, subkat: e.target.value }))
+                      }
+                    >
+                      <option value="">—</option>
+                      {expSubCatsFor(settings, recForm.kat).map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <div className="fl">Periyot</div>
+                    <select
+                      value={recForm.freq}
+                      onChange={(e) =>
+                        setRecForm((f) => ({
+                          ...f,
+                          freq: e.target.value as "monthly" | "weekly",
+                        }))
+                      }
+                    >
+                      <option value="monthly">Aylık</option>
+                      <option value="weekly">Haftalık</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="fg c2">
+                  <div>
+                    <div className="fl">Açıklama</div>
+                    <input
+                      placeholder="Örn. Ofis kirası"
+                      value={recForm.acik}
+                      onChange={(e) =>
+                        setRecForm((f) => ({ ...f, acik: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <div className="fl">Tutar (₺)</div>
+                    <input
+                      type="number"
+                      placeholder="50000"
+                      value={recForm.tutar}
+                      onChange={(e) =>
+                        setRecForm((f) => ({ ...f, tutar: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="fg c2">
+                  <div>
+                    <div className="fl">Başlangıç</div>
+                    <input
+                      type="date"
+                      value={recForm.startDate}
+                      onChange={(e) =>
+                        setRecForm((f) => ({ ...f, startDate: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <div className="fl">Bitiş</div>
+                    <input
+                      type="date"
+                      value={recForm.endDate}
+                      onChange={(e) =>
+                        setRecForm((f) => ({ ...f, endDate: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12 }}>
+                  {recEditId != null ? (
+                    <button type="button" className="btn sm" onClick={cancelRecurringEdit}>
+                      İptal
+                    </button>
+                  ) : null}
+                  <button type="button" className="btn sm primary" onClick={() => void saveRecurring()}>
+                    {recEditId != null ? "Güncelle" : "+ Tekrarlayan Gider Ekle"}
+                  </button>
+                </div>
+                {recurringExpenses.length ? (
+                  <div className="tbl-wrap recurring-desktop-table">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Kategori</th>
+                          <th>Açıklama</th>
+                          <th>Tutar</th>
+                          <th>Periyot</th>
+                          <th>Aralık</th>
+                          <th>Durum</th>
+                          <th>İşlem</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recurringExpenses.map((r) => (
+                          <tr key={r.id}>
+                            <td>
+                              {escHtml(r.kat)}
+                              {r.subkat ? (
+                                <span style={{ color: "var(--text3)", fontSize: 11 }}>
+                                  {" "}
+                                  / {escHtml(r.subkat)}
+                                </span>
+                              ) : null}
+                            </td>
+                            <td>{escHtml(r.acik)}</td>
+                            <td>{fmtM(r.tutar)}</td>
+                            <td>{r.freq === "weekly" ? "Haftalık" : "Aylık"}</td>
+                            <td style={{ fontSize: 12, color: "var(--text3)" }}>
+                              {fmtDate(r.startDate)} – {fmtDate(r.endDate)}
+                            </td>
+                            <td>
+                              <span className={`badge ${r.active ? "green" : "amber"}`}>
+                                {r.active ? "Aktif" : "Pasif"}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                                <button
+                                  type="button"
+                                  className="btn sm"
+                                  onClick={() => editRecurring(r)}
+                                >
+                                  Düzenle
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn sm"
+                                  onClick={() => void toggleRecurringActive(r.id, !r.active)}
+                                >
+                                  {r.active ? "Durdur" : "Aktifleştir"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn sm danger"
+                                  onClick={() => void removeRecurring(r.id)}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="empty">Henüz tekrarlayan gider tanımı yok</div>
+                )}
+                {recurringExpenses.length ? (
+                  <div className="recurring-mobile-list">
+                    {recurringExpenses.map((r) => (
+                      <div key={r.id} className="expense-card">
+                        <div className="expense-card-head">
+                          <span className="badge blue" style={{ fontSize: 10 }}>
+                            {escHtml(r.kat)}
+                            {r.subkat ? ` / ${escHtml(r.subkat)}` : ""}
+                          </span>
+                          <span className={`badge ${r.active ? "green" : "amber"}`}>
+                            {r.active ? "Aktif" : "Pasif"}
+                          </span>
+                        </div>
+                        <div className="expense-card-desc">{escHtml(r.acik)}</div>
+                        <div className="expense-card-meta">
+                          <span>{fmtM(r.tutar)}</span>
+                          <span>{r.freq === "weekly" ? "Haftalık" : "Aylık"}</span>
+                          <span style={{ fontSize: 11, color: "var(--text3)" }}>
+                            {fmtDate(r.startDate)} – {fmtDate(r.endDate)}
+                          </span>
+                        </div>
+                        <div className="expense-card-actions">
+                          <button type="button" className="btn sm" onClick={() => editRecurring(r)}>
+                            Düzenle
+                          </button>
+                          <button
+                            type="button"
+                            className="btn sm"
+                            onClick={() => void toggleRecurringActive(r.id, !r.active)}
+                          >
+                            {r.active ? "Durdur" : "Aktifleştir"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn sm danger"
+                            onClick={() => void removeRecurring(r.id)}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
               <div className="card" style={{ marginTop: 14 }}>
                 <div className="card-title">🖨 Kargo Etiketi / PDF</div>
