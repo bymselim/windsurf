@@ -43,8 +43,10 @@ export function normalizeOrderForImport(raw: unknown, autoId: number): ErpOrder 
     toplam: Number(o.toplam) || 0,
     kapora: Number(o.kapora) || 0,
     tahsilat: Number(o.tahsilat) || 0,
-    not_icerik: String(o.not_icerik ?? o.not ?? ""),
-    bilgi: String(o.bilgi ?? ""),
+    not_icerik: String(o.not_icerik ?? o.not ?? "").trim(),
+    bilgi: String(o.bilgi ?? "").trim(),
+    adres: String(o.adres ?? "").trim(),
+    mapsUrl: String(o.mapsUrl ?? o.maps_konum ?? "").trim(),
     durum: parseOrderDurum(o.durum),
     created_at:
       typeof o.created_at === "string" ? o.created_at : new Date().toISOString(),

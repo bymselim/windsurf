@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { clearAdminPassword } from "@/lib/admin-auth-client";
+import { logoutAdminSession, verifyAdminSession } from "@/lib/admin-auth-client";
 import { APP_NAME, APP_VERSION } from "@/lib/app-version";
 
 const NAV = [
@@ -25,9 +25,14 @@ export default function AdminDashboardPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const saved =
-      typeof window !== "undefined" && localStorage.getItem("admin-authenticated");
-    setIsAuthenticated(saved === "true");
+    let cancelled = false;
+    void (async () => {
+      const ok = await verifyAdminSession();
+      if (!cancelled) setIsAuthenticated(ok);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -46,11 +51,8 @@ export default function AdminDashboardPage() {
 
   if (!isAuthenticated) return null;
 
-  const handleLogout = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("admin-authenticated");
-      clearAdminPassword();
-    }
+  const handleLogout = async () => {
+    await logoutAdminSession();
     router.replace("/admin/access-logs");
   };
 

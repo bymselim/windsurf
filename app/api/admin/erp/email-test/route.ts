@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth-server";
 import { readErpEmailSettings } from "@/lib/erp/email-store";
-import { sendErpTestDaily, sendErpTestMonthly } from "@/lib/erp/email-send";
+import { sendErpTestDaily, sendErpTestMonthly, sendErpTestWeeklyBackup } from "@/lib/erp/email-send";
 import { isSmtpConfigured, smtpConfigHint } from "@/lib/mail";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,12 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const kind = body?.kind === "monthly" ? "monthly" : "daily";
+  const kind =
+    body?.kind === "monthly"
+      ? "monthly"
+      : body?.kind === "weekly"
+        ? "weekly"
+        : "daily";
   const settings = await readErpEmailSettings();
   const to =
     typeof body?.toEmail === "string" && body.toEmail.includes("@")
@@ -29,6 +34,7 @@ export async function POST(request: NextRequest) {
 
   try {
     if (kind === "monthly") await sendErpTestMonthly(to);
+    else if (kind === "weekly") await sendErpTestWeeklyBackup(to);
     else await sendErpTestDaily(to);
     return NextResponse.json({ ok: true, to, kind });
   } catch (e) {

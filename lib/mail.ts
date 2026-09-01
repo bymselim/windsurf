@@ -5,6 +5,11 @@ export interface SendMailOptions {
   subject: string;
   text: string;
   html?: string;
+  attachments?: Array<{
+    filename: string;
+    content: string | Buffer;
+    contentType?: string;
+  }>;
 }
 
 export function isSmtpConfigured(): boolean {
@@ -50,5 +55,10 @@ export async function sendMail(opts: SendMailOptions): Promise<void> {
     subject: opts.subject,
     text: opts.text,
     html: opts.html || opts.text.replace(/\n/g, "<br>"),
+    attachments: opts.attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+      contentType: a.contentType,
+    })),
   });
 }

@@ -17,6 +17,7 @@ import {
   createErpOrder,
   createErpRecurring,
   deleteErpExpense,
+  deleteErpExpensesBulk,
   deleteErpOrder,
   deleteErpRecurring,
   fetchErpData,
@@ -32,7 +33,7 @@ import {
 } from "@/components/erp/api";
 import { ErpImportPanel } from "@/components/erp/ErpImportPanel";
 import { TodosPanel } from "@/components/erp/TodosPanel";
-import { clearAdminPassword } from "@/lib/admin-auth-client";
+import { AdminAuthError, logoutAdminSession } from "@/lib/admin-auth-client";
 import { APP_VERSION } from "@/lib/app-version";
 import type { ErpEmailSectionKey, ErpEmailSettings } from "@/lib/erp/email-types";
 import { ERP_EMAIL_SECTION_LABELS } from "@/lib/erp/email-types";
@@ -44,6 +45,10 @@ import type {
   ErpTodo,
   ErpTodoRecurring,
 } from "@/lib/erp/types";
+import {
+  openWhatsAppShare,
+  printShippingLabel,
+} from "@/lib/erp/shipping-label";
 import {
   addWorkdays,
   assignOrderNums,
@@ -63,6 +68,7 @@ import {
   isInMonth,
   monthStr,
   orderKalan,
+  orderKalanBakiye,
   toInputDateValue,
   type ExpenseSortKey,
   type OrderSortKey,
@@ -112,6 +118,8 @@ type OrderForm = {
   kapora: string;
   not_icerik: string;
   bilgi: string;
+  adres: string;
+  mapsUrl: string;
 };
 
 function defaultOrderBitis(tarih: string): string {
@@ -153,6 +161,8 @@ const emptyOrderForm = (): OrderForm => {
     kapora: "",
     not_icerik: "",
     bilgi: "",
+    adres: "",
+    mapsUrl: "",
   };
 };
 
@@ -453,6 +463,7 @@ export default function ErpApp() {
   const [emailSmtpOk, setEmailSmtpOk] = useState<boolean | null>(null);
   const [emailSmtpHint, setEmailSmtpHint] = useState("");
   const [emailBody, setEmailBody] = useState("");
+  const [selectedExpenseIds, setSelectedExpenseIds] = useState<number[]>([]);
 
   const topbarDate = useMemo(
     () =>
@@ -505,10 +516,11 @@ export default function ErpApp() {
       const data = await fetchErpData();
       applyErpData(data);
     } catch (e) {
+      if (e instanceof AdminAuthError) return;
       console.error(e);
       setSyncOk(false);
       alert(
-        "Veritabanı bağlantı hatası: " +
+        "Veri yüklenemedi: " +
           (e instanceof Error ? e.message : "Bilinmeyen hata")
       );
     } finally {
@@ -525,11 +537,8 @@ export default function ErpApp() {
     setMobileNavOpen(false);
   }, []);
 
-  const handleLogout = useCallback(() => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("admin-authenticated");
-      clearAdminPassword();
-    }
+  const handleLogout = useCallback(async () => {
+    await logoutAdminSession();
     router.replace("/admin/access-logs");
   }, [router]);
 
@@ -566,7 +575,7 @@ export default function ErpApp() {
   }, [emailSettings, showLoading, hideLoading]);
 
   const testEmail = useCallback(
-    async (kind: "daily" | "monthly") => {
+    async (kind: "daily" | "monthly" | "weekly") => {
       if (!emailSettings?.toEmail) {
         alert("Önce alıcı e-posta adresini girin.");
         return;
@@ -574,7 +583,9 @@ export default function ErpApp() {
       showLoading("Test maili gönderiliyor...");
       try {
         await sendErpEmailTest(kind, emailSettings.toEmail);
-        alert(`Test maili gönderildi (${kind === "daily" ? "günlük" : "ay sonu"}).`);
+        const label =
+          kind === "daily" ? "günlük" : kind === "monthly" ? "ay sonu" : "haftalık yedek";
+        alert(`Test maili gönderildi (${label}).`);
       } catch (e) {
         alert("Hata: " + (e instanceof Error ? e.message : "Gönderilemedi"));
       } finally {
@@ -688,6 +699,8 @@ export default function ErpApp() {
         kapora: o.kapora ? String(o.kapora) : "",
         not_icerik: o.not_icerik || "",
         bilgi: o.bilgi || "",
+        adres: o.adres || "",
+        mapsUrl: o.mapsUrl || "",
       });
       setOrderModalOpen(true);
     },
@@ -728,6 +741,8 @@ export default function ErpApp() {
       tahsilat,
       not_icerik: orderForm.not_icerik.trim(),
       bilgi: orderForm.bilgi.trim(),
+      adres: orderForm.adres.trim(),
+      mapsUrl: orderForm.mapsUrl.trim(),
     };
     showLoading("Kaydediliyor...");
     try {
@@ -948,6 +963,7 @@ export default function ErpApp() {
       try {
         await deleteErpExpense(id);
         setExpenses((prev) => prev.filter((e) => e.id !== id));
+        setSelectedExpenseIds((prev) => prev.filter((x) => x !== id));
       } catch (e) {
         alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
       } finally {
@@ -956,6 +972,65 @@ export default function ErpApp() {
     },
     [showLoading, hideLoading]
   );
+
+  const toggleExpenseSelected = useCallback((id: number) => {
+    setSelectedExpenseIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }, []);
+
+  const selectAllVisibleExpenses = useCallback(() => {
+    setSelectedExpenseIds(sortedExpenses.map((e) => e.id));
+  }, [sortedExpenses]);
+
+  const clearExpenseSelection = useCallback(() => {
+    setSelectedExpenseIds([]);
+  }, []);
+
+  const deleteSelectedExpenses = useCallback(async () => {
+    if (!selectedExpenseIds.length) {
+      alert("Silmek için en az bir gider seçin.");
+      return;
+    }
+    if (
+      !confirm(`${selectedExpenseIds.length} gider kaydı silinsin mi? Bu işlem geri alınamaz.`)
+    )
+      return;
+    showLoading("Seçilen giderler siliniyor...");
+    try {
+      const removed = await deleteErpExpensesBulk(selectedExpenseIds);
+      const idSet = new Set(selectedExpenseIds);
+      setExpenses((prev) => prev.filter((e) => !idSet.has(e.id)));
+      setSelectedExpenseIds([]);
+      if (removed === 0) alert("Silinecek kayıt bulunamadı.");
+    } catch (e) {
+      alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+    } finally {
+      hideLoading();
+    }
+  }, [selectedExpenseIds, showLoading, hideLoading]);
+
+  const deleteAllExpenses = useCallback(async () => {
+    if (!expenses.length) return;
+    if (
+      !confirm(
+        `Tüm gider listesi silinecek (${expenses.length} kayıt). Emin misiniz?`
+      )
+    )
+      return;
+    if (!confirm("Son onay: Bu işlem geri alınamaz. Devam edilsin mi?")) return;
+    showLoading("Tüm giderler siliniyor...");
+    try {
+      const ids = expenses.map((e) => e.id);
+      await deleteErpExpensesBulk(ids);
+      setExpenses([]);
+      setSelectedExpenseIds([]);
+    } catch (e) {
+      alert("Hata: " + (e instanceof Error ? e.message : "Bilinmeyen hata"));
+    } finally {
+      hideLoading();
+    }
+  }, [expenses, showLoading, hideLoading]);
 
   const persistSettings = useCallback(
     async (next: ErpSettings) => {
@@ -1201,6 +1276,8 @@ export default function ErpApp() {
         "Durum",
         "İçerik",
         "Özel Not",
+        "Adres",
+        "Maps",
       ],
     ];
     orders.forEach((o) =>
@@ -1217,10 +1294,12 @@ export default function ErpApp() {
         o.toplam,
         o.kapora,
         o.tahsilat,
-        orderKalan(o),
+        orderKalanBakiye(o),
         getOrderStatus(o),
         o.not_icerik,
         o.bilgi,
+        o.adres ?? "",
+        o.mapsUrl ?? "",
       ])
     );
     const csv = toCsv(rows);
@@ -1839,6 +1918,7 @@ Saygılarımla`;
                         <th>Bitiş</th>
                         <th>Kapora</th>
                         <th>Toplam</th>
+                        <th>Kalan</th>
                         <th>Durum</th>
                       </tr>
                     </thead>
@@ -1864,6 +1944,9 @@ Saygılarımla`;
                             </td>
                             <td style={{ color: "var(--amber)", fontWeight: 500 }}>
                               {fmtM(o.toplam)}
+                            </td>
+                            <td style={{ color: "var(--red)", fontWeight: 500 }}>
+                              {fmtM(orderKalanBakiye(o))}
                             </td>
                             <td>
                               <span className={`badge ${STATUS_COLORS[st]}`}>
@@ -1964,6 +2047,7 @@ Saygılarımla`;
                         >
                           Toplam Bedel{sortIndicator("toplam")}
                         </th>
+                        <th>Kalan</th>
                         <th
                           className={`sortable${orderSort.key === "ad" ? " sorted" : ""}`}
                           onClick={() => toggleOrderSort("ad")}
@@ -2022,6 +2106,9 @@ Saygılarımla`;
                               <td style={{ color: "var(--amber)", fontWeight: 500 }}>
                                 {fmtM(o.toplam)}
                               </td>
+                              <td style={{ color: "var(--red)", fontWeight: 500 }}>
+                                {fmtM(orderKalanBakiye(o))}
+                              </td>
                               <td className="b">
                                 <span
                                   dangerouslySetInnerHTML={{
@@ -2043,7 +2130,23 @@ Saygılarımla`;
                               <td style={{ fontSize: 12, color: "var(--text3)" }}>
                                 {fmtDate(o.bitis)}
                               </td>
-                              <td style={{ whiteSpace: "nowrap" }}>
+                              <td style={{ whiteSpace: "nowrap" }} className="order-actions">
+                                <button
+                                  type="button"
+                                  className="btn sm"
+                                  title="Etiket yazdır"
+                                  onClick={() => printShippingLabel(o)}
+                                >
+                                  🖨
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn sm success"
+                                  title="WhatsApp ile paylaş"
+                                  onClick={() => openWhatsAppShare(o)}
+                                >
+                                  WA
+                                </button>
                                 <button
                                   type="button"
                                   className="btn sm"
@@ -2084,7 +2187,7 @@ Saygılarımla`;
                         })
                       ) : (
                         <tr>
-                          <td colSpan={11} className="empty">
+                          <td colSpan={13} className="empty">
                             Sipariş bulunamadı.
                           </td>
                         </tr>
@@ -2346,16 +2449,64 @@ Saygılarımla`;
               >
                 <div style={{ fontSize: 14, fontWeight: 500 }}>
                   Fatura / Gider Listesi
+                  {selectedExpenseIds.length ? (
+                    <span style={{ fontSize: 12, color: "var(--amber)", marginLeft: 8 }}>
+                      ({selectedExpenseIds.length} seçili)
+                    </span>
+                  ) : null}
                 </div>
-                <button type="button" className="btn sm success" onClick={prepareEmail}>
-                  ✉ Muhasebeye Gönder
-                </button>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  <button type="button" className="btn sm" onClick={selectAllVisibleExpenses}>
+                    Tümünü seç
+                  </button>
+                  <button
+                    type="button"
+                    className="btn sm"
+                    onClick={clearExpenseSelection}
+                    disabled={!selectedExpenseIds.length}
+                  >
+                    Seçimi temizle
+                  </button>
+                  <button
+                    type="button"
+                    className="btn sm danger"
+                    onClick={() => void deleteSelectedExpenses()}
+                    disabled={!selectedExpenseIds.length}
+                  >
+                    Seçilenleri sil
+                  </button>
+                  <button
+                    type="button"
+                    className="btn sm danger"
+                    onClick={() => void deleteAllExpenses()}
+                    disabled={!expenses.length}
+                  >
+                    Tüm giderleri sil
+                  </button>
+                  <button type="button" className="btn sm success" onClick={prepareEmail}>
+                    ✉ Muhasebeye Gönder
+                  </button>
+                </div>
               </div>
               <div className="card" style={{ padding: 0, overflow: "hidden" }}>
                 <div className="tbl-wrap">
                   <table>
                     <thead>
                       <tr>
+                        <th style={{ width: 36 }}>
+                          <input
+                            type="checkbox"
+                            aria-label="Tümünü seç"
+                            checked={
+                              sortedExpenses.length > 0 &&
+                              sortedExpenses.every((e) => selectedExpenseIds.includes(e.id))
+                            }
+                            onChange={(ev) => {
+                              if (ev.target.checked) selectAllVisibleExpenses();
+                              else clearExpenseSelection();
+                            }}
+                          />
+                        </th>
                         <th
                           className={`sortable${expenseSort.key === "tarih" ? " sorted" : ""}`}
                           onClick={() => toggleExpenseSort("tarih")}
@@ -2394,6 +2545,14 @@ Saygılarımla`;
                       {sortedExpenses.length ? (
                         sortedExpenses.map((e) => (
                           <tr key={e.id}>
+                            <td>
+                              <input
+                                type="checkbox"
+                                checked={selectedExpenseIds.includes(e.id)}
+                                onChange={() => toggleExpenseSelected(e.id)}
+                                aria-label={`Gider ${e.id} seç`}
+                              />
+                            </td>
                             <td style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>
                               {fmtDate(e.tarih)}
                             </td>
@@ -2439,7 +2598,7 @@ Saygılarımla`;
                                   className="btn sm danger"
                                   onClick={() => void delExpense(e.id)}
                                 >
-                                  ✕
+                                  Sil
                                 </button>
                               </div>
                             </td>
@@ -2447,7 +2606,7 @@ Saygılarımla`;
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={7} className="empty">
+                          <td colSpan={8} className="empty">
                             Gider yok
                           </td>
                         </tr>
@@ -2570,7 +2729,7 @@ Saygılarımla`;
                               }}
                             >
                               {o.cat || ""} · {o.tur}×{o.adet} · Kalan:{" "}
-                              {fmtM(orderKalan(o))}
+                              {fmtM(orderKalanBakiye(o))}
                             </div>
                           </div>
                         );
@@ -2806,8 +2965,9 @@ Saygılarımla`;
               <div className="card" style={{ marginTop: 14 }}>
                 <div className="card-title">✉ E-posta Bildirimleri</div>
                 <p className="hint" style={{ marginBottom: 12 }}>
-                  Her sabah 07:00 (TR) günlük özet; ayın 1&apos;inde bir önceki ayın raporu
-                  gönderilir. Gmail için Vercel ortam değişkenlerine SMTP bilgilerini ekleyin.
+                  Her sabah 07:00 (TR) günlük özet; ayın 1&apos;inde bir önceki ayın raporu;
+                  her Pazartesi sipariş + gider tam yedeği (JSON/CSV ek) gönderilir. Gmail için
+                  Vercel ortam değişkenlerine SMTP bilgilerini ekleyin.
                 </p>
                 {emailSettings ? (
                   <>
@@ -2847,6 +3007,13 @@ Saygılarımla`;
                         checked={emailSettings.monthlyReportEnabled}
                         onChange={() => toggleEmailSection("monthlyReport")}
                       />
+                      <ErpToggle
+                        label="Haftalık veri yedeği (Pazartesi, JSON + CSV ek)"
+                        checked={emailSettings.weeklyBackupEnabled}
+                        onChange={(weeklyBackupEnabled) =>
+                          setEmailSettings((s) => (s ? { ...s, weeklyBackupEnabled } : s))
+                        }
+                      />
                     </div>
                     <p className="hint" style={{ marginBottom: 12, fontSize: 11 }}>
                       Bitime yakın siparişler bölümünde müşteri telefonu ve özet göstergeler
@@ -2870,10 +3037,13 @@ Saygılarımla`;
                         </div>
                       ) : null}
                     </div>
-                    {emailSettings.lastDailySent || emailSettings.lastMonthlySent ? (
+                    {emailSettings.lastDailySent ||
+                    emailSettings.lastMonthlySent ||
+                    emailSettings.lastWeeklyBackupSent ? (
                       <p style={{ fontSize: 11, color: "var(--text3)", marginBottom: 10 }}>
                         Son günlük: {emailSettings.lastDailySent || "—"} · Son ay raporu:{" "}
-                        {emailSettings.lastMonthlySent || "—"}
+                        {emailSettings.lastMonthlySent || "—"} · Son haftalık yedek:{" "}
+                        {emailSettings.lastWeeklyBackupSent || "—"}
                       </p>
                     ) : null}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -2885,6 +3055,9 @@ Saygılarımla`;
                       </button>
                       <button type="button" className="btn sm" onClick={() => void testEmail("monthly")}>
                         Test — Ay sonu
+                      </button>
+                      <button type="button" className="btn sm" onClick={() => void testEmail("weekly")}>
+                        Test — Haftalık yedek
                       </button>
                     </div>
                   </>
@@ -3113,6 +3286,37 @@ Saygılarımla`;
                   setOrderForm((f) => ({ ...f, bilgi: e.target.value }))
                 }
               />
+            </div>
+          </div>
+          <div className="fg">
+            <div>
+              <div className="fl">Teslimat Adresi</div>
+              <textarea
+                id="f-adres"
+                rows={3}
+                placeholder="Mahalle, sokak, bina no, ilçe, il..."
+                value={orderForm.adres}
+                onChange={(e) =>
+                  setOrderForm((f) => ({ ...f, adres: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+          <div className="fg">
+            <div>
+              <div className="fl">Google Maps Konum Linki</div>
+              <input
+                id="f-maps"
+                placeholder="https://maps.app.goo.gl/... veya WhatsApp konum linki"
+                value={orderForm.mapsUrl}
+                onChange={(e) =>
+                  setOrderForm((f) => ({ ...f, mapsUrl: e.target.value }))
+                }
+              />
+              <div className="hint" style={{ marginTop: 6 }}>
+                Google Maps veya WhatsApp&apos;tan &quot;Konumu paylaş&quot; ile gelen linki
+                yapıştırın. Etikette QR kod olarak görünür.
+              </div>
             </div>
           </div>
 

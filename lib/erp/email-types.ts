@@ -26,10 +26,14 @@ export interface ErpEmailSettings {
   dailySections: ErpEmailSectionKey[];
   /** Ayın 1'inde bir önceki ay raporu gönderilsin mi. */
   monthlyReportEnabled: boolean;
+  /** Her Pazartesi sipariş + gider tam yedeği (JSON/CSV ek). */
+  weeklyBackupEnabled: boolean;
   /** Çift gönderimi önlemek için YYYY-MM-DD */
   lastDailySent?: string;
   /** Çift gönderimi önlemek için YYYY-MM */
   lastMonthlySent?: string;
+  /** Son haftalık yedek (Pazartesi YYYY-MM-DD). */
+  lastWeeklyBackupSent?: string;
 }
 
 export function defaultErpEmailSettings(): ErpEmailSettings {
@@ -38,6 +42,7 @@ export function defaultErpEmailSettings(): ErpEmailSettings {
     toEmail: "",
     dailySections: [...ERP_DAILY_SECTION_KEYS],
     monthlyReportEnabled: true,
+    weeklyBackupEnabled: true,
   };
 }
 
@@ -56,7 +61,10 @@ export function normalizeErpEmailSettings(raw: unknown): ErpEmailSettings {
     toEmail: typeof r.toEmail === "string" ? r.toEmail.trim() : "",
     dailySections: dailySections.length ? dailySections : [...ERP_DAILY_SECTION_KEYS],
     monthlyReportEnabled: r.monthlyReportEnabled !== false,
+    weeklyBackupEnabled: r.weeklyBackupEnabled !== false,
     lastDailySent: typeof r.lastDailySent === "string" ? r.lastDailySent : undefined,
     lastMonthlySent: typeof r.lastMonthlySent === "string" ? r.lastMonthlySent : undefined,
+    lastWeeklyBackupSent:
+      typeof r.lastWeeklyBackupSent === "string" ? r.lastWeeklyBackupSent : undefined,
   };
 }

@@ -46,6 +46,8 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     "tahsilat",
     "not_icerik",
     "bilgi",
+    "adres",
+    "mapsUrl",
     "durum",
   ] as const;
   for (const f of fields) {

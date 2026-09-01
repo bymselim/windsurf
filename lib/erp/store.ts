@@ -75,6 +75,8 @@ function normalizeOrder(raw: unknown): ErpOrder | null {
     tahsilat: Number(o.tahsilat) || 0,
     not_icerik: String(o.not_icerik ?? ""),
     bilgi: String(o.bilgi ?? ""),
+    adres: String(o.adres ?? ""),
+    mapsUrl: String(o.mapsUrl ?? o.maps_konum ?? ""),
     durum: parseOrderDurum(o.durum),
     created_at: typeof o.created_at === "string" ? o.created_at : new Date().toISOString(),
   };
@@ -482,6 +484,16 @@ export async function deleteExpense(id: number): Promise<boolean> {
   if (next.length === expenses.length) return false;
   await writeExpenses(next);
   return true;
+}
+
+export async function deleteExpensesBulk(ids: number[]): Promise<number> {
+  const idSet = new Set(ids.filter((id) => Number.isFinite(id)));
+  if (!idSet.size) return 0;
+  const expenses = await readExpenses();
+  const next = expenses.filter((e) => !idSet.has(e.id));
+  const removed = expenses.length - next.length;
+  if (removed > 0) await writeExpenses(next);
+  return removed;
 }
 
 export async function createRecurringExpense(

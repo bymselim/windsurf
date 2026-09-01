@@ -2,7 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { setAdminPassword, clearAdminPassword, getAdminAuthHeaders } from "@/lib/admin-auth-client";
+import {
+  getAdminAuthHeaders,
+  getPostLoginRedirect,
+  logoutAdminSession,
+  setAdminAuthenticated,
+  setAdminPassword,
+  verifyAdminSession,
+} from "@/lib/admin-auth-client";
 
 function normalizePhone(phone: string): string {
   const digits = String(phone ?? "").replace(/\D/g, "");
@@ -161,11 +168,18 @@ export default function AccessLogsPage() {
   };
 
   useEffect(() => {
-    const savedAuth = typeof window !== "undefined" && localStorage.getItem("admin-authenticated");
-    if (savedAuth === "true") {
-      setIsAuthenticated(true);
-      void loadLogs();
-    }
+    let cancelled = false;
+    void (async () => {
+      const ok = await verifyAdminSession();
+      if (cancelled) return;
+      if (ok) {
+        setIsAuthenticated(true);
+        void loadLogs();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [loadLogs]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -184,14 +198,9 @@ export default function AccessLogsPage() {
       return;
     }
 
-    setIsAuthenticated(true);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("admin-authenticated", "true");
-      setAdminPassword(password);
-    }
-    loadLogs();
-    loadBlockedPhones();
-    loadExpiredPhones();
+    setAdminPassword(password);
+    setAdminAuthenticated();
+    window.location.href = getPostLoginRedirect();
   };
 
   const handleExtendCredits = async () => {
@@ -217,13 +226,10 @@ export default function AccessLogsPage() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsAuthenticated(false);
     setPassword("");
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("admin-authenticated");
-      clearAdminPassword();
-    }
+    await logoutAdminSession();
   };
 
   if (!isAuthenticated) {

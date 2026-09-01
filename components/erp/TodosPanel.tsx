@@ -235,39 +235,6 @@ export function TodosPanel({
 
   return (
     <div className="todos-panel">
-      <div className="metric-grid" style={{ marginBottom: 16 }}>
-        <div className="metric">
-          <div className="metric-label">Açılan</div>
-          <div className="metric-value">{stats.opened}</div>
-        </div>
-        <div className="metric">
-          <div className="metric-label">Bekleyen</div>
-          <div className="metric-value" style={{ color: "var(--amber)" }}>
-            {stats.waiting}
-          </div>
-        </div>
-        <div className="metric">
-          <div className="metric-label">Tamamlanan</div>
-          <div className="metric-value" style={{ color: "var(--green)" }}>
-            {stats.closed}
-          </div>
-        </div>
-        <div className="metric">
-          <div className="metric-label">Ort. süre</div>
-          <div className="metric-value" style={{ fontSize: 16 }}>
-            {stats.avgMs != null ? formatDurationMs(stats.avgMs) : "—"}
-          </div>
-        </div>
-        <div className="metric">
-          <div className="metric-label">7g kapanan</div>
-          <div className="metric-value">{stats.closed7}</div>
-        </div>
-        <div className="metric">
-          <div className="metric-label">30g kapanan</div>
-          <div className="metric-value">{stats.closed30}</div>
-        </div>
-      </div>
-
       <div
         style={{
           display: "flex",
@@ -485,6 +452,39 @@ export function TodosPanel({
             ))}
           </div>
         )}
+      </div>
+
+      <div className="metric-grid" style={{ marginTop: 18, marginBottom: 8 }}>
+        <div className="metric">
+          <div className="metric-label">Açılan</div>
+          <div className="metric-value">{stats.opened}</div>
+        </div>
+        <div className="metric">
+          <div className="metric-label">Bekleyen</div>
+          <div className="metric-value" style={{ color: "var(--amber)" }}>
+            {stats.waiting}
+          </div>
+        </div>
+        <div className="metric">
+          <div className="metric-label">Tamamlanan</div>
+          <div className="metric-value" style={{ color: "var(--green)" }}>
+            {stats.closed}
+          </div>
+        </div>
+        <div className="metric">
+          <div className="metric-label">Ort. süre</div>
+          <div className="metric-value" style={{ fontSize: 16 }}>
+            {stats.avgMs != null ? formatDurationMs(stats.avgMs) : "—"}
+          </div>
+        </div>
+        <div className="metric">
+          <div className="metric-label">7g kapanan</div>
+          <div className="metric-value">{stats.closed7}</div>
+        </div>
+        <div className="metric">
+          <div className="metric-label">30g kapanan</div>
+          <div className="metric-value">{stats.closed30}</div>
+        </div>
       </div>
 
       {modalOpen ? (

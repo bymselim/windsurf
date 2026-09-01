@@ -216,6 +216,12 @@ export function compareOrders(
   }
 }
 
+/** Sipariş listesinde: toplam − kapora */
+export function orderKalanBakiye(o: ErpOrder): number {
+  const v = (+o.toplam || 0) - (+o.kapora || 0);
+  return v > 0 ? v : 0;
+}
+
 /** Sipariş listesindeki kalan bakiye (yalnızca pozitif; vadeli alacak). */
 export function orderKalan(o: ErpOrder): number {
   const v = (+o.toplam || 0) - (+o.tahsilat || 0);

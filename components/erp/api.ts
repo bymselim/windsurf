@@ -1,4 +1,4 @@
-import { getAdminAuthHeaders } from "@/lib/admin-auth-client";
+import { adminFetch, getAdminAuthHeaders } from "@/lib/admin-auth-client";
 import type { ErpImportMode, ErpImportResult } from "@/lib/erp/import";
 import type {
   ErpData,
@@ -18,15 +18,14 @@ function headers(json = true): HeadersInit {
 }
 
 export async function fetchErpData(): Promise<ErpData> {
-  const res = await fetch("/api/admin/erp", { credentials: "include", headers: headers() });
+  const res = await adminFetch("/api/admin/erp", { headers: headers() });
   if (!res.ok) throw new Error("Veriler yüklenemedi");
   return res.json();
 }
 
 export async function createErpOrder(payload: Record<string, unknown>): Promise<ErpOrder> {
-  const res = await fetch("/api/admin/erp/orders", {
+  const res = await adminFetch("/api/admin/erp/orders", {
     method: "POST",
-    credentials: "include",
     headers: headers(),
     body: JSON.stringify(payload),
   });
@@ -39,9 +38,8 @@ export async function updateErpOrder(
   id: number,
   payload: Record<string, unknown>
 ): Promise<ErpOrder> {
-  const res = await fetch(`/api/admin/erp/orders/${id}`, {
+  const res = await adminFetch(`/api/admin/erp/orders/${id}`, {
     method: "PATCH",
-    credentials: "include",
     headers: headers(),
     body: JSON.stringify(payload),
   });
@@ -55,9 +53,8 @@ export async function toggleErpOrderDone(id: number): Promise<ErpOrder> {
 }
 
 export async function deleteErpOrder(id: number): Promise<void> {
-  const res = await fetch(`/api/admin/erp/orders/${id}`, {
+  const res = await adminFetch(`/api/admin/erp/orders/${id}`, {
     method: "DELETE",
-    credentials: "include",
     headers: headers(),
   });
   if (!res.ok) {
@@ -67,9 +64,8 @@ export async function deleteErpOrder(id: number): Promise<void> {
 }
 
 export async function createErpExpense(form: FormData): Promise<ErpExpense> {
-  const res = await fetch("/api/admin/erp/expenses", {
+  const res = await adminFetch("/api/admin/erp/expenses", {
     method: "POST",
-    credentials: "include",
     headers: getAdminAuthHeaders(),
     body: form,
   });
@@ -79,9 +75,8 @@ export async function createErpExpense(form: FormData): Promise<ErpExpense> {
 }
 
 export async function deleteErpExpense(id: number): Promise<void> {
-  const res = await fetch(`/api/admin/erp/expenses/${id}`, {
+  const res = await adminFetch(`/api/admin/erp/expenses/${id}`, {
     method: "DELETE",
-    credentials: "include",
     headers: headers(),
   });
   if (!res.ok) {
@@ -90,14 +85,24 @@ export async function deleteErpExpense(id: number): Promise<void> {
   }
 }
 
+export async function deleteErpExpensesBulk(ids: number[]): Promise<number> {
+  const res = await adminFetch("/api/admin/erp/expenses/bulk-delete", {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ ids }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json?.error ?? "Toplu silme başarısız");
+  return Number(json.removed) || 0;
+}
+
 export async function updateErpExpense(
   id: number,
   body: Record<string, unknown> | FormData
 ): Promise<ErpExpense> {
   const isForm = typeof FormData !== "undefined" && body instanceof FormData;
-  const res = await fetch(`/api/admin/erp/expenses/${id}`, {
+  const res = await adminFetch(`/api/admin/erp/expenses/${id}`, {
     method: "PATCH",
-    credentials: "include",
     headers: isForm ? getAdminAuthHeaders() : headers(),
     body: isForm ? body : JSON.stringify(body),
   });
@@ -116,9 +121,8 @@ export async function importErpJson(
     form.append("files", file);
   }
 
-  const res = await fetch("/api/admin/erp/import", {
+  const res = await adminFetch("/api/admin/erp/import", {
     method: "POST",
-    credentials: "include",
     headers: getAdminAuthHeaders(),
     body: form,
   });
@@ -128,9 +132,8 @@ export async function importErpJson(
 }
 
 export async function saveErpSettings(settings: ErpSettings): Promise<ErpSettings> {
-  const res = await fetch("/api/admin/erp/settings", {
+  const res = await adminFetch("/api/admin/erp/settings", {
     method: "PUT",
-    credentials: "include",
     headers: headers(),
     body: JSON.stringify(settings),
   });
@@ -142,9 +145,8 @@ export async function saveErpSettings(settings: ErpSettings): Promise<ErpSetting
 export async function createErpRecurring(
   payload: Record<string, unknown>
 ): Promise<{ rule: ErpRecurringExpense; expenses: ErpExpense[] }> {
-  const res = await fetch("/api/admin/erp/recurring", {
+  const res = await adminFetch("/api/admin/erp/recurring", {
     method: "POST",
-    credentials: "include",
     headers: headers(),
     body: JSON.stringify(payload),
   });
@@ -154,9 +156,8 @@ export async function createErpRecurring(
 }
 
 export async function deleteErpRecurring(id: number): Promise<void> {
-  const res = await fetch(`/api/admin/erp/recurring/${id}`, {
+  const res = await adminFetch(`/api/admin/erp/recurring/${id}`, {
     method: "DELETE",
-    credentials: "include",
     headers: headers(),
   });
   if (!res.ok) {
@@ -169,9 +170,8 @@ export async function updateErpRecurring(
   id: number,
   payload: Record<string, unknown>
 ): Promise<{ rule: ErpRecurringExpense; expenses: ErpExpense[] }> {
-  const res = await fetch(`/api/admin/erp/recurring/${id}`, {
+  const res = await adminFetch(`/api/admin/erp/recurring/${id}`, {
     method: "PATCH",
-    credentials: "include",
     headers: headers(),
     body: JSON.stringify(payload),
   });
@@ -184,9 +184,8 @@ export async function toggleErpRecurringActive(
   id: number,
   active: boolean
 ): Promise<{ rule: ErpRecurringExpense; expenses: ErpExpense[] }> {
-  const res = await fetch(`/api/admin/erp/recurring/${id}`, {
+  const res = await adminFetch(`/api/admin/erp/recurring/${id}`, {
     method: "PATCH",
-    credentials: "include",
     headers: headers(),
     body: JSON.stringify({ active }),
   });
@@ -202,8 +201,7 @@ export async function fetchErpEmailSettings(): Promise<{
   sectionLabels: Record<ErpEmailSectionKey, string>;
   dailySectionKeys: ErpEmailSectionKey[];
 }> {
-  const res = await fetch("/api/admin/erp/email-settings", {
-    credentials: "include",
+  const res = await adminFetch("/api/admin/erp/email-settings", {
     headers: headers(),
   });
   const json = await res.json();
@@ -214,9 +212,8 @@ export async function fetchErpEmailSettings(): Promise<{
 export async function saveErpEmailSettings(
   settings: Partial<ErpEmailSettings>
 ): Promise<ErpEmailSettings> {
-  const res = await fetch("/api/admin/erp/email-settings", {
+  const res = await adminFetch("/api/admin/erp/email-settings", {
     method: "PUT",
-    credentials: "include",
     headers: headers(),
     body: JSON.stringify(settings),
   });
@@ -226,12 +223,11 @@ export async function saveErpEmailSettings(
 }
 
 export async function sendErpEmailTest(
-  kind: "daily" | "monthly",
+  kind: "daily" | "monthly" | "weekly",
   toEmail?: string
 ): Promise<void> {
-  const res = await fetch("/api/admin/erp/email-test", {
+  const res = await adminFetch("/api/admin/erp/email-test", {
     method: "POST",
-    credentials: "include",
     headers: headers(),
     body: JSON.stringify({ kind, toEmail }),
   });
@@ -243,9 +239,8 @@ export async function createErpTodo(payload: {
   title: string;
   note?: string;
 }): Promise<{ todo: ErpTodo; todos: ErpTodo[] }> {
-  const res = await fetch("/api/admin/erp/todos", {
+  const res = await adminFetch("/api/admin/erp/todos", {
     method: "POST",
-    credentials: "include",
     headers: headers(),
     body: JSON.stringify(payload),
   });
@@ -258,9 +253,8 @@ export async function updateErpTodo(
   id: number,
   payload: Record<string, unknown>
 ): Promise<{ todo: ErpTodo; todos: ErpTodo[] }> {
-  const res = await fetch(`/api/admin/erp/todos/${id}`, {
+  const res = await adminFetch(`/api/admin/erp/todos/${id}`, {
     method: "PATCH",
-    credentials: "include",
     headers: headers(),
     body: JSON.stringify(payload),
   });
@@ -279,9 +273,8 @@ export async function reorderErpTodo(
   id: number,
   direction: "up" | "down"
 ): Promise<{ todos: ErpTodo[] }> {
-  const res = await fetch(`/api/admin/erp/todos/${id}`, {
+  const res = await adminFetch(`/api/admin/erp/todos/${id}`, {
     method: "PATCH",
-    credentials: "include",
     headers: headers(),
     body: JSON.stringify({ reorder: direction }),
   });
@@ -291,9 +284,8 @@ export async function reorderErpTodo(
 }
 
 export async function deleteErpTodo(id: number): Promise<void> {
-  const res = await fetch(`/api/admin/erp/todos/${id}`, {
+  const res = await adminFetch(`/api/admin/erp/todos/${id}`, {
     method: "DELETE",
-    credentials: "include",
     headers: headers(),
   });
   if (!res.ok) {
@@ -307,9 +299,8 @@ export async function createErpTodoRecurring(payload: Record<string, unknown>): 
   todos: ErpTodo[];
   recurringTodos: ErpTodoRecurring[];
 }> {
-  const res = await fetch("/api/admin/erp/todo-recurring", {
+  const res = await adminFetch("/api/admin/erp/todo-recurring", {
     method: "POST",
-    credentials: "include",
     headers: headers(),
     body: JSON.stringify(payload),
   });
@@ -326,9 +317,8 @@ export async function updateErpTodoRecurring(
   todos: ErpTodo[];
   recurringTodos: ErpTodoRecurring[];
 }> {
-  const res = await fetch(`/api/admin/erp/todo-recurring/${id}`, {
+  const res = await adminFetch(`/api/admin/erp/todo-recurring/${id}`, {
     method: "PATCH",
-    credentials: "include",
     headers: headers(),
     body: JSON.stringify(payload),
   });
@@ -338,9 +328,8 @@ export async function updateErpTodoRecurring(
 }
 
 export async function deleteErpTodoRecurring(id: number): Promise<void> {
-  const res = await fetch(`/api/admin/erp/todo-recurring/${id}`, {
+  const res = await adminFetch(`/api/admin/erp/todo-recurring/${id}`, {
     method: "DELETE",
-    credentials: "include",
     headers: headers(),
   });
   if (!res.ok) {

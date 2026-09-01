@@ -15,6 +15,10 @@ export interface ErpOrder {
   tahsilat: number;
   not_icerik: string;
   bilgi: string;
+  /** Teslimat / kargo adresi */
+  adres?: string;
+  /** Google Maps paylaşım linki */
+  mapsUrl?: string;
   durum?: ErpOrderStatus;
   created_at: string;
 }

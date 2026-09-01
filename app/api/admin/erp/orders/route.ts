@@ -44,6 +44,8 @@ export async function POST(request: NextRequest) {
     tahsilat,
     not_icerik: String(body?.not_icerik ?? "").trim(),
     bilgi: String(body?.bilgi ?? "").trim(),
+    adres: String(body?.adres ?? "").trim(),
+    mapsUrl: String(body?.mapsUrl ?? body?.maps_konum ?? "").trim(),
     durum: parseOrderDurum(body?.durum ?? "bekleyen"),
   });
 
