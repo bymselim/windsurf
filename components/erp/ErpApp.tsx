@@ -1592,24 +1592,6 @@ Saygılarımla`;
       .filter((o) => isOrderDueTracked(o))
       .sort((a, b) => daysLeft(a.bitis) - daysLeft(b.bitis));
 
-    const expKatGroups = buildExpenseKatGroups(expenses).filter(
-      (g) => g.kat.trim().localeCompare("Diğer", "tr", { sensitivity: "base" }) !== 0
-    );
-
-    const prodCats: Record<string, number> = {};
-    const prodAdet: Record<string, number> = {};
-    orders.forEach((o) => {
-      if (o.cat) {
-        prodCats[o.cat] = (prodCats[o.cat] || 0) + (+o.toplam || 0);
-        prodAdet[o.cat] = (prodAdet[o.cat] || 0) + (+o.adet || 0);
-      }
-    });
-    const prodCatRows = Object.keys(prodCats).map((cat) => ({
-      cat,
-      ciro: prodCats[cat],
-      adet: prodAdet[cat] || 0,
-    }));
-
     return {
       metrics: {
         bekleyen,
@@ -1624,29 +1606,8 @@ Saygılarımla`;
       },
       alerts,
       upcoming,
-      expKatGroups,
-      prodCatRows,
     };
   }, [orders, expenses]);
-
-  /* ─── Expenses computed ─── */
-  const expenseView = useMemo(() => {
-    const total = expenses.reduce((s, e) => s + (+e.tutar || 0), 0);
-    const thisM = monthStr(0);
-    const aylik = expenses
-      .filter((e) => isInMonth(e.tarih, thisM))
-      .reduce((s, e) => s + (+e.tutar || 0), 0);
-    const faturali = expenses.filter((e) => e.fatno || e.dosya).length;
-    const katGroups = buildExpenseKatGroups(expenses);
-    const months: Record<string, number> = {};
-    expenses.forEach((e) => {
-      const m = dateMonthKey(e.tarih);
-      if (m) months[m] = (months[m] || 0) + (+e.tutar || 0);
-    });
-    const monthEntries = Object.entries(months).sort().slice(-6) as [string, number][];
-    const mMax = Math.max(...monthEntries.map(([, v]) => v), 1);
-    return { total, aylik, faturali, katGroups, monthEntries, mMax };
-  }, [expenses]);
 
   /* ─── Reports computed ─── */
   const reports = useMemo(() => {
@@ -1696,6 +1657,32 @@ Saygılarımla`;
     });
     const monthlyEntries = Object.entries(months).sort().slice(-8) as [string, number][];
     const mMax = Math.max(...monthlyEntries.map(([, v]) => v), 1);
+
+    const expKatGroups = buildExpenseKatGroups(exp).filter(
+      (g) => g.kat.trim().localeCompare("Diğer", "tr", { sensitivity: "base" }) !== 0
+    );
+    const prodCats: Record<string, number> = {};
+    const prodAdet: Record<string, number> = {};
+    ord.forEach((o) => {
+      if (o.cat) {
+        prodCats[o.cat] = (prodCats[o.cat] || 0) + (+o.toplam || 0);
+        prodAdet[o.cat] = (prodAdet[o.cat] || 0) + (+o.adet || 0);
+      }
+    });
+    const prodCatRows = Object.keys(prodCats).map((cat) => ({
+      cat,
+      ciro: prodCats[cat],
+      adet: prodAdet[cat] || 0,
+    }));
+
+    const expMonths: Record<string, number> = {};
+    exp.forEach((e) => {
+      const m = dateMonthKey(e.tarih);
+      if (m) expMonths[m] = (expMonths[m] || 0) + (+e.tutar || 0);
+    });
+    const expMonthEntries = Object.entries(expMonths).sort().slice(-6) as [string, number][];
+    const expMMax = Math.max(...expMonthEntries.map(([, v]) => v), 1);
+    const expFaturali = exp.filter((e) => e.fatno || e.dosya).length;
 
     return {
       production: [
@@ -1758,6 +1745,17 @@ Saygılarımla`;
       allGider,
       monthlyEntries,
       mMax,
+      expKatGroups,
+      prodCatRows,
+      expMonthEntries,
+      expMMax,
+      expFaturali,
+      topToplam,
+      topTah,
+      topGider,
+      topAdet,
+      sipAdet,
+      expCount: exp.length,
     };
   }, [orders, expenses, rPeriod, rYear]);
 
@@ -1972,75 +1970,61 @@ Saygılarımla`;
                   <MonthBox ms={monthStr(-1)} orders={orders} expenses={expenses} />
                 </div>
               </div>
-              <div className="grid2">
-                <div className="card">
-                  <div className="card-title">⏱ Bitime Yakın</div>
-                  <div id="d-upcoming" className="d-upcoming-scroll">
-                    {dashboard.upcoming.length ? (
-                      dashboard.upcoming.map((o) => {
-                        const dl = daysLeft(o.bitis);
-                        const c = dl < 0 ? "red" : dl <= 3 ? "amber" : "green";
-                        const label =
-                          dl < 0
-                            ? Math.abs(dl) + " gün gecikti"
-                            : dl === 0
-                              ? "Bugün teslim"
-                              : dl + " gün kaldı";
-                        return (
-                          <div
-                            key={o.id}
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              padding: "9px 0",
-                              borderBottom: "1px solid var(--border)",
-                            }}
-                          >
-                            <div style={{ minWidth: 0, flex: 1, paddingRight: 8 }}>
-                              <div
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: 500,
-                                  color: "var(--text)",
-                                }}
-                              >
-                                {o.ad} {o.soyad}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: 11,
-                                  color: "var(--text3)",
-                                  marginTop: 2,
-                                  lineHeight: 1.35,
-                                }}
-                              >
-                                {(o.cat || "—") + " · Bitiş " + fmtDate(o.bitis)}
-                                <span style={{ color: "var(--text2)" }}> · {label}</span>
-                              </div>
+              <div className="card" style={{ marginBottom: 14 }}>
+                <div className="card-title">⏱ Bitime Yakın</div>
+                <div id="d-upcoming" className="d-upcoming-scroll">
+                  {dashboard.upcoming.length ? (
+                    dashboard.upcoming.map((o) => {
+                      const dl = daysLeft(o.bitis);
+                      const c = dl < 0 ? "red" : dl <= 3 ? "amber" : "green";
+                      const label =
+                        dl < 0
+                          ? Math.abs(dl) + " gün gecikti"
+                          : dl === 0
+                            ? "Bugün teslim"
+                            : dl + " gün kaldı";
+                      return (
+                        <div
+                          key={o.id}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "9px 0",
+                            borderBottom: "1px solid var(--border)",
+                          }}
+                        >
+                          <div style={{ minWidth: 0, flex: 1, paddingRight: 8 }}>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 500,
+                                color: "var(--text)",
+                              }}
+                            >
+                              {o.ad} {o.soyad}
                             </div>
-                            <span className={`badge ${c}`} style={{ flexShrink: 0 }}>
-                              {label}
-                            </span>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: "var(--text3)",
+                                marginTop: 2,
+                                lineHeight: 1.35,
+                              }}
+                            >
+                              {(o.cat || "—") + " · Bitiş " + fmtDate(o.bitis)}
+                              <span style={{ color: "var(--text2)" }}> · {label}</span>
+                            </div>
                           </div>
-                        );
-                      })
-                    ) : (
-                      <div className="empty">Bekleyen yok 🎉</div>
-                    )}
-                  </div>
-                </div>
-                <div className="card">
-                  <div className="card-title">Gider Dağılımı</div>
-                  <div className="bar-chart" id="d-exp-chart">
-                    {renderGroupedExpenseChart(dashboard.expKatGroups, 6)}
-                  </div>
-                </div>
-              </div>
-              <div className="card">
-                <div className="card-title">Ürün Kategorisi Ciroları</div>
-                <div className="bar-chart" id="d-cat-revenue">
-                  {renderProductCatRevenueChart(dashboard.prodCatRows)}
+                          <span className={`badge ${c}`} style={{ flexShrink: 0 }}>
+                            {label}
+                          </span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="empty">Bekleyen yok 🎉</div>
+                  )}
                 </div>
               </div>
               <div className="card">
@@ -2620,7 +2604,7 @@ Saygılarımla`;
 
             {/* RAPORLAR */}
             <div className={`page${tab === "raporlar" ? " active" : ""}`} id="page-raporlar">
-              <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+              <div className="report-filters">
                 <select
                   id="r-year"
                   value={rYear}
@@ -2645,46 +2629,132 @@ Saygılarımla`;
                   <option value="q4">Q4</option>
                 </select>
               </div>
-              <div className="card" style={{ marginBottom: 14 }}>
-                <div className="card-title">Gider İstatistikleri</div>
-                <div className="metric-grid" id="r-exp-metrics">
+
+              {/* ——— GELİRLER ——— */}
+              <section className="report-block">
+                <h2 className="report-block-title">Gelirler</h2>
+                <div className="metric-grid report-metrics">
                   <div className="metric">
-                    <div className="metric-label">Toplam Gider</div>
-                    <div className="metric-value" style={{ color: "var(--red)" }}>
-                      {fmtM(expenseView.total)}
-                    </div>
-                  </div>
-                  <div className="metric">
-                    <div className="metric-label">Bu Ay</div>
-                    <div className="metric-value" style={{ color: "var(--amber)" }}>
-                      {fmtM(expenseView.aylik)}
-                    </div>
-                  </div>
-                  <div className="metric">
-                    <div className="metric-label">Faturalı</div>
+                    <div className="metric-label">Toplam Ciro</div>
                     <div className="metric-value" style={{ color: "var(--blue)" }}>
-                      {expenseView.faturali}/{expenses.length}
+                      {fmtM(reports.topToplam)}
                     </div>
                   </div>
                   <div className="metric">
-                    <div className="metric-label">Ortalama</div>
-                    <div className="metric-value">
-                      {expenses.length ? fmtM(expenseView.total / expenses.length) : "—"}
+                    <div className="metric-label">Tahsilat</div>
+                    <div className="metric-value" style={{ color: "var(--green)" }}>
+                      {fmtM(reports.topTah)}
+                    </div>
+                  </div>
+                  <div className="metric">
+                    <div className="metric-label">Sipariş Sayısı</div>
+                    <div className="metric-value">{reports.sipAdet}</div>
+                  </div>
+                  <div className="metric">
+                    <div className="metric-label">Üretilen Adet</div>
+                    <div className="metric-value" style={{ color: "var(--blue)" }}>
+                      {reports.topAdet}
                     </div>
                   </div>
                 </div>
-                <div className="grid2" style={{ marginTop: 14 }}>
-                  <div>
-                    <div className="card-title">Kategoriye Göre Dağılım</div>
-                    <div className="bar-chart" id="r-exp-cat-chart">
-                      {renderGroupedExpenseChart(expenseView.katGroups)}
+                <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: 14 }}>
+                  <div className="report-section">Üretim &amp; Sipariş</div>
+                  <table className="report-table">
+                    <tbody id="r-production">{reportRows(reports.production)}</tbody>
+                  </table>
+                  <div className="report-section">Ortalamalar</div>
+                  <table className="report-table">
+                    <tbody id="r-averages">{reportRows(reports.averages)}</tbody>
+                  </table>
+                  <div className="report-section">Ciro Analizi</div>
+                  <table className="report-table">
+                    <tbody id="r-revenue">{reportRows(reports.revenue)}</tbody>
+                  </table>
+                </div>
+                <div className="grid2" style={{ marginBottom: 14 }}>
+                  <div className="card" style={{ margin: 0 }}>
+                    <div className="card-title">Ürün Kategorisi Ciroları</div>
+                    <div className="bar-chart" id="r-cat-revenue">
+                      {renderProductCatRevenueChart(reports.prodCatRows)}
                     </div>
                   </div>
-                  <div>
+                  <div className="card" style={{ margin: 0 }}>
+                    <div className="card-title">Aylık Tahsilat</div>
+                    <div className="bar-chart" id="r-monthly">
+                      {reports.monthlyEntries.length ? (
+                        reports.monthlyEntries.map(([m, v]) => {
+                          const pct = Math.round((v / reports.mMax) * 100);
+                          return (
+                            <div className="bar-row" key={m}>
+                              <div className="bar-label">
+                                {m.slice(5)}.{m.slice(2, 4)}
+                              </div>
+                              <div className="bar-track">
+                                <div
+                                  className="bar-fill"
+                                  style={{
+                                    width: `${pct}%`,
+                                    background: "#4ade80",
+                                  }}
+                                >
+                                  {pct > 18 ? fmtM(v) : ""}
+                                </div>
+                              </div>
+                              <div className="bar-val">{fmtM(v)}</div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="empty">Veri yok</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* ——— GİDERLER ——— */}
+              <section className="report-block">
+                <h2 className="report-block-title">Giderler</h2>
+                <div className="metric-grid report-metrics">
+                  <div className="metric">
+                    <div className="metric-label">Dönem Gideri</div>
+                    <div className="metric-value" style={{ color: "var(--red)" }}>
+                      {fmtM(reports.topGider)}
+                    </div>
+                  </div>
+                  <div className="metric">
+                    <div className="metric-label">Faturalı Kayıt</div>
+                    <div className="metric-value" style={{ color: "var(--blue)" }}>
+                      {reports.expFaturali}/{reports.expCount}
+                    </div>
+                  </div>
+                  <div className="metric">
+                    <div className="metric-label">Ortalama Gider</div>
+                    <div className="metric-value" style={{ color: "var(--amber)" }}>
+                      {reports.expCount ? fmtM(reports.topGider / reports.expCount) : "—"}
+                    </div>
+                  </div>
+                  <div className="metric">
+                    <div className="metric-label">Gider / Ciro</div>
+                    <div className="metric-value">
+                      {reports.topToplam
+                        ? fmtPct((reports.topGider / reports.topToplam) * 100)
+                        : "—"}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid2" style={{ marginBottom: 14 }}>
+                  <div className="card" style={{ margin: 0 }}>
+                    <div className="card-title">Gider Dağılımı</div>
+                    <div className="bar-chart" id="r-exp-dist-chart">
+                      {renderGroupedExpenseChart(reports.expKatGroups)}
+                    </div>
+                  </div>
+                  <div className="card" style={{ margin: 0 }}>
                     <div className="card-title">Aylık Gider Trendi</div>
                     <div className="bar-chart" id="r-exp-month-chart">
-                      {expenseView.monthEntries.length ? (
-                        expenseView.monthEntries.map(([m, v]) => (
+                      {reports.expMonthEntries.length ? (
+                        reports.expMonthEntries.map(([m, v]) => (
                           <div className="bar-row" key={m}>
                             <div className="bar-label">
                               {m.slice(5)}.{m.slice(2, 4)}
@@ -2693,8 +2763,8 @@ Saygılarımla`;
                               <div
                                 className="bar-fill"
                                 style={{
-                                  width: `${Math.round((v / expenseView.mMax) * 100)}%`,
-                                  background: "#60a5fa",
+                                  width: `${Math.round((v / reports.expMMax) * 100)}%`,
+                                  background: "#f87171",
                                 }}
                               />
                             </div>
@@ -2707,173 +2777,137 @@ Saygılarımla`;
                     </div>
                   </div>
                 </div>
-              </div>
-              <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-                <div className="report-section">Üretim & Sipariş</div>
-                <table className="report-table">
-                  <tbody id="r-production">{reportRows(reports.production)}</tbody>
-                </table>
-                <div className="report-section">Ortalamalar</div>
-                <table className="report-table">
-                  <tbody id="r-averages">{reportRows(reports.averages)}</tbody>
-                </table>
-                <div className="report-section">Ciro Analizi</div>
-                <table className="report-table">
-                  <tbody id="r-revenue">{reportRows(reports.revenue)}</tbody>
-                </table>
-                <div className="report-section">Reklam Maliyetleri</div>
-                <table className="report-table">
-                  <tbody id="r-ads">{reportRows(reports.ads)}</tbody>
-                </table>
-                <div className="report-section">Hammadde / Genel Maliyet</div>
-                <table className="report-table">
-                  <tbody id="r-cost">{reportRows(reports.cost)}</tbody>
-                </table>
-                <div className="report-section">Maaşlar</div>
-                <table className="report-table">
-                  <tbody id="r-salary">{reportRows(reports.salary)}</tbody>
-                </table>
-                <div className="report-section">Nakliye</div>
-                <table className="report-table">
-                  <tbody id="r-cargo">{reportRows(reports.cargo)}</tbody>
-                </table>
-              </div>
-              <div className="grid2" style={{ marginTop: 14 }}>
-                <div className="card">
-                  <div className="card-title">Bu Hafta Teslim</div>
-                  <div id="r-week">
-                    {reports.week.length ? (
-                      reports.week.map((o) => {
-                        const dl = daysLeft(o.bitis);
-                        return (
-                          <div
-                            key={o.id}
-                            style={{
-                              padding: "9px 0",
-                              borderBottom: "1px solid var(--border)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                              }}
-                            >
-                              <span style={{ fontWeight: 500, color: "var(--text)" }}>
-                                {escHtml(o.ad)} {escHtml(o.soyad)}
-                              </span>
-                              <span
-                                className={`badge ${dl === 0 ? "red" : dl <= 3 ? "amber" : "green"}`}
-                              >
-                                {dl === 0 ? "Bugün" : dl + " gün"}
-                              </span>
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 11,
-                                color: "var(--text3)",
-                                marginTop: 3,
-                              }}
-                            >
-                              {o.cat || ""} · {o.tur}×{o.adet} · Kalan:{" "}
-                              {fmtM(orderKalanBakiye(o))}
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="empty">Bu hafta teslim yok 🎉</div>
-                    )}
-                  </div>
+                <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+                  <div className="report-section">Reklam Maliyetleri</div>
+                  <table className="report-table">
+                    <tbody id="r-ads">{reportRows(reports.ads)}</tbody>
+                  </table>
+                  <div className="report-section">Hammadde / Genel Maliyet</div>
+                  <table className="report-table">
+                    <tbody id="r-cost">{reportRows(reports.cost)}</tbody>
+                  </table>
+                  <div className="report-section">Maaşlar</div>
+                  <table className="report-table">
+                    <tbody id="r-salary">{reportRows(reports.salary)}</tbody>
+                  </table>
+                  <div className="report-section">Nakliye</div>
+                  <table className="report-table">
+                    <tbody id="r-cargo">{reportRows(reports.cargo)}</tbody>
+                  </table>
                 </div>
-                <div className="card">
-                  <div className="card-title">Tahsilat Özeti</div>
-                  <div id="r-collection">
-                    <div style={{ marginBottom: 12 }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          fontSize: 13,
-                          marginBottom: 5,
-                        }}
-                      >
-                        <span style={{ color: "var(--text2)" }}>Tahsilat oranı</span>
-                        <span style={{ fontWeight: 500 }}>{reports.tahRate}%</span>
-                      </div>
-                      <div className="progress">
+              </section>
+
+              {/* ——— KARŞILAŞTIRMA ——— */}
+              <section className="report-block">
+                <h2 className="report-block-title">Karşılaştırma &amp; Özet</h2>
+                <div className="grid2">
+                  <div className="card" style={{ margin: 0 }}>
+                    <div className="card-title">Tahsilat &amp; Kar Özeti</div>
+                    <div id="r-collection">
+                      <div style={{ marginBottom: 12 }}>
                         <div
-                          className="progress-fill"
                           style={{
-                            width: `${reports.tahRate}%`,
-                            background: "var(--green)",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            fontSize: 13,
+                            marginBottom: 5,
                           }}
-                        />
+                        >
+                          <span style={{ color: "var(--text2)" }}>Tahsilat oranı</span>
+                          <span style={{ fontWeight: 500 }}>{reports.tahRate}%</span>
+                        </div>
+                        <div className="progress">
+                          <div
+                            className="progress-fill"
+                            style={{
+                              width: `${reports.tahRate}%`,
+                              background: "var(--green)",
+                            }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                    {(
-                      [
-                        ["Toplam Ciro", reports.allToplam, "var(--blue)"],
-                        ["Tahsil Edilen", reports.allTah, "var(--green)"],
-                        ["Alacak", reports.allAlacak, "var(--amber)"],
-                        ["Toplam Gider", reports.allGider, "var(--red)"],
+                      {(
                         [
-                          "Net Kar",
-                          reports.allTah - reports.allGider,
-                          reports.allTah - reports.allGider >= 0
-                            ? "var(--blue)"
-                            : "var(--red)",
-                        ],
-                      ] as const
-                    ).map(([l, v, c]) => (
-                      <div
-                        key={l}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          padding: "7px 0",
-                          borderBottom: "1px solid var(--border)",
-                          fontSize: 13,
-                        }}
-                      >
-                        <span style={{ color: "var(--text2)" }}>{l}</span>
-                        <span style={{ fontWeight: 500, color: c }}>{fmtM(v)}</span>
-                      </div>
-                    ))}
+                          ["Toplam Ciro", reports.allToplam, "var(--blue)"],
+                          ["Tahsil Edilen", reports.allTah, "var(--green)"],
+                          ["Alacak", reports.allAlacak, "var(--amber)"],
+                          ["Toplam Gider", reports.allGider, "var(--red)"],
+                          [
+                            "Net Kar",
+                            reports.allTah - reports.allGider,
+                            reports.allTah - reports.allGider >= 0
+                              ? "var(--blue)"
+                              : "var(--red)",
+                          ],
+                        ] as const
+                      ).map(([l, v, c]) => (
+                        <div
+                          key={l}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            padding: "7px 0",
+                            borderBottom: "1px solid var(--border)",
+                            fontSize: 13,
+                          }}
+                        >
+                          <span style={{ color: "var(--text2)" }}>{l}</span>
+                          <span style={{ fontWeight: 500, color: c }}>{fmtM(v)}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </div>
-              <div className="card">
-                <div className="card-title">Aylık Tahsilat</div>
-                <div className="bar-chart" id="r-monthly">
-                  {reports.monthlyEntries.length ? (
-                    reports.monthlyEntries.map(([m, v]) => {
-                      const pct = Math.round((v / reports.mMax) * 100);
-                      return (
-                        <div className="bar-row" key={m}>
-                          <div className="bar-label">
-                            {m.slice(5)}.{m.slice(2, 4)}
-                          </div>
-                          <div className="bar-track">
+                  <div className="card" style={{ margin: 0 }}>
+                    <div className="card-title">Bu Hafta Teslim</div>
+                    <div id="r-week">
+                      {reports.week.length ? (
+                        reports.week.map((o) => {
+                          const dl = daysLeft(o.bitis);
+                          return (
                             <div
-                              className="bar-fill"
+                              key={o.id}
                               style={{
-                                width: `${pct}%`,
-                                background: "#60a5fa",
+                                padding: "9px 0",
+                                borderBottom: "1px solid var(--border)",
                               }}
                             >
-                              {pct > 18 ? fmtM(v) : ""}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                }}
+                              >
+                                <span style={{ fontWeight: 500, color: "var(--text)" }}>
+                                  {escHtml(o.ad)} {escHtml(o.soyad)}
+                                </span>
+                                <span
+                                  className={`badge ${dl === 0 ? "red" : dl <= 3 ? "amber" : "green"}`}
+                                >
+                                  {dl === 0 ? "Bugün" : dl + " gün"}
+                                </span>
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: "var(--text3)",
+                                  marginTop: 3,
+                                }}
+                              >
+                                {o.cat || ""} · {o.tur}×{o.adet}
+                                {orderListShowsKalan(o)
+                                  ? ` · Kalan: ${fmtM(orderKalanBakiye(o))}`
+                                  : ""}
+                              </div>
                             </div>
-                          </div>
-                          <div className="bar-val">{fmtM(v)}</div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="empty">Veri yok</div>
-                  )}
+                          );
+                        })
+                      ) : (
+                        <div className="empty">Bu hafta teslim yok 🎉</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </section>
             </div>
 
             {/* TANIMLAMALAR */}

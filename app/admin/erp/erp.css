@@ -215,6 +215,18 @@ th.sortable.sorted{color:var(--blue)}
   color:#000;font-size:13px;font-weight:700;line-height:1;
 }
 .label-cell-switch:disabled{opacity:.35;cursor:not-allowed}
+
+.report-filters{display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap;align-items:center}
+.report-block{margin-bottom:28px}
+.report-block-title{
+  font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.55px;
+  color:var(--text2);margin:0 0 12px;padding:8px 0 8px 2px;
+  border-bottom:1px solid var(--border);
+}
+.metric-grid.report-metrics{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:14px}
+@media(max-width:768px){
+  .metric-grid.report-metrics{grid-template-columns:repeat(2,1fr)}
+}
 @media(max-width:768px){
   .label-field-head,.label-field-row{grid-template-columns:44px 1fr 40px 40px 60px;padding:8px}
 }
