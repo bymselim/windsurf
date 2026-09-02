@@ -109,7 +109,7 @@ function fieldBlock(
   const heading = labelHeadingPt(cfg.fontSizePt);
   if (key === "adSoyad") {
     return `<div class="field field-name${extraClass}">
-      ${cfg.showLabel ? `<span class="k" style="font-size:${heading}pt">${escapeHtml(label)}</span>` : ""}
+      ${cfg.showLabel ? `<span class="k" style="font-size:${heading}pt">${labelText(label)}</span>` : ""}
       <div class="v name-v" style="font-size:${cfg.fontSizePt}pt">${valueHtml}</div>
     </div>`;
   }
@@ -117,7 +117,7 @@ function fieldBlock(
     return `<div class="field field-maps${extraClass}">${valueHtml}</div>`;
   }
   return `<div class="field${extraClass}">
-    ${cfg.showLabel ? `<span class="k" style="font-size:${heading}pt">${escapeHtml(label)}</span>` : ""}
+    ${cfg.showLabel ? `<span class="k" style="font-size:${heading}pt">${labelText(label)}</span>` : ""}
     <div class="v" style="font-size:${cfg.fontSizePt}pt">${valueHtml}</div>
   </div>`;
 }
@@ -140,15 +140,18 @@ export function buildLabelHtml(
     : "";
 
   const values: Record<ErpLabelFieldKey, string> = {
-    adSoyad: escapeHtml(orderFullName(o)),
-    telefon: escapeHtml(o.tel?.trim() || "—"),
-    eser: escapeHtml(eserDisplay(o)),
-    adres: escapeHtml((o.adres ?? "").trim() || "—"),
-    mapsLink: maps ? escapeHtml(maps) : "",
+    adSoyad: labelText(orderFullName(o)),
+    telefon: labelText(o.tel?.trim() || "—"),
+    eser: labelText(eserDisplay(o)),
+    adres: labelText((o.adres ?? "").trim() || "—"),
+    mapsLink: maps ? labelText(maps) : "",
     mapsQr: maps
       ? `<div class="maps-row"><img id="qr" src="${qrSrc}" alt="QR" style="width:${qrPx}px;height:${qrPx}px"/></div>`
       : "",
-    siparisNo: ctx.orderNum != null && ctx.orderNum !== "" ? escapeHtml(String(ctx.orderNum)) : "",
+    siparisNo:
+      ctx.orderNum != null && ctx.orderNum !== ""
+        ? labelText(String(ctx.orderNum))
+        : "",
   };
 
   const blocks: string[] = [];
@@ -198,6 +201,7 @@ export function buildLabelHtml(
     white-space: pre-wrap;
     word-break: break-word;
     font-weight: 500;
+    text-transform: uppercase;
   }
   .field-name .name-v {
     font-weight: 700;
@@ -298,4 +302,13 @@ function escapeHtml(s: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/** Etiket basımında tüm metin büyük harf (Türkçe kuralları). */
+function labelUpper(s: string): string {
+  return s.toLocaleUpperCase("tr-TR");
+}
+
+function labelText(s: string): string {
+  return escapeHtml(labelUpper(s));
 }
