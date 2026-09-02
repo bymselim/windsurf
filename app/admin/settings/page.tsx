@@ -10,6 +10,7 @@ type AccessGateSettings = {
   password?: string;
   passwordTR: string;
   passwordEN: string;
+  selimPassword: string;
   requireFullName: boolean;
   requirePhoneNumber: boolean;
   usePhoneBasedPassword?: boolean;
@@ -41,6 +42,7 @@ export default function SettingsPage() {
   const [accessGate, setAccessGate] = useState<AccessGateSettings | null>(null);
   const [newPasswordTR, setNewPasswordTR] = useState("");
   const [newPasswordEN, setNewPasswordEN] = useState("");
+  const [newSelimPassword, setNewSelimPassword] = useState("");
   const [gateMessage, setGateMessage] = useState("");
   const [requireFullName, setRequireFullName] = useState(true);
   const [requirePhoneNumber, setRequirePhoneNumber] = useState(true);
@@ -264,7 +266,7 @@ export default function SettingsPage() {
   };
 
   const updateGalleryPassword = async (
-    gallery: "turkish" | "international",
+    gallery: "turkish" | "international" | "selim",
     newPassword: string
   ) => {
     setGateMessage("");
@@ -274,6 +276,13 @@ export default function SettingsPage() {
     }
     setSaving(true);
     try {
+      const accessGatePayload =
+        gallery === "turkish"
+          ? { passwordTR: newPassword.trim() }
+          : gallery === "international"
+            ? { passwordEN: newPassword.trim() }
+            : { selimPassword: newPassword.trim() };
+
       const res = await fetch("/api/admin/settings", {
         method: "PUT",
         headers: {
@@ -281,12 +290,7 @@ export default function SettingsPage() {
           ...getAdminAuthHeaders(),
         },
         credentials: "include",
-        body: JSON.stringify({
-          accessGate:
-            gallery === "turkish"
-              ? { passwordTR: newPassword.trim() }
-              : { passwordEN: newPassword.trim() },
-        }),
+        body: JSON.stringify({ accessGate: accessGatePayload }),
       });
       const data = await res.json();
       if (res.status === 401) {
@@ -302,12 +306,15 @@ export default function SettingsPage() {
       }
       if (data?.accessGate) setAccessGate(data.accessGate);
       setGateMessage(
-        gallery === "turkish"
-          ? "✅ Turkish gallery password updated."
-          : "✅ International gallery password updated."
+        gallery === "selim"
+          ? "✅ /selim giriş şifresi güncellendi."
+          : gallery === "turkish"
+            ? "✅ Turkish gallery password updated."
+            : "✅ International gallery password updated."
       );
       if (gallery === "turkish") setNewPasswordTR("");
-      else setNewPasswordEN("");
+      else if (gallery === "international") setNewPasswordEN("");
+      else setNewSelimPassword("");
     } catch {
       setGateMessage("❌ Failed to update");
     } finally {
@@ -407,6 +414,34 @@ export default function SettingsPage() {
             </div>
           </div>
           )}
+
+          <div className="p-4 bg-zinc-900/50 rounded-lg border border-zinc-800 mb-6">
+            <h3 className="font-bold mb-1 text-zinc-100">🔑 /selim Özel Giriş</h3>
+            <p className="text-xs text-zinc-500 mb-3">
+              <code className="text-amber-500/90">/selim</code> adresinde yalnızca şifre ile
+              Türkçe kataloga giriş. Telefon, KVKK veya yetkilendirme gerekmez.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <code className="px-3 py-1 bg-zinc-950 rounded text-amber-400 text-sm font-mono">
+                {accessGate?.selimPassword ?? "1"}
+              </code>
+              <input
+                type="text"
+                placeholder="Yeni /selim şifresi"
+                value={newSelimPassword}
+                onChange={(e) => setNewSelimPassword(e.target.value)}
+                className="flex-1 min-w-[140px] p-2 bg-zinc-900 border border-zinc-700 rounded text-zinc-100 placeholder-zinc-500 focus:border-amber-500/50 focus:outline-none text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => updateGalleryPassword("selim", newSelimPassword)}
+                disabled={saving}
+                className="rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 px-4 py-2 text-sm font-medium transition disabled:opacity-50"
+              >
+                Güncelle
+              </button>
+            </div>
+          </div>
 
           {/* B. Form field toggles */}
           <div className="space-y-3 mb-4">

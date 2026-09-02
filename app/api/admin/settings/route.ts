@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
       password: settings.password != null ? maskPassword(settings.password) : undefined,
       passwordTR: maskPassword(settings.passwordTR),
       passwordEN: maskPassword(settings.passwordEN),
+      selimPassword: settings.selimPassword,
     },
     passwords: {
       turkish: maskPassword(passwords.turkish),
@@ -87,6 +88,9 @@ export async function PUT(request: NextRequest) {
     }
     if (typeof accessGate.kvkkText === "string") {
       updates.kvkkText = accessGate.kvkkText;
+    }
+    if (typeof accessGate.selimPassword === "string" && accessGate.selimPassword.trim() !== "") {
+      updates.selimPassword = accessGate.selimPassword.trim();
     }
   }
 
@@ -139,6 +143,7 @@ export async function PUT(request: NextRequest) {
       password: updated.password != null ? maskPassword(updated.password) : undefined,
       passwordTR: maskPassword(updated.passwordTR),
       passwordEN: maskPassword(updated.passwordEN),
+      selimPassword: updated.selimPassword,
     },
     passwords: {
       turkish: maskPassword(passwords.turkish),

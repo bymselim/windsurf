@@ -2,6 +2,7 @@ import type { ErpExpense, ErpOrder } from "./types";
 import {
   computeAlacak,
   computeTahsilat,
+  computeTahsilatForMonth,
   computeToplamCiro,
   dateMonthKey,
   fmtM,
@@ -58,7 +59,7 @@ export function buildErpReportSnapshot(
   const ord = filterByMonth(orders, ym);
   const exp = filterByMonth(expenses, ym);
   const topToplam = computeToplamCiro(ord);
-  const topTah = computeTahsilat(ord);
+  const topTah = computeTahsilatForMonth(orders, ym);
   const topGider = exp.reduce((s, e) => s + (+e.tutar || 0), 0);
   const topAdet = ord.reduce((s, o) => s + (+o.adet || 0), 0);
   const sipAdet = ord.length;

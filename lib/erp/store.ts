@@ -13,6 +13,7 @@ import type {
 import { applyRecurringExpenses, removeFutureRecurringExpenses } from "./recurring";
 import { applyTodoRecurring } from "./todo-recurring";
 import { applyOrderTodoReminders } from "./order-todo-reminders";
+import { applyRecurringExpenseTodos } from "./recurring-todo-reminders";
 import {
   type ErpImportMode,
   type ErpImportPayload,
@@ -74,6 +75,7 @@ function normalizeOrder(raw: unknown): ErpOrder | null {
     toplam: Number(o.toplam) || 0,
     kapora: Number(o.kapora) || 0,
     tahsilat: Number(o.tahsilat) || 0,
+    closedAt: o.closedAt != null && String(o.closedAt).trim() ? String(o.closedAt).trim() : undefined,
     not_icerik: String(o.not_icerik ?? ""),
     bilgi: String(o.bilgi ?? ""),
     adres: String(o.adres ?? ""),
@@ -374,6 +376,29 @@ async function syncOrderTodoReminders(
   return result.todos;
 }
 
+async function syncRecurringExpenseTodos(
+  todos: ErpTodo[],
+  rules: ErpRecurringExpense[]
+): Promise<ErpTodo[]> {
+  let cursor = 0;
+  const peekMax =
+    todos.reduce((m, t) => Math.max(m, t.id), 0) +
+    rules.reduce((m, r) => Math.max(m, r.id), 0);
+  const kvNext = await kvGetJson<number>(KV_NEXT_ID);
+  cursor = typeof kvNext === "number" && kvNext > 0 ? kvNext : peekMax;
+  let idSeq = cursor;
+  const result = applyRecurringExpenseTodos(todos, rules, () => {
+    cursor += 1;
+    idSeq = cursor;
+    return cursor;
+  });
+  if (result.created > 0) {
+    await writeTodos(result.todos);
+    if (await isKvAvailable()) await kvSetJson(KV_NEXT_ID, idSeq);
+  }
+  return result.todos;
+}
+
 async function readRecurring(): Promise<ErpRecurringExpense[]> {
   const kv = await kvGetJson<ErpRecurringExpense[]>(KV_RECURRING);
   if (Array.isArray(kv)) {
@@ -427,6 +452,7 @@ export async function readErpData(): Promise<ErpData> {
     ]);
   const expenses = await syncRecurringExpenses(rawExpenses);
   let todos = await syncTodoRecurring(rawTodos);
+  todos = await syncRecurringExpenseTodos(todos, recurringExpenses);
   todos = await syncOrderTodoReminders(todos, orders);
   orders.sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()

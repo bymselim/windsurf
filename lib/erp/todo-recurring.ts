@@ -1,4 +1,5 @@
 import type { ErpTodo, ErpTodoRecurring } from "./types";
+import { appendRecurringVadeNote } from "./recurring-todo-reminders";
 import { todayStr, toInputDateValue } from "./utils";
 
 function ymdFromDate(d: Date): string {
@@ -108,7 +109,7 @@ export function applyTodoRecurring(
       merged.unshift({
         id: nextId(),
         title: rule.title,
-        note: rule.note || "",
+        note: appendRecurringVadeNote(rule.note || "", dueDate),
         status: "bekleyen",
         sortOrder: minSort,
         createdAt: new Date().toISOString(),

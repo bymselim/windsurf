@@ -71,14 +71,16 @@ import {
   compareExpenses,
   computeAlacak,
   computeTahsilat,
+  computeTahsilatForMonth,
+  computeTahsilatMatching,
+  buildMonthlyTahsilatMap,
   computeToplamCiro,
   getOrderStatus,
   isOrderDueTracked,
   dateMonthKey,
   isInMonth,
   monthStr,
-  orderKalanBakiye,
-  orderListShowsKalan,
+  orderListKalan,
   toInputDateValue,
   type ExpenseSortKey,
   type OrderSortKey,
@@ -198,16 +200,16 @@ function escHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function filterByPeriod<T extends { tarih?: string }>(
-  list: T[],
+function dateMatchesPeriod(
+  tarih: string | null | undefined,
   period: string,
   year: string
-): T[] {
+): boolean {
   const thisM = monthStr(0);
   const lastM = monthStr(-1);
-  if (period === "all") return list;
-  if (period === "thismonth") return list.filter((o) => isInMonth(o.tarih, thisM));
-  if (period === "lastmonth") return list.filter((o) => isInMonth(o.tarih, lastM));
+  if (period === "all") return true;
+  if (period === "thismonth") return isInMonth(tarih, thisM);
+  if (period === "lastmonth") return isInMonth(tarih, lastM);
   const q: Record<string, string[]> = {
     q1: ["01", "02", "03"],
     q2: ["04", "05", "06"],
@@ -215,12 +217,19 @@ function filterByPeriod<T extends { tarih?: string }>(
     q4: ["10", "11", "12"],
   };
   if (q[period]) {
-    return list.filter((o) => {
-      const key = dateMonthKey(o.tarih);
-      return key.startsWith(year) && q[period].includes(key.slice(5, 7));
-    });
+    const key = dateMonthKey(tarih);
+    return key.startsWith(year) && q[period].includes(key.slice(5, 7));
   }
-  return list;
+  return true;
+}
+
+function filterByPeriod<T extends { tarih?: string }>(
+  list: T[],
+  period: string,
+  year: string
+): T[] {
+  if (period === "all") return list;
+  return list.filter((o) => dateMatchesPeriod(o.tarih, period, year));
 }
 
 type ExpenseKatGroup = {
@@ -402,7 +411,7 @@ function MonthBox({
   const ord = orders.filter((o) => isInMonth(o.tarih, ms));
   const exp = expenses.filter((e) => isInMonth(e.tarih, ms));
   const ciro = computeToplamCiro(ord);
-  const tah = computeTahsilat(ord);
+  const tah = computeTahsilatForMonth(orders, ms);
   const gid = exp.reduce((s, e) => s + (+e.tutar || 0), 0);
   const net = ciro - gid;
   return (
@@ -811,8 +820,13 @@ export default function ErpApp() {
       alert("Bitiş tarihi zorunlu!");
       return;
     }
-    const kapora = +orderForm.kapora || 0;
+    const kaporaFromForm = +orderForm.kapora || 0;
     const existing = editId != null ? orders.find((o) => o.id === editId) : null;
+    // Kapora geçmiş kayıt: form boş gönderilse bile mevcut kapora korunur
+    const kapora =
+      existing && kaporaFromForm === 0 && (+existing.kapora || 0) > 0 && !orderForm.kapora.trim()
+        ? +existing.kapora || 0
+        : kaporaFromForm;
     const tahsilat =
       existing?.durum === "biten" ? +existing.toplam || 0 : kapora;
     const payload = {
@@ -1360,6 +1374,7 @@ export default function ErpApp() {
         "Toplam",
         "Kapora",
         "Tahsilat",
+        "Kapama Tarihi",
         "Kalan",
         "Durum",
         "İçerik",
@@ -1382,7 +1397,8 @@ export default function ErpApp() {
         o.toplam,
         o.kapora,
         o.tahsilat,
-        orderKalanBakiye(o),
+        o.closedAt || "",
+        orderListKalan(o),
         getOrderStatus(o),
         o.not_icerik,
         o.bilgi,
@@ -1614,7 +1630,9 @@ Saygılarımla`;
     const ord = filterByPeriod(orders, rPeriod, rYear);
     const exp = filterByPeriod(expenses, rPeriod, rYear);
     const topToplam = computeToplamCiro(ord);
-    const topTah = computeTahsilat(ord);
+    const topTah = computeTahsilatMatching(orders, (d) =>
+      dateMatchesPeriod(d, rPeriod, rYear)
+    );
     const topGider = exp.reduce((s, e) => s + (+e.tutar || 0), 0);
     const topAdet = ord.reduce((s, o) => s + (+o.adet || 0), 0);
     const sipAdet = ord.length;
@@ -1650,11 +1668,7 @@ Saygılarımla`;
     const allGider = expenses.reduce((s, e) => s + (+e.tutar || 0), 0);
     const tahRate = allToplam ? Math.round((allTah / allToplam) * 100) : 0;
 
-    const months: Record<string, number> = {};
-    orders.forEach((o) => {
-      const m = dateMonthKey(o.tarih);
-      if (m) months[m] = (months[m] || 0) + (+o.tahsilat || 0);
-    });
+    const months = buildMonthlyTahsilatMap(orders);
     const monthlyEntries = Object.entries(months).sort().slice(-8) as [string, number][];
     const mMax = Math.max(...monthlyEntries.map(([, v]) => v), 1);
 
@@ -2067,7 +2081,7 @@ Saygılarımla`;
                               {fmtM(o.toplam)}
                             </td>
                             <td style={{ color: "var(--red)", fontWeight: 500 }}>
-                              {orderListShowsKalan(o) ? fmtM(orderKalanBakiye(o)) : "—"}
+                              {fmtM(orderListKalan(o))}
                             </td>
                             <td>
                               <span className={`badge ${STATUS_COLORS[st]}`}>
@@ -2228,9 +2242,7 @@ Saygılarımla`;
                                 {fmtM(o.toplam)}
                               </td>
                               <td style={{ color: "var(--red)", fontWeight: 500 }}>
-                                {orderListShowsKalan(o)
-                                  ? fmtM(orderKalanBakiye(o))
-                                  : "—"}
+                                {fmtM(orderListKalan(o))}
                               </td>
                               <td className="b">
                                 <span
@@ -2298,9 +2310,7 @@ Saygılarımla`;
                             ) : null}{" "}
                             {eser !== "—" ? eser : o.tur || "—"}
                           </div>
-                          <div
-                            className={`order-card-balance${orderListShowsKalan(o) ? "" : " settled"}`}
-                          >
+                          <div className="order-card-balance">
                             <div>
                               <span className="k">Kapora</span>
                               <span className="v">{fmtM(o.kapora)}</span>
@@ -2309,12 +2319,10 @@ Saygılarımla`;
                               <span className="k">Toplam</span>
                               <span className="v amber">{fmtM(o.toplam)}</span>
                             </div>
-                            {orderListShowsKalan(o) ? (
-                              <div>
-                                <span className="k">Kalan</span>
-                                <span className="v red">{fmtM(orderKalanBakiye(o))}</span>
-                              </div>
-                            ) : null}
+                            <div>
+                              <span className="k">Kalan</span>
+                              <span className="v red">{fmtM(orderListKalan(o))}</span>
+                            </div>
                           </div>
                           <div className="order-card-foot">
                             <div className="order-card-actions order-actions">
@@ -2894,9 +2902,7 @@ Saygılarımla`;
                                 }}
                               >
                                 {o.cat || ""} · {o.tur}×{o.adet}
-                                {orderListShowsKalan(o)
-                                  ? ` · Kalan: ${fmtM(orderKalanBakiye(o))}`
-                                  : ""}
+                                {` · Kalan: ${fmtM(orderListKalan(o))}`}
                               </div>
                             </div>
                           );

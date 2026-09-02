@@ -13,6 +13,11 @@ export interface ErpOrder {
   toplam: number;
   kapora: number;
   tahsilat: number;
+  /**
+   * Tahsilat kapama (sipariş biten) tarihi YYYY-MM-DD.
+   * Kalan tahsilat bu aya yazılır; kapora sipariş tarihine aittir.
+   */
+  closedAt?: string;
   not_icerik: string;
   bilgi: string;
   /** Teslimat / kargo adresi */

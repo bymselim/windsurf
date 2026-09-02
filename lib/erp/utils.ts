@@ -216,15 +216,21 @@ export function compareOrders(
   }
 }
 
-/** Sipariş listesinde: toplam − kapora */
+/** Sipariş listesinde açık siparişler: toplam − kapora */
 export function orderKalanBakiye(o: ErpOrder): number {
   const v = (+o.toplam || 0) - (+o.kapora || 0);
   return v > 0 ? v : 0;
 }
 
-/** Tamamlanan siparişlerde kalan sütunu gösterilmez. */
-export function orderListShowsKalan(o: ErpOrder): boolean {
-  return getOrderStatus(o) !== "biten";
+/**
+ * Listede gösterilen kalan:
+ * - Tamamlanan (tahsilat kapandı): 0
+ * - Diğer: toplam − kapora
+ * Kapora alanı geçmiş kayıt için korunur; tahsilat kapatınca sıfırlanmaz.
+ */
+export function orderListKalan(o: ErpOrder): number {
+  if (getOrderStatus(o) === "biten") return 0;
+  return orderKalanBakiye(o);
 }
 
 /** Sipariş listesindeki kalan bakiye (yalnızca pozitif; vadeli alacak). */
@@ -245,6 +251,83 @@ export function computeTahsilat(orders: ErpOrder[]): number {
     if (o.durum === "askida") return s;
     return s + (+o.kapora || 0);
   }, 0);
+}
+
+/**
+ * Tahsilat olayları:
+ * - Kapora → sipariş tarihi (tarih)
+ * - Kapanışta kalan (tahsilat − kapora) → kapama günü (closedAt; yoksa tarih)
+ */
+export function orderTahsilatEvents(
+  o: ErpOrder
+): { date: string; amount: number; kind: "kapora" | "kapama" }[] {
+  if (o.durum === "askida") return [];
+  const events: { date: string; amount: number; kind: "kapora" | "kapama" }[] =
+    [];
+  const kapora = Math.max(0, +o.kapora || 0);
+  const orderDate = toInputDateValue(o.tarih) || String(o.tarih || "").slice(0, 10);
+  if (kapora > 0 && orderDate) {
+    events.push({ date: orderDate, amount: kapora, kind: "kapora" });
+  }
+  if (o.durum === "biten") {
+    const tahsilat = Math.max(0, +o.tahsilat || 0);
+    const remaining = Math.max(0, tahsilat - kapora);
+    if (remaining > 0) {
+      const closeDate =
+        toInputDateValue(o.closedAt) ||
+        String(o.closedAt || "").slice(0, 10) ||
+        orderDate;
+      if (closeDate) {
+        events.push({ date: closeDate, amount: remaining, kind: "kapama" });
+      }
+    }
+  }
+  return events;
+}
+
+/** Belirli bir aya (YYYY-MM) düşen tahsilat (kapora + kapama kalanı). */
+export function computeTahsilatForMonth(
+  orders: ErpOrder[],
+  ym: string
+): number {
+  return orders.reduce((s, o) => {
+    return (
+      s +
+      orderTahsilatEvents(o)
+        .filter((e) => isInMonth(e.date, ym))
+        .reduce((a, e) => a + e.amount, 0)
+    );
+  }, 0);
+}
+
+/** Tarih aralığı / dönem filtresine uyan tahsilat olayları toplamı. */
+export function computeTahsilatMatching(
+  orders: ErpOrder[],
+  matchDate: (date: string) => boolean
+): number {
+  return orders.reduce((s, o) => {
+    return (
+      s +
+      orderTahsilatEvents(o)
+        .filter((e) => matchDate(e.date))
+        .reduce((a, e) => a + e.amount, 0)
+    );
+  }, 0);
+}
+
+/** Aylık tahsilat serisi (kapora + kapama ayına göre). */
+export function buildMonthlyTahsilatMap(
+  orders: ErpOrder[]
+): Record<string, number> {
+  const months: Record<string, number> = {};
+  for (const o of orders) {
+    for (const e of orderTahsilatEvents(o)) {
+      const m = dateMonthKey(e.date);
+      if (!m) continue;
+      months[m] = (months[m] || 0) + e.amount;
+    }
+  }
+  return months;
 }
 
 /** Tahsil edilmemiş kalan bakiyelerin toplamı. */

@@ -43,6 +43,10 @@ export function normalizeOrderForImport(raw: unknown, autoId: number): ErpOrder 
     toplam: Number(o.toplam) || 0,
     kapora: Number(o.kapora) || 0,
     tahsilat: Number(o.tahsilat) || 0,
+    closedAt:
+      o.closedAt != null && String(o.closedAt).trim()
+        ? String(o.closedAt).trim()
+        : undefined,
     not_icerik: String(o.not_icerik ?? o.not ?? "").trim(),
     bilgi: String(o.bilgi ?? "").trim(),
     adres: String(o.adres ?? "").trim(),

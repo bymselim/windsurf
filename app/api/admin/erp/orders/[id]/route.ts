@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin-auth-server";
-import { addWorkdays, parseOrderDurum } from "@/lib/erp/utils";
+import { addWorkdays, parseOrderDurum, todayStr } from "@/lib/erp/utils";
 import { deleteOrder, readErpData, updateOrder } from "@/lib/erp/store";
 
 export const dynamic = "force-dynamic";
@@ -23,9 +23,21 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     const existing = (await readErpData()).orders.find((o) => o.id === id);
     if (!existing) return NextResponse.json({ error: "Bulunamadı" }, { status: 404 });
     const closing = existing.durum !== "biten";
+    // kapora geçmiş kayıt: tahsilat kapatılınca/açılınca değiştirilmez
+    const kapora = +existing.kapora || 0;
     const patch = closing
-      ? { durum: "biten" as const, tahsilat: +existing.toplam || 0 }
-      : { durum: "bekleyen" as const, tahsilat: +existing.kapora || 0 };
+      ? {
+          durum: "biten" as const,
+          tahsilat: +existing.toplam || 0,
+          kapora,
+          closedAt: todayStr(),
+        }
+      : {
+          durum: "bekleyen" as const,
+          tahsilat: kapora,
+          kapora,
+          closedAt: "",
+        };
     const order = await updateOrder(id, patch);
     if (!order) return NextResponse.json({ error: "Bulunamadı" }, { status: 404 });
     return NextResponse.json({ order });
@@ -44,6 +56,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     "toplam",
     "kapora",
     "tahsilat",
+    "closedAt",
     "not_icerik",
     "bilgi",
     "adres",

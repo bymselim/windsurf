@@ -16,6 +16,8 @@ export interface AccessGateSettings {
   requirePhoneNumber: boolean;
   /** When true, password is computed from phone (m+month+sum) instead of static. */
   usePhoneBasedPassword: boolean;
+  /** /selim özel giriş şifresi (sabit). */
+  selimPassword: string;
   showKVKK: boolean;
   kvkkText: string;
   updatedAt: string;
@@ -125,6 +127,8 @@ export interface SettingsJson {
 
 const DEFAULT_PW = process.env.NEXT_PUBLIC_ACCESS_PASSWORD ?? "gallery2024";
 
+const DEFAULT_SELIM_PW = "1";
+
 const DEFAULT_ACCESS_GATE: AccessGateSettings = {
   password: DEFAULT_PW,
   passwordTR: DEFAULT_PW,
@@ -132,6 +136,7 @@ const DEFAULT_ACCESS_GATE: AccessGateSettings = {
   requireFullName: true,
   requirePhoneNumber: true,
   usePhoneBasedPassword: true,
+  selimPassword: DEFAULT_SELIM_PW,
   showKVKK: true,
   kvkkText: "",
   updatedAt: new Date().toISOString(),
@@ -205,6 +210,10 @@ export async function getAccessGateSettings(): Promise<AccessGateSettings> {
       passwordEN:
         (typeof pw?.international === "string" ? pw.international : null) ??
         (typeof ag.passwordEN === "string" ? ag.passwordEN : legacy),
+      selimPassword:
+        typeof ag.selimPassword === "string" && ag.selimPassword.length > 0
+          ? ag.selimPassword
+          : DEFAULT_SELIM_PW,
     };
   }
   return { ...DEFAULT_ACCESS_GATE };
