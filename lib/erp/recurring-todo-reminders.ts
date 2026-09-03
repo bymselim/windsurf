@@ -16,7 +16,14 @@ export function expenseRecurringTodoKey(recurringId: number, tarih: string): str
   return `expense-recurring:${recurringId}:${toInputDateValue(tarih) || tarih}`;
 }
 
-/** Düzenli gider vadesi geldiğinde yapılacaklar listesine hatırlatma ekler. */
+/**
+ * Düzenli gider vadesi geldiğinde yapılacaklar listesine hatırlatma ekler.
+ *
+ * Kural: Her kural için **yalnızca en son (en güncel) vadesi gelmiş tarih**
+ * todo'ya dönüşür. Daha önceki vadeler zaten tamamlandı sayılır ya da
+ * kullanıcı onları atlamış demektir; listeyi onlarla kirletmemek için eklenmez.
+ * Geçmiş vadeler için todo zaten tamamlanmışsa (biten) yeni ekleme olmaz.
+ */
 export function applyRecurringExpenseTodos(
   todos: ErpTodo[],
   rules: ErpRecurringExpense[],
@@ -25,6 +32,18 @@ export function applyRecurringExpenseTodos(
   const existing = new Set<string>();
   for (const t of todos) {
     if (t.periodKey) existing.add(t.periodKey);
+  }
+
+  // Kural başına halihazırda todo oluşturulmuş son tarih
+  const latestExistingByRule = new Map<number, string>();
+  for (const t of todos) {
+    if (!t.periodKey) continue;
+    const m = t.periodKey.match(/^expense-recurring:(\d+):(\d{4}-\d{2}-\d{2})$/);
+    if (!m) continue;
+    const ruleId = Number(m[1]);
+    const tarih = m[2];
+    const prev = latestExistingByRule.get(ruleId);
+    if (!prev || tarih > prev) latestExistingByRule.set(ruleId, tarih);
   }
 
   let minSort = todos.reduce(
@@ -36,33 +55,41 @@ export function applyRecurringExpenseTodos(
 
   for (const rule of rules) {
     if (!rule.active) continue;
-    for (const tarih of recurringDueDates(rule)) {
-      const periodKey = expenseRecurringTodoKey(rule.id, tarih);
-      if (existing.has(periodKey)) continue;
 
-      const katLabel = [rule.kat, rule.subkat].filter(Boolean).join(" / ");
-      const detail = [
-        katLabel,
-        fmtM(rule.tutar),
-        rule.freq === "weekly" ? "Haftalık" : "Aylık",
-      ]
-        .filter(Boolean)
-        .join(" · ");
+    const dueDates = recurringDueDates(rule);
+    if (!dueDates.length) continue;
 
-      minSort -= 1;
-      merged.unshift({
-        id: nextId(),
-        title: `💳 Düzenli ödeme — ${rule.acik}`,
-        note: appendRecurringVadeNote(detail, tarih),
-        status: "bekleyen",
-        sortOrder: minSort,
-        createdAt: new Date().toISOString(),
-        periodKey,
-        dueDate: tarih,
-      });
-      existing.add(periodKey);
-      created++;
-    }
+    // En son vadesi gelen tarih (bugün veya öncesi, en güncel olanı)
+    const latestDue = dueDates[dueDates.length - 1];
+    const periodKey = expenseRecurringTodoKey(rule.id, latestDue);
+
+    // Bu vade için zaten todo varsa geç (biten veya bekleyen)
+    if (existing.has(periodKey)) continue;
+
+    // Daha eski bir vade için todo oluşturulmuşsa ve henüz bekleyen durumdaysa
+    // yeni vade eklenince karışıklık olur — sadece bu kuralın en son vadesini ekle
+    const katLabel = [rule.kat, rule.subkat].filter(Boolean).join(" / ");
+    const detail = [
+      katLabel,
+      fmtM(rule.tutar),
+      rule.freq === "weekly" ? "Haftalık" : "Aylık",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    minSort -= 1;
+    merged.unshift({
+      id: nextId(),
+      title: `💳 Düzenli ödeme — ${rule.acik}`,
+      note: appendRecurringVadeNote(detail, latestDue),
+      status: "bekleyen",
+      sortOrder: minSort,
+      createdAt: new Date().toISOString(),
+      periodKey,
+      dueDate: latestDue,
+    });
+    existing.add(periodKey);
+    created++;
   }
 
   return { todos: merged, created };

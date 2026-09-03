@@ -80,7 +80,14 @@ export function todoRecurringDuePeriods(
   return out;
 }
 
-/** Eksik tekrarlayan yapılacakları oluşturur (yalnızca vadesi gelmiş dönemler). */
+/**
+ * Eksik tekrarlayan yapılacakları oluşturur.
+ *
+ * Kural: Her kural için **yalnızca en son vadesi gelmiş dönem** todo'ya dönüşür.
+ * Eski dönemler zaten tamamlandı ya da atlandı sayılır; listeyi onlarla
+ * kirletmemek için eklenmez. Kullanıcı mevcut todo'yu tamamladıkça bir sonraki
+ * vade zamanı geldiğinde otomatik yeni todo oluşturulur.
+ */
 export function applyTodoRecurring(
   todos: ErpTodo[],
   rules: ErpTodoRecurring[],
@@ -103,23 +110,29 @@ export function applyTodoRecurring(
   for (const rule of rules) {
     if (!rule.active) continue;
     const periods = todoRecurringDuePeriods(rule);
-    for (const { periodKey, dueDate } of periods) {
-      if (existing.has(periodKey)) continue;
-      minSort -= 1;
-      merged.unshift({
-        id: nextId(),
-        title: rule.title,
-        note: appendRecurringVadeNote(rule.note || "", dueDate),
-        status: "bekleyen",
-        sortOrder: minSort,
-        createdAt: new Date().toISOString(),
-        recurringId: rule.id,
-        periodKey,
-        dueDate,
-      });
-      existing.add(periodKey);
-      created++;
-    }
+    if (!periods.length) continue;
+
+    // En son vadesi gelen dönem — önceki dönemler için zaten todo oluşturulmuş
+    // ya da kullanıcı tarafından atlanmış; sadece en güncel olanı ekle
+    const latest = periods[periods.length - 1];
+    const { periodKey, dueDate } = latest;
+
+    if (existing.has(periodKey)) continue;
+
+    minSort -= 1;
+    merged.unshift({
+      id: nextId(),
+      title: rule.title,
+      note: appendRecurringVadeNote(rule.note || "", dueDate),
+      status: "bekleyen",
+      sortOrder: minSort,
+      createdAt: new Date().toISOString(),
+      recurringId: rule.id,
+      periodKey,
+      dueDate,
+    });
+    existing.add(periodKey);
+    created++;
   }
 
   return { todos: merged, created };
