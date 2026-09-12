@@ -5,19 +5,11 @@ import { readCMessages, writeCMessages, type CMessage } from "@/lib/c-messages-i
 
 export const dynamic = "force-dynamic";
 
-function sortMessages(list: CMessage[]): CMessage[] {
-  return [...list].sort((a, b) => {
-    const pin = Number(Boolean(b.pinned)) - Number(Boolean(a.pinned));
-    if (pin !== 0) return pin;
-    return a.title.localeCompare(b.title, "tr");
-  });
-}
-
 export async function GET(request: NextRequest) {
   if (!(await verifyAdminAuth(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const messages = sortMessages(await readCMessages());
+  const messages = await readCMessages();
   return NextResponse.json({ messages });
 }
 
@@ -39,6 +31,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "TR veya EN metin gerekli" }, { status: 400 });
   }
 
+  const list = await readCMessages();
+  const maxOrder = list.reduce((m, x) => Math.max(m, x.sortOrder ?? 0), -1);
   const now = new Date().toISOString();
   const entry: CMessage = {
     id: randomUUID(),
@@ -46,13 +40,22 @@ export async function POST(request: NextRequest) {
     bodyTR,
     bodyEN,
     pinned,
+    sortOrder: pinned ? 0 : maxOrder + 1,
     createdAt: now,
     updatedAt: now,
   };
 
-  const list = await readCMessages();
-  list.push(entry);
-  await writeCMessages(list);
+  if (pinned) {
+    const shifted = list.map((m) => ({
+      ...m,
+      sortOrder: (m.sortOrder ?? 0) + 1,
+    }));
+    shifted.unshift(entry);
+    await writeCMessages(shifted);
+  } else {
+    list.push(entry);
+    await writeCMessages(list);
+  }
 
   return NextResponse.json({ message: entry }, { status: 201 });
 }

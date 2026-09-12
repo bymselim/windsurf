@@ -11,6 +11,8 @@ export interface CMessage {
   bodyTR: string;
   bodyEN: string;
   pinned?: boolean;
+  /** Elle sıralama: küçük sayı = daha üstte. */
+  sortOrder?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,16 +46,52 @@ export async function writeCMessages(entries: CMessage[]): Promise<void> {
 
 function normalizeList(raw: unknown): CMessage[] {
   if (!Array.isArray(raw)) return [];
-  return raw
+  const list = raw
     .filter((x): x is CMessage => Boolean(x) && typeof x === "object")
-    .map((x) => ({
+    .map((x, index) => ({
       id: typeof x.id === "string" ? x.id : "",
       title: typeof x.title === "string" ? x.title.trim() : "",
       bodyTR: typeof x.bodyTR === "string" ? x.bodyTR : "",
       bodyEN: typeof x.bodyEN === "string" ? x.bodyEN : "",
       pinned: Boolean(x.pinned),
+      sortOrder:
+        typeof x.sortOrder === "number" && Number.isFinite(x.sortOrder)
+          ? x.sortOrder
+          : index,
       createdAt: typeof x.createdAt === "string" ? x.createdAt : new Date().toISOString(),
       updatedAt: typeof x.updatedAt === "string" ? x.updatedAt : new Date().toISOString(),
     }))
     .filter((x) => x.id && x.title);
+
+  return list.sort((a, b) => {
+    const ao = a.sortOrder ?? 0;
+    const bo = b.sortOrder ?? 0;
+    if (ao !== bo) return ao - bo;
+    return a.title.localeCompare(b.title, "tr");
+  });
+}
+
+/** Komşu mesajlarla yer değiştirerek sıralamayı günceller. */
+export function moveCMessage(
+  list: CMessage[],
+  id: string,
+  direction: "up" | "down"
+): CMessage[] | null {
+  const sorted = normalizeList(list);
+  const idx = sorted.findIndex((m) => m.id === id);
+  if (idx < 0) return null;
+  const swapWith = direction === "up" ? idx - 1 : idx + 1;
+  if (swapWith < 0 || swapWith >= sorted.length) return sorted;
+
+  const a = sorted[idx];
+  const b = sorted[swapWith];
+  const orderA = a.sortOrder ?? idx;
+  const orderB = b.sortOrder ?? swapWith;
+  sorted[idx] = { ...a, sortOrder: orderB, updatedAt: new Date().toISOString() };
+  sorted[swapWith] = { ...b, sortOrder: orderA, updatedAt: new Date().toISOString() };
+
+  // Normalize contiguous sortOrder after swap
+  return sorted
+    .sort((x, y) => (x.sortOrder ?? 0) - (y.sortOrder ?? 0))
+    .map((m, i) => ({ ...m, sortOrder: i }));
 }

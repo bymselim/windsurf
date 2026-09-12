@@ -10,8 +10,10 @@ import type { CMessage } from "@/lib/c-messages-io";
 
 type Lang = "tr" | "en";
 
-const RECENT_KEY = "c-recent-message-ids";
-const MAX_RECENT = 8;
+const USAGE_KEY = "c-message-usage";
+const MAX_FREQUENT = 5;
+
+type UsageMap = Record<string, { count: number; lastUsed: number }>;
 
 function matchScore(title: string, query: string): number {
   const t = title.toLocaleLowerCase("tr");
@@ -31,20 +33,26 @@ function bodyFor(msg: CMessage, lang: Lang): string {
   return lang === "tr" ? msg.bodyEN : msg.bodyTR;
 }
 
-function loadRecentIds(): string[] {
-  if (typeof window === "undefined") return [];
+function loadUsage(): UsageMap {
+  if (typeof window === "undefined") return {};
   try {
-    const raw = localStorage.getItem(RECENT_KEY);
-    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+    const raw = localStorage.getItem(USAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : {};
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as UsageMap;
   } catch {
-    return [];
+    return {};
   }
 }
 
-function pushRecentId(id: string): void {
-  const prev = loadRecentIds().filter((x) => x !== id);
-  localStorage.setItem(RECENT_KEY, JSON.stringify([id, ...prev].slice(0, MAX_RECENT)));
+function recordUsage(id: string): void {
+  const map = loadUsage();
+  const prev = map[id];
+  map[id] = {
+    count: (prev?.count ?? 0) + 1,
+    lastUsed: Date.now(),
+  };
+  localStorage.setItem(USAGE_KEY, JSON.stringify(map));
 }
 
 function PageShell({ children }: { children: React.ReactNode }) {
@@ -63,7 +71,7 @@ export default function QuickMessagesPage() {
   const [messages, setMessages] = useState<CMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [recentTick, setRecentTick] = useState(0);
+  const [usageTick, setUsageTick] = useState(0);
 
   const [query, setQuery] = useState("");
   const [highlightIdx, setHighlightIdx] = useState(0);
@@ -77,13 +85,15 @@ export default function QuickMessagesPage() {
   const [formEN, setFormEN] = useState("");
   const [formPinned, setFormPinned] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [movingId, setMovingId] = useState<string | null>(null);
 
   const searchRef = useRef<HTMLInputElement>(null);
 
   const sorted = useMemo(() => {
     return [...messages].sort((a, b) => {
-      const pin = Number(Boolean(b.pinned)) - Number(Boolean(a.pinned));
-      if (pin !== 0) return pin;
+      const ao = a.sortOrder ?? 0;
+      const bo = b.sortOrder ?? 0;
+      if (ao !== bo) return ao - bo;
       return a.title.localeCompare(b.title, "tr");
     });
   }, [messages]);
@@ -98,13 +108,21 @@ export default function QuickMessagesPage() {
       .map((x) => x.m);
   }, [sorted, query]);
 
-  const recentMessages = useMemo(() => {
-    void recentTick;
-    const ids = loadRecentIds();
-    return ids
-      .map((id) => messages.find((m) => m.id === id))
-      .filter((m): m is CMessage => Boolean(m));
-  }, [messages, recentTick]);
+  const frequentMessages = useMemo(() => {
+    void usageTick;
+    const usage = loadUsage();
+    return [...messages]
+      .filter((m) => (usage[m.id]?.count ?? 0) > 0)
+      .sort((a, b) => {
+        const ua = usage[a.id];
+        const ub = usage[b.id];
+        const ca = ua?.count ?? 0;
+        const cb = ub?.count ?? 0;
+        if (cb !== ca) return cb - ca;
+        return (ub?.lastUsed ?? 0) - (ua?.lastUsed ?? 0);
+      })
+      .slice(0, MAX_FREQUENT);
+  }, [messages, usageTick]);
 
   const selected = useMemo(
     () => messages.find((m) => m.id === selectedId) ?? null,
@@ -196,8 +214,8 @@ export default function QuickMessagesPage() {
     if (!text.trim()) return;
     try {
       await navigator.clipboard.writeText(text);
-      pushRecentId(msg.id);
-      setRecentTick((t) => t + 1);
+      recordUsage(msg.id);
+      setUsageTick((t) => t + 1);
       setSelectedId(msg.id);
       setCopyFlash(`${msg.title} · ${lang.toUpperCase()}`);
       window.setTimeout(() => setCopyFlash(null), 2200);
@@ -296,6 +314,33 @@ export default function QuickMessagesPage() {
     await loadMessages();
   };
 
+  const moveMessage = async (msg: CMessage, direction: "up" | "down") => {
+    setMovingId(msg.id);
+    setApiError(null);
+    try {
+      const res = await fetch(`/api/c/messages/${msg.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...getAdminAuthHeaders() },
+        credentials: "include",
+        body: JSON.stringify({ move: direction }),
+      });
+      if (!res.ok) {
+        setApiError("Sıralama güncellenemedi.");
+        return;
+      }
+      const data = await res.json();
+      if (Array.isArray(data.messages)) {
+        setMessages(data.messages);
+      } else {
+        await loadMessages();
+      }
+    } catch {
+      setApiError("Sıralama hatası.");
+    } finally {
+      setMovingId(null);
+    }
+  };
+
   const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -313,6 +358,84 @@ export default function QuickMessagesPage() {
     } else if (e.key === "Escape") {
       setQuery("");
     }
+  };
+
+  const renderMessageCard = (
+    m: CMessage,
+    opts: { showReorder: boolean; index: number; total: number }
+  ) => {
+    const active = m.id === selectedId;
+    const canUp = opts.showReorder && opts.index > 0;
+    const canDown = opts.showReorder && opts.index < opts.total - 1;
+    return (
+      <li key={m.id}>
+        <div
+          className={`rounded-xl border transition ${
+            active ? "border-amber-500/40 bg-zinc-900" : "border-zinc-800 bg-zinc-900/40"
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() => selectMessage(m)}
+            className="w-full text-left px-4 py-3"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              {m.pinned && <span className="text-amber-500 text-sm shrink-0">★</span>}
+              <span className="font-medium truncate">{m.title}</span>
+            </div>
+            <p className="text-xs text-zinc-500 mt-1 truncate">{bodyFor(m, lang)}</p>
+          </button>
+          <div className="flex items-stretch border-t border-zinc-800/80">
+            <button
+              type="button"
+              onClick={() => void copyMessage(m)}
+              className="flex-[2.2] py-3.5 text-base font-semibold text-amber-300 hover:bg-amber-500/10 active:bg-amber-500/20"
+            >
+              Kopyala
+            </button>
+            {opts.showReorder && (
+              <>
+                <button
+                  type="button"
+                  disabled={!canUp || movingId === m.id}
+                  onClick={() => void moveMessage(m, "up")}
+                  className="px-3 py-3 text-sm text-zinc-400 hover:bg-zinc-800/80 disabled:opacity-30 disabled:pointer-events-none"
+                  title="Yukarı taşı"
+                  aria-label="Yukarı taşı"
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  disabled={!canDown || movingId === m.id}
+                  onClick={() => void moveMessage(m, "down")}
+                  className="px-3 py-3 text-sm text-zinc-400 hover:bg-zinc-800/80 disabled:opacity-30 disabled:pointer-events-none"
+                  title="Aşağı taşı"
+                  aria-label="Aşağı taşı"
+                >
+                  ▼
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => void togglePin(m)}
+              className="px-3 py-3 text-sm text-zinc-500 hover:bg-zinc-800/80"
+              title={m.pinned ? "Sabiti kaldır" : "Sabitle"}
+            >
+              {m.pinned ? "★" : "☆"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void deleteMessage(m.id)}
+              className="px-3 py-3 text-sm text-red-400/80 hover:bg-zinc-800/80"
+            >
+              Sil
+            </button>
+          </div>
+        </div>
+      </li>
+    );
   };
 
   if (isAuthenticated === null) {
@@ -352,6 +475,7 @@ export default function QuickMessagesPage() {
   }
 
   const listToShow = query.trim() ? filtered : sorted;
+  const searching = Boolean(query.trim());
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col max-w-lg mx-auto relative">
@@ -438,31 +562,23 @@ export default function QuickMessagesPage() {
         {apiError && <p className="text-sm text-red-400 mb-3 px-1">{apiError}</p>}
         {loading && <p className="text-sm text-zinc-500 px-1">Yükleniyor…</p>}
 
-        {!loading && !query.trim() && recentMessages.length > 0 && (
-          <section className="mb-4">
-            <h2 className="text-xs uppercase tracking-wide text-zinc-500 mb-2 px-1">Son kullanılan</h2>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {recentMessages.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => {
-                    selectMessage(m);
-                    void copyMessage(m);
-                  }}
-                  className="shrink-0 px-3 py-2 rounded-full bg-zinc-900 border border-zinc-700 text-sm hover:border-amber-500/40"
-                >
-                  {m.title}
-                </button>
-              ))}
-            </div>
+        {!loading && !searching && frequentMessages.length > 0 && (
+          <section className="mb-5">
+            <h2 className="text-xs uppercase tracking-wide text-zinc-500 mb-2 px-1">
+              Sık kullanılan
+            </h2>
+            <ul className="space-y-2">
+              {frequentMessages.map((m) =>
+                renderMessageCard(m, { showReorder: false, index: 0, total: 1 })
+              )}
+            </ul>
           </section>
         )}
 
         {selected && (
           <section className="mb-4 p-4 rounded-2xl border border-amber-500/30 bg-zinc-900/80">
             <div className="flex items-start justify-between gap-2 mb-2">
-              <h2 className="font-semibold text-amber-100">{selected.title}</h2>
+              <h2 className="font-semibold text-amber-100 truncate">{selected.title}</h2>
               <button
                 type="button"
                 onClick={() => openEdit(selected)}
@@ -471,9 +587,7 @@ export default function QuickMessagesPage() {
                 Düzenle
               </button>
             </div>
-            <p className="text-sm text-zinc-400 whitespace-pre-wrap mb-4 max-h-40 overflow-y-auto">
-              {bodyFor(selected, lang)}
-            </p>
+            <p className="text-sm text-zinc-400 truncate mb-4">{bodyFor(selected, lang)}</p>
             <button
               type="button"
               onClick={() => void copyMessage(selected)}
@@ -484,61 +598,27 @@ export default function QuickMessagesPage() {
           </section>
         )}
 
-        <ul className="space-y-2">
-          {listToShow.length === 0 && !loading && (
-            <li className="text-center text-zinc-500 text-sm py-8">
-              {query.trim() ? "Eşleşen mesaj yok." : "Henüz mesaj yok. + ile ekleyin."}
-            </li>
+        <section>
+          {!searching && listToShow.length > 0 && (
+            <h2 className="text-xs uppercase tracking-wide text-zinc-500 mb-2 px-1">
+              Tüm mesajlar
+            </h2>
           )}
-          {listToShow.map((m) => {
-            const active = m.id === selectedId;
-            return (
-              <li key={m.id}>
-                <div
-                  className={`rounded-xl border transition ${
-                    active ? "border-amber-500/40 bg-zinc-900" : "border-zinc-800 bg-zinc-900/40"
-                  }`}
-                >
-                      <button
-                        type="button"
-                        onClick={() => selectMessage(m)}
-                        className="w-full text-left px-4 py-3"
-                      >
-                        <div className="flex items-center gap-2">
-                          {m.pinned && <span className="text-amber-500 text-sm">★</span>}
-                          <span className="font-medium">{m.title}</span>
-                        </div>
-                        <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{bodyFor(m, lang)}</p>
-                      </button>
-                      <div className="flex border-t border-zinc-800/80">
-                        <button
-                          type="button"
-                          onClick={() => void copyMessage(m)}
-                          className="flex-1 py-2.5 text-sm font-medium text-amber-400 hover:bg-zinc-800/80"
-                        >
-                          Kopyala
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void togglePin(m)}
-                          className="px-4 py-2.5 text-sm text-zinc-500 hover:bg-zinc-800/80"
-                          title={m.pinned ? "Sabiti kaldır" : "Sabitle"}
-                        >
-                          {m.pinned ? "★" : "☆"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void deleteMessage(m.id)}
-                          className="px-4 py-2.5 text-sm text-red-400/80 hover:bg-zinc-800/80"
-                        >
-                          Sil
-                        </button>
-                      </div>
-                </div>
+          <ul className="space-y-2">
+            {listToShow.length === 0 && !loading && (
+              <li className="text-center text-zinc-500 text-sm py-8">
+                {searching ? "Eşleşen mesaj yok." : "Henüz mesaj yok. + ile ekleyin."}
               </li>
-            );
-          })}
-        </ul>
+            )}
+            {listToShow.map((m, index) =>
+              renderMessageCard(m, {
+                showReorder: !searching,
+                index,
+                total: listToShow.length,
+              })
+            )}
+          </ul>
+        </section>
       </main>
 
       {panel !== "none" && (
