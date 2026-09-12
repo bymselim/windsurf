@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
   };
 
   if (pinned) {
-    const shifted = list.map((m) => ({
+    const shifted: CMessage[] = list.map((m) => ({
       ...m,
       sortOrder: (m.sortOrder ?? 0) + 1,
     }));
