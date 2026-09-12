@@ -64,6 +64,8 @@ function normalizeList(raw: unknown): CMessage[] {
     .filter((x) => x.id && x.title);
 
   return list.sort((a, b) => {
+    const pin = Number(Boolean(b.pinned)) - Number(Boolean(a.pinned));
+    if (pin !== 0) return pin;
     const ao = a.sortOrder ?? 0;
     const bo = b.sortOrder ?? 0;
     if (ao !== bo) return ao - bo;
@@ -71,7 +73,7 @@ function normalizeList(raw: unknown): CMessage[] {
   });
 }
 
-/** Komşu mesajlarla yer değiştirerek sıralamayı günceller. */
+/** Komşu mesajlarla yer değiştirerek sıralamayı günceller (aynı yıldız grubu içinde). */
 export function moveCMessage(
   list: CMessage[],
   id: string,
@@ -83,6 +85,11 @@ export function moveCMessage(
   const swapWith = direction === "up" ? idx - 1 : idx + 1;
   if (swapWith < 0 || swapWith >= sorted.length) return sorted;
 
+  // Yıldızlı / yıldızsız gruplar karışmasın
+  if (Boolean(sorted[idx].pinned) !== Boolean(sorted[swapWith].pinned)) {
+    return sorted;
+  }
+
   const a = sorted[idx];
   const b = sorted[swapWith];
   const orderA = a.sortOrder ?? idx;
@@ -90,8 +97,11 @@ export function moveCMessage(
   sorted[idx] = { ...a, sortOrder: orderB, updatedAt: new Date().toISOString() };
   sorted[swapWith] = { ...b, sortOrder: orderA, updatedAt: new Date().toISOString() };
 
-  // Normalize contiguous sortOrder after swap
   return sorted
-    .sort((x, y) => (x.sortOrder ?? 0) - (y.sortOrder ?? 0))
+    .sort((x, y) => {
+      const pin = Number(Boolean(y.pinned)) - Number(Boolean(x.pinned));
+      if (pin !== 0) return pin;
+      return (x.sortOrder ?? 0) - (y.sortOrder ?? 0);
+    })
     .map((m, i) => ({ ...m, sortOrder: i }));
 }
