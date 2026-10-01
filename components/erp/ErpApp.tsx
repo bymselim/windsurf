@@ -45,6 +45,7 @@ import {
   type ErpLabelFieldKey,
   type ErpLabelSettings,
 } from "@/lib/erp/label-types";
+import { buildPeriodAnalysis, type BreakdownRow, type ExpenseKatBreakdown } from "@/lib/erp/reports-build";
 import type {
   ErpExpense,
   ErpOrder,
@@ -116,6 +117,29 @@ type Tab =
   | "yapilacaklar"
   | "raporlar"
   | "tanimlamalar";
+
+type OrderExtraLine = {
+  key: string;
+  cat: string;
+  tur: string;
+  adet: number;
+  toplam: string;
+  kapora: string;
+  not_icerik: string;
+};
+
+function newExtraLine(cat: string, tur: string): OrderExtraLine {
+  const other = tur === "PLX" ? "Poly" : tur === "Poly" ? "PLX" : "PLX";
+  return {
+    key: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    cat,
+    tur: other,
+    adet: 1,
+    toplam: "",
+    kapora: "",
+    not_icerik: "",
+  };
+}
 
 type OrderForm = {
   ad: string;
@@ -468,6 +492,7 @@ export default function ErpApp() {
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [orderForm, setOrderForm] = useState<OrderForm>(emptyOrderForm);
+  const [extraLines, setExtraLines] = useState<OrderExtraLine[]>([]);
   const [bitisManual, setBitisManual] = useState(false);
   const [expForm, setExpForm] = useState<ExpenseForm>({
     tarih: todayStr(),
@@ -771,6 +796,7 @@ export default function ErpApp() {
       ...emptyOrderForm(),
       cat: cats[0] ?? "",
     });
+    setExtraLines([]);
     setOrderModalOpen(true);
   }, [settings.orderCats]);
 
@@ -799,6 +825,7 @@ export default function ErpApp() {
         adres: o.adres || "",
         mapsUrl: o.mapsUrl || "",
       });
+      setExtraLines([]);
       setOrderModalOpen(true);
     },
     [orders, settings.orderCats]
@@ -829,12 +856,26 @@ export default function ErpApp() {
         : kaporaFromForm;
     const tahsilat =
       existing?.durum === "biten" ? +existing.toplam || 0 : kapora;
-    const payload = {
+    for (const line of extraLines) {
+      const lineTotal = +line.toplam || 0;
+      const lineKapora = +line.kapora || 0;
+      if (lineTotal <= 0 && lineKapora <= 0) {
+        alert("Ek siparişte toplam veya kapora girin. Malzeme (PLX / Poly) satırda ayrı seçilir.");
+        return;
+      }
+    }
+    const shared = {
       ad,
       soyad,
       tel: orderForm.tel.trim(),
       tarih: orderForm.tarih,
       bitis,
+      bilgi: orderForm.bilgi.trim(),
+      adres: orderForm.adres.trim(),
+      mapsUrl: orderForm.mapsUrl.trim(),
+    };
+    const payload = {
+      ...shared,
       cat: orderForm.cat,
       tur: orderForm.tur,
       adet: +orderForm.adet || 1,
@@ -842,28 +883,43 @@ export default function ErpApp() {
       kapora,
       tahsilat,
       not_icerik: orderForm.not_icerik.trim(),
-      bilgi: orderForm.bilgi.trim(),
-      adres: orderForm.adres.trim(),
-      mapsUrl: orderForm.mapsUrl.trim(),
     };
     showLoading("Kaydediliyor...");
     try {
+      const createdExtras: ErpOrder[] = [];
+      for (const line of extraLines) {
+        const lineKapora = +line.kapora || 0;
+        createdExtras.push(
+          await createErpOrder({
+            ...shared,
+            cat: line.cat,
+            tur: line.tur,
+            adet: +line.adet || 1,
+            toplam: +line.toplam || 0,
+            kapora: lineKapora,
+            tahsilat: lineKapora,
+            not_icerik: line.not_icerik.trim(),
+          })
+        );
+      }
       if (editId != null) {
         const updated = await updateErpOrder(editId, payload);
-        setOrders((prev) =>
-          prev.map((o) => (o.id === editId ? { ...o, ...updated } : o))
-        );
+        setOrders((prev) => [
+          ...createdExtras,
+          ...prev.map((o) => (o.id === editId ? { ...o, ...updated } : o)),
+        ]);
       } else {
         const created = await createErpOrder(payload);
-        setOrders((prev) => [created, ...prev]);
+        setOrders((prev) => [...createdExtras, created, ...prev]);
       }
+      setExtraLines([]);
       setOrderModalOpen(false);
     } catch (e) {
       alertUnlessAdminAuthError(e);
     } finally {
       hideLoading();
     }
-  }, [orderForm, editId, orders, showLoading, hideLoading]);
+  }, [orderForm, extraLines, editId, orders, showLoading, hideLoading]);
 
   const toggleDone = useCallback(
     async (id: number) => {
@@ -1764,6 +1820,9 @@ Saygılarımla`;
       expMonthEntries,
       expMMax,
       expFaturali,
+      analysis: buildPeriodAnalysis(orders, expenses, (d) =>
+        dateMatchesPeriod(d, rPeriod, rYear)
+      ),
       topToplam,
       topTah,
       topGider,
@@ -1772,6 +1831,71 @@ Saygılarımla`;
       expCount: exp.length,
     };
   }, [orders, expenses, rPeriod, rYear]);
+
+  const analysisBars = (rows: BreakdownRow[], color: string) => {
+    if (!rows.length) return <div className="empty">Bu dönemde kayıt yok</div>;
+    const max = Math.max(...rows.map((r) => r.amount), 1);
+    return rows.map((r) => (
+      <div className="bar-row" key={r.label}>
+        <div className="bar-label" title={r.label}>
+          {r.label}
+        </div>
+        <div className="bar-track">
+          <div
+            className="bar-fill"
+            style={{ width: `${Math.round((r.amount / max) * 100)}%`, background: color }}
+          >
+            {r.share >= 18 ? `%${r.share}` : ""}
+          </div>
+        </div>
+        <div className="bar-val">
+          {fmtM(r.amount)}
+          <div style={{ fontSize: 10, color: "var(--text3)" }}>{r.count} kayıt</div>
+        </div>
+      </div>
+    ));
+  };
+
+  const expenseAnalysis = (groups: ExpenseKatBreakdown[]) => {
+    if (!groups.length) return <div className="empty">Bu dönemde gider yok</div>;
+    const max = Math.max(...groups.map((g) => g.amount), 1);
+    return groups.map((g) => (
+      <div key={g.kat} style={{ marginBottom: 12 }}>
+        <div className="bar-row">
+          <div className="bar-label" title={g.kat}>
+            {g.kat}
+          </div>
+          <div className="bar-track">
+            <div
+              className="bar-fill"
+              style={{
+                width: `${Math.round((g.amount / max) * 100)}%`,
+                background: "#f87171",
+              }}
+            >
+              {g.share >= 12 ? `%${g.share}` : ""}
+            </div>
+          </div>
+          <div className="bar-val">
+            {fmtM(g.amount)}
+            <div style={{ fontSize: 10, color: "var(--text3)" }}>{g.count} kayıt</div>
+          </div>
+        </div>
+        {g.subs.length > 1 || (g.subs.length === 1 && g.subs[0].label !== "Genel") ? (
+          <div style={{ margin: "4px 0 0 8px", fontSize: 12, color: "var(--text2)" }}>
+            {g.subs.map((s) => (
+              <div key={s.label} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "2px 0" }}>
+                <span>{s.label}</span>
+                <span>
+                  {fmtM(s.amount)} · %{s.share}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    ));
+  };
 
   const reportRows = (data: [string, string | number, string][]) =>
     data.map(([l, v, c]) => (
@@ -2681,6 +2805,22 @@ Saygılarımla`;
                 </div>
                 <div className="grid2" style={{ marginBottom: 14 }}>
                   <div className="card" style={{ margin: 0 }}>
+                    <div className="card-title">Gelir — ürün kategorisi</div>
+                    <div className="hint" style={{ marginBottom: 8 }}>
+                      Tahsilat: kapora sipariş ayına, kalan kapama ayına. Seçili dönem.
+                    </div>
+                    <div className="bar-chart">{analysisBars(reports.analysis.incomeByCat, "#4ade80")}</div>
+                  </div>
+                  <div className="card" style={{ margin: 0 }}>
+                    <div className="card-title">Gelir — malzeme (PLX / Poly)</div>
+                    <div className="hint" style={{ marginBottom: 8 }}>
+                      Aynı kişinin ayrı satırları kendi malzemesine yazılır.
+                    </div>
+                    <div className="bar-chart">{analysisBars(reports.analysis.incomeByTur, "#60a5fa")}</div>
+                  </div>
+                </div>
+                <div className="grid2" style={{ marginBottom: 14 }}>
+                  <div className="card" style={{ margin: 0 }}>
                     <div className="card-title">Ürün Kategorisi Ciroları</div>
                     <div className="bar-chart" id="r-cat-revenue">
                       {renderProductCatRevenueChart(reports.prodCatRows)}
@@ -2783,6 +2923,19 @@ Saygılarımla`;
                         <div className="empty">Veri yok</div>
                       )}
                     </div>
+                  </div>
+                </div>
+                <div className="grid2" style={{ marginBottom: 14 }}>
+                  <div className="card" style={{ margin: 0 }}>
+                    <div className="card-title">Gider — nereye gitti</div>
+                    <div className="hint" style={{ marginBottom: 8 }}>
+                      Kategori ve alt kategori. Seçili dönem.
+                    </div>
+                    <div className="bar-chart">{expenseAnalysis(reports.analysis.expenseByKat)}</div>
+                  </div>
+                  <div className="card" style={{ margin: 0 }}>
+                    <div className="card-title">En büyük gider kalemleri</div>
+                    <div className="bar-chart">{analysisBars(reports.analysis.topExpenses, "#fbbf24")}</div>
                   </div>
                 </div>
                 <div className="card" style={{ padding: 0, overflow: "hidden" }}>
@@ -3725,6 +3878,142 @@ Saygılarımla`;
               />
             </div>
           </div>
+          {extraLines.map((line, index) => (
+            <div
+              key={line.key}
+              style={{
+                marginTop: 12,
+                padding: 12,
+                borderRadius: 10,
+                border: "1px solid var(--border)",
+                background: "var(--bg3)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div className="fl" style={{ margin: 0 }}>
+                  Ek sipariş {index + 2}
+                </div>
+                <button
+                  type="button"
+                  className="btn sm danger"
+                  onClick={() =>
+                    setExtraLines((rows) => rows.filter((r) => r.key !== line.key))
+                  }
+                >
+                  Kaldır
+                </button>
+              </div>
+              <div className="fg c3" style={{ marginBottom: 8 }}>
+                <div>
+                  <div className="fl">Ürün Kategorisi</div>
+                  <select
+                    value={line.cat}
+                    onChange={(e) =>
+                      setExtraLines((rows) =>
+                        rows.map((r) => (r.key === line.key ? { ...r, cat: e.target.value } : r))
+                      )
+                    }
+                  >
+                    {buildCatOptions(settings.orderCats, line.cat)}
+                  </select>
+                </div>
+                <div>
+                  <div className="fl">Malzeme</div>
+                  <select
+                    value={line.tur}
+                    onChange={(e) =>
+                      setExtraLines((rows) =>
+                        rows.map((r) => (r.key === line.key ? { ...r, tur: e.target.value } : r))
+                      )
+                    }
+                  >
+                    <option>PLX</option>
+                    <option>Poly</option>
+                    <option>Diğer</option>
+                  </select>
+                </div>
+                <div>
+                  <div className="fl">Adet</div>
+                  <input
+                    type="number"
+                    min={1}
+                    value={line.adet}
+                    onChange={(e) =>
+                      setExtraLines((rows) =>
+                        rows.map((r) =>
+                          r.key === line.key ? { ...r, adet: +e.target.value || 1 } : r
+                        )
+                      )
+                    }
+                  />
+                </div>
+              </div>
+              <div className="fg c2" style={{ marginBottom: 8 }}>
+                <div>
+                  <div className="fl">Toplam Tutar (₺)</div>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={line.toplam}
+                    onChange={(e) =>
+                      setExtraLines((rows) =>
+                        rows.map((r) =>
+                          r.key === line.key ? { ...r, toplam: e.target.value } : r
+                        )
+                      )
+                    }
+                  />
+                </div>
+                <div>
+                  <div className="fl">Kapora (₺)</div>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={line.kapora}
+                    onChange={(e) =>
+                      setExtraLines((rows) =>
+                        rows.map((r) =>
+                          r.key === line.key ? { ...r, kapora: e.target.value } : r
+                        )
+                      )
+                    }
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="fl">Sipariş İçeriği</div>
+                <textarea
+                  rows={2}
+                  placeholder="Bu eserin rengi, boyutu..."
+                  value={line.not_icerik}
+                  onChange={(e) =>
+                    setExtraLines((rows) =>
+                      rows.map((r) =>
+                        r.key === line.key ? { ...r, not_icerik: e.target.value } : r
+                      )
+                    )
+                  }
+                />
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="btn sm"
+            style={{ marginTop: 10 }}
+            onClick={() =>
+              setExtraLines((rows) => [
+                ...rows,
+                newExtraLine(orderForm.cat, rows.length ? rows[rows.length - 1].tur : orderForm.tur),
+              ])
+            }
+          >
+            + Bir sipariş daha ekle
+          </button>
+          <div className="hint" style={{ marginTop: 6 }}>
+            Aynı kişi Poly ve PLX alırsa her satırın malzemesini ve tutarını ayrı yazın. Kayıtlar analizde ayrı sipariş olur; ad, telefon ve adres ortaktır.
+          </div>
+
           <div className="fg">
             <div>
               <div className="fl">Özel İstekler / Notlar</div>

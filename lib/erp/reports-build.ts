@@ -4,6 +4,7 @@ import {
   computeTahsilat,
   computeTahsilatForMonth,
   computeToplamCiro,
+  orderTahsilatEvents,
   dateMonthKey,
   fmtM,
   fmtPct,
@@ -152,6 +153,129 @@ export function expenseDateKey(e: ErpExpense): string {
 
 export function previousMonthKey(): string {
   return monthStr(-1);
+}
+
+export type BreakdownRow = {
+  label: string;
+  amount: number;
+  count: number;
+  share: number;
+};
+
+export type ExpenseKatBreakdown = {
+  kat: string;
+  amount: number;
+  count: number;
+  share: number;
+  subs: BreakdownRow[];
+};
+
+export interface PeriodAnalysis {
+  incomeByCat: BreakdownRow[];
+  incomeByTur: BreakdownRow[];
+  expenseByKat: ExpenseKatBreakdown[];
+  topExpenses: BreakdownRow[];
+  incomeTotal: number;
+  expenseTotal: number;
+}
+
+function shareOf(amount: number, total: number): number {
+  return total > 0 ? Math.round((amount / total) * 1000) / 10 : 0;
+}
+
+function rowsFromMap(
+  map: Map<string, { amount: number; count: number }>,
+  total: number
+): BreakdownRow[] {
+  return Array.from(map.entries())
+    .map(([label, v]) => ({
+      label,
+      amount: v.amount,
+      count: v.count,
+      share: shareOf(v.amount, total),
+    }))
+    .sort((a, b) => b.amount - a.amount);
+}
+
+/**
+ * Seçili döneme düşen tahsilat (kapora + kapama) ve gider kırılımı.
+ * Gelir, siparişin ürün kategorisi ve malzemesine (PLX / Poly) yazılır.
+ */
+export function buildPeriodAnalysis(
+  orders: ErpOrder[],
+  expenses: ErpExpense[],
+  matchDate: (date: string) => boolean
+): PeriodAnalysis {
+  const byCat = new Map<string, { amount: number; count: number }>();
+  const byTur = new Map<string, { amount: number; count: number }>();
+  let incomeTotal = 0;
+
+  for (const o of orders) {
+    const events = orderTahsilatEvents(o).filter((e) => matchDate(e.date));
+    if (!events.length) continue;
+    const amount = events.reduce((s, e) => s + e.amount, 0);
+    incomeTotal += amount;
+    const cat = (o.cat || "Kategorisiz").trim() || "Kategorisiz";
+    const tur = (o.tur || "Diğer").trim() || "Diğer";
+    const c = byCat.get(cat) ?? { amount: 0, count: 0 };
+    c.amount += amount;
+    c.count += 1;
+    byCat.set(cat, c);
+    const t = byTur.get(tur) ?? { amount: 0, count: 0 };
+    t.amount += amount;
+    t.count += 1;
+    byTur.set(tur, t);
+  }
+
+  const expIn = expenses.filter((e) => matchDate(e.tarih));
+  const expenseTotal = expIn.reduce((s, e) => s + (+e.tutar || 0), 0);
+  const byKat = new Map<string, ErpExpense[]>();
+  for (const e of expIn) {
+    const kat = (e.kat || "Kategorisiz").trim() || "Kategorisiz";
+    const list = byKat.get(kat) ?? [];
+    list.push(e);
+    byKat.set(kat, list);
+  }
+
+  const expenseByKat: ExpenseKatBreakdown[] = Array.from(byKat.entries())
+    .map(([kat, list]) => {
+      const amount = list.reduce((s, e) => s + (+e.tutar || 0), 0);
+      const subMap = new Map<string, { amount: number; count: number }>();
+      for (const e of list) {
+        const sub = (e.subkat || "Genel").trim() || "Genel";
+        const cur = subMap.get(sub) ?? { amount: 0, count: 0 };
+        cur.amount += +e.tutar || 0;
+        cur.count += 1;
+        subMap.set(sub, cur);
+      }
+      return {
+        kat,
+        amount,
+        count: list.length,
+        share: shareOf(amount, expenseTotal),
+        subs: rowsFromMap(subMap, amount),
+      };
+    })
+    .sort((a, b) => b.amount - a.amount);
+
+  const topExpenses = [...expIn]
+    .sort((a, b) => (+b.tutar || 0) - (+a.tutar || 0))
+    .slice(0, 8)
+    .map((e) => ({
+      label: [e.kat, e.subkat, e.acik].filter(Boolean).join(" · ") || "Gider",
+      amount: +e.tutar || 0,
+      count: 1,
+      share: shareOf(+e.tutar || 0, expenseTotal),
+    }));
+
+  return {
+    incomeByCat: rowsFromMap(byCat, incomeTotal),
+    incomeByTur: rowsFromMap(byTur, incomeTotal),
+    expenseByKat,
+    topExpenses,
+    incomeTotal,
+    expenseTotal,
+  };
 }
 
 export function formatMonthTitle(ym: string): string {

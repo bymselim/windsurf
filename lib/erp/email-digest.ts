@@ -3,6 +3,7 @@ import type { ErpEmailSectionKey } from "./email-types";
 import { ERP_EMAIL_SECTION_LABELS } from "./email-types";
 import {
   buildErpReportSnapshot,
+  buildPeriodAnalysis,
   expenseDateKey,
   formatMonthTitle,
   orderDateKey,
@@ -15,6 +16,7 @@ import {
   fmtDate,
   fmtM,
   getOrderStatus,
+  isInMonth,
   isOrderDueTracked,
   computeAlacak,
   computeTahsilat,
@@ -282,18 +284,93 @@ export function buildMonthlyReportEmail(
   const section = (name: string, rows: ReportRow[]) =>
     `<h2 style="margin:20px 0 8px;font-size:15px;">${name}</h2><table style="border-collapse:collapse;">${rowHtml(rows)}</table>`;
 
+  const analysis = buildPeriodAnalysis(orders, expenses, (d) => isInMonth(d, monthKey));
+
+  const breakdownText = (titleName: string, rows: { label: string; amount: number; share: number; count: number }[]) => {
+    if (!rows.length) return `${titleName}\n  (kayıt yok)\n`;
+    return (
+      `${titleName}\n` +
+      rows
+        .map((r) => `  • ${r.label} · ${fmtM(r.amount)} · %${r.share} · ${r.count} kayıt`)
+        .join("\n") +
+      "\n"
+    );
+  };
+
+  const expenseText = analysis.expenseByKat
+    .map((g) => {
+      const head = `  • ${g.kat} · ${fmtM(g.amount)} · %${g.share} · ${g.count} kayıt`;
+      const subs = g.subs
+        .map((s) => `      – ${s.label} · ${fmtM(s.amount)} · %${s.share}`)
+        .join("\n");
+      return subs ? `${head}\n${subs}` : head;
+    })
+    .join("\n");
+
+  const textExtra = [
+    "",
+    "AYLIK GELİR ANALİZİ (tahsilat)",
+    `Toplam tahsilat: ${fmtM(analysis.incomeTotal)}`,
+    breakdownText("Ürün kategorisi", analysis.incomeByCat).trimEnd(),
+    breakdownText("Malzeme (PLX / Poly)", analysis.incomeByTur).trimEnd(),
+    "",
+    "AYLIK GİDER ANALİZİ",
+    `Toplam gider: ${fmtM(analysis.expenseTotal)}`,
+    expenseText || "  (kayıt yok)",
+    "",
+    "En büyük gider kalemleri",
+    analysis.topExpenses.length
+      ? analysis.topExpenses.map((r) => `  • ${r.label} · ${fmtM(r.amount)}`).join("\n")
+      : "  (kayıt yok)",
+  ].join("\n");
+
+  const tableRows = (rows: { label: string; amount: number; share: number; count: number }[]) =>
+    rows.length
+      ? rows
+          .map(
+            (r) =>
+              `<tr><td style="padding:6px 12px 6px 0;">${r.label.replace(/</g, "&lt;")}</td><td style="padding:6px 8px;font-weight:600;">${fmtM(r.amount)}</td><td style="padding:6px 0;color:#666;">%${r.share} · ${r.count}</td></tr>`
+          )
+          .join("")
+      : `<tr><td style="color:#666;">Kayıt yok</td></tr>`;
+
+  const expenseHtml = analysis.expenseByKat.length
+    ? analysis.expenseByKat
+        .map((g) => {
+          const subs = g.subs
+            .map(
+              (s) =>
+                `<tr><td style="padding:4px 12px 4px 16px;color:#555;">${s.label.replace(/</g, "&lt;")}</td><td style="padding:4px 8px;">${fmtM(s.amount)}</td><td style="padding:4px 0;color:#666;">%${s.share}</td></tr>`
+            )
+            .join("");
+          return `<tr><td style="padding:8px 12px 4px 0;font-weight:600;">${g.kat.replace(/</g, "&lt;")}</td><td style="padding:8px 8px 4px;font-weight:600;">${fmtM(g.amount)}</td><td style="padding:8px 0 4px;color:#666;">%${g.share} · ${g.count} kayıt</td></tr>${subs}`;
+        })
+        .join("")
+    : `<tr><td style="color:#666;">Kayıt yok</td></tr>`;
+
   const html = `<div style="font-family:system-ui,sans-serif;font-size:14px;">
     <h1 style="font-size:18px;">Ay sonu raporu — ${title}</h1>
     ${section("Üretim & Sipariş", snap.production)}
     ${section("Ortalamalar", snap.averages)}
     ${section("Ciro Analizi", snap.revenue)}
+    <h2 style="margin:20px 0 8px;font-size:15px;">Aylık gelir analizi</h2>
+    <p style="margin:0 0 8px;color:#555;">Tahsilat (kapora sipariş ayına, kalan tahsilat kapama ayına yazılır). Toplam: <strong>${fmtM(analysis.incomeTotal)}</strong></p>
+    <p style="margin:12px 0 4px;font-weight:600;">Ürün kategorisi</p>
+    <table style="border-collapse:collapse;width:100%;">${tableRows(analysis.incomeByCat)}</table>
+    <p style="margin:12px 0 4px;font-weight:600;">Malzeme</p>
+    <table style="border-collapse:collapse;width:100%;">${tableRows(analysis.incomeByTur)}</table>
+    <h2 style="margin:20px 0 8px;font-size:15px;">Aylık gider analizi</h2>
+    <p style="margin:0 0 8px;color:#555;">Toplam: <strong>${fmtM(analysis.expenseTotal)}</strong></p>
+    <table style="border-collapse:collapse;width:100%;">${expenseHtml}</table>
+    <p style="margin:12px 0 4px;font-weight:600;">En büyük gider kalemleri</p>
+    <table style="border-collapse:collapse;width:100%;">${tableRows(analysis.topExpenses)}</table>
     ${section("Reklam", snap.ads)}
     ${section("Maliyet", snap.cost)}
     ${section("Maaşlar", snap.salary)}
     ${section("Nakliye", snap.cargo)}
   </div>`;
 
-  return { subject, text, html };
+  return { subject, text: text + "\n" + textExtra, html };
 }
 
 /** Test / manuel gönderim için dün tarihini kullanır. */
