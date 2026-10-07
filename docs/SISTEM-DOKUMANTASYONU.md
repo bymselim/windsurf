@@ -352,10 +352,10 @@ Kullanıcı /turkish veya /international sayfasına gelir
 | Telefon bazlı | `usePhoneBasedPassword: true` | Telefondan türetilen dinamik şifre |
 
 **Telefon bazlı şifre algoritması** (`lib/gate-password.ts`):
-- Base: `m` + ay (1-12) + son 3 hanenin toplamı (01-27) → örn. `m308`
-- Ters: `803s`
-- Türkçe galeri: `m308` veya `803s` (4 karakter)
-- Uluslararası: başına `y` → `ym308` veya `y803s` (5 karakter)
+- Base: `m` + ay (1-12) + son 3 hanenin toplamı (01-27). Ocak–Eylül 4 karakter (`m915`), Ekim–Aralık 5 karakter (`m1015`)
+- Ters: sondaki `m` → `s` (`519s`, `5101s`)
+- Türkçe galeri: base veya tersi
+- Uluslararası: başına `y` (`ym1015`, `y5101s`)
 
 **Oturum:** `gallery_session` HTTP-only cookie, JWT payload: `sub`, `name`, `gallery`, `logId`
 

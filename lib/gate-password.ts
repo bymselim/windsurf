@@ -1,9 +1,10 @@
 /**
  * Telefon numarasına göre dinamik şifre algoritması.
- * Base şifre (her iki galeri için aynı): m + ay(1-12) + son3Toplam(01-27) = 4 karakter, örn. m308
- * Ters: 803s
- * Turkish: m308 veya 803s (4 karakter)
- * International: başına y zorunlu → ym308 veya y803s (5 karakter)
+ * Base: m + ay(1-12) + son3Toplam(01-27).
+ * Ocak–Eylül 4 karakter (m915), Ekim–Aralık 5 karakter (m1015).
+ * Ters: sondaki m → s (519s, 5101s).
+ * Turkish: base veya tersi.
+ * International: başına y (ym1015, y5101s).
  */
 
 export type GalleryType = "turkish" | "international";
@@ -54,10 +55,9 @@ export function validateGatePassword(
   gallery: GalleryType = "turkish"
 ): boolean {
   const p = String(password ?? "").trim().toLowerCase();
-  const expectedLen = gallery === "international" ? 5 : 4;
-  if (!p || p.length !== expectedLen) return false;
-
   const base = computeBasePassword(phone).toLowerCase();
+  if (!p || !base) return false;
+
   const baseRev = getBaseReversePassword(base);
 
   if (gallery === "international") {
