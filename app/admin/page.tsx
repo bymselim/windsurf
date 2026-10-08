@@ -15,6 +15,12 @@ const NAV = [
     desc: "Sergi kataloğu — görseller ve eser bilgileri",
     icon: "◇",
   },
+  {
+    href: "/admin/new",
+    label: "New Katalog",
+    desc: "Kategorilerden seçmeli katalog — /new",
+    icon: "▣",
+  },
   { href: "/admin/artworks", label: "Artworks", desc: "Edit all artworks", icon: "🖼️" },
   { href: "/admin/uploads", label: "Uploads", desc: "Upload photos/videos", icon: "⬆️" },
   { href: "/admin/categories", label: "Categories", desc: "Manage categories", icon: "📁" },

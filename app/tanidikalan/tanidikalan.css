@@ -292,6 +292,49 @@
   padding-bottom: clamp(24px, 5vw, 40px);
 }
 
+.tk-cat-rail {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px clamp(20px, 5vw, 48px) 8px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.tk-cat-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.tk-cat-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 8px 14px;
+  border: 1px solid var(--tk-line);
+  background: transparent;
+  color: var(--tk-silver);
+  font-family: var(--tk-font-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.25s ease, color 0.25s ease, background 0.25s ease;
+}
+
+.tk-cat-chip.is-active,
+.tk-cat-chip:hover {
+  border-color: var(--tk-accent);
+  color: var(--tk-ink);
+  background: rgba(142, 184, 196, 0.1);
+}
+
+.tk-cat-chip-count {
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+
 .tk-work-body {
   display: grid;
   gap: 14px;
