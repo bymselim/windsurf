@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TanidikalanCatalog as Catalog, TanidikalanWork } from "@/lib/tanidikalan-types";
 import { workImages } from "@/lib/tanidikalan-types";
-import { displayImageSrc } from "@/lib/tanidikalan-media";
+import {
+  displayMediaSrc,
+  firstStillUrl,
+  isVideoUrl,
+} from "@/lib/tanidikalan-media";
 
 const WHATSAPP_NUMBER =
   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "908505327262";
@@ -13,6 +17,7 @@ const INSTAGRAM_HANDLE =
   process.env.NEXT_PUBLIC_INSTAGRAM ??
   process.env.NEXT_PUBLIC_INSTAGRAM_USERNAME ??
   "bymelikesevinc";
+const SITE_URL = "https://www.melikesevinc.com";
 
 function inquiryWhatsApp(work: TanidikalanWork): string {
   const price = [work.priceTR, work.priceUSD].filter(Boolean).join(" / ");
@@ -50,6 +55,14 @@ function inquiryEmail(work: TanidikalanWork): string {
       .join("\n")
   );
   return `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`;
+}
+
+function SiteButton({ href }: { href: string }) {
+  return (
+    <a className="tk-site-btn" href={href} target="_blank" rel="noreferrer">
+      melikesevinc.com →
+    </a>
+  );
 }
 
 function InquiryModal({
@@ -123,14 +136,14 @@ function InquiryModal({
   );
 }
 
-function WorkPhotoRail({ work }: { work: TanidikalanWork }) {
-  const images = workImages(work);
+function WorkMediaRail({ work }: { work: TanidikalanWork }) {
+  const media = workImages(work);
   const railRef = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState(0);
 
   const syncActive = useCallback(() => {
     const rail = railRef.current;
-    if (!rail || !images.length) return;
+    if (!rail || !media.length) return;
     const slides = Array.from(rail.querySelectorAll<HTMLElement>("[data-photo]"));
     if (!slides.length) return;
     const mid = rail.scrollLeft + rail.clientWidth / 2;
@@ -145,7 +158,7 @@ function WorkPhotoRail({ work }: { work: TanidikalanWork }) {
       }
     });
     setActive(best);
-  }, [images.length]);
+  }, [media.length]);
 
   useEffect(() => {
     const rail = railRef.current;
@@ -156,33 +169,47 @@ function WorkPhotoRail({ work }: { work: TanidikalanWork }) {
     return () => rail.removeEventListener("scroll", onScroll);
   }, [syncActive]);
 
-  if (!images.length) {
-    return <div className="tk-photo-empty">Görsel yok</div>;
+  if (!media.length) {
+    return <div className="tk-photo-empty">Medya yok</div>;
   }
 
   return (
     <div className="tk-photo-wrap">
       <div className="tk-photo-rail" ref={railRef}>
-        {images.map((src, i) => (
-          <div className="tk-photo" data-photo key={`${work.id}-${src}-${i}`}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={displayImageSrc(src, 1600)}
-              alt={`${work.title} — ${i + 1}`}
-              loading="lazy"
-            />
-          </div>
-        ))}
+        {media.map((src, i) => {
+          const href = displayMediaSrc(src, 1920);
+          const video = isVideoUrl(src);
+          return (
+            <div className="tk-photo" data-photo key={`${work.id}-${src}-${i}`}>
+              {video ? (
+                <video
+                  src={href}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  aria-label={`${work.title} — video ${i + 1}`}
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={href}
+                  alt={`${work.title} — ${i + 1}`}
+                  loading="lazy"
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
-      {images.length > 1 ? (
+      {media.length > 1 ? (
         <>
-          <div className="tk-dots" role="tablist" aria-label={`${work.title} fotoğrafları`}>
-            {images.map((src, i) => (
+          <div className="tk-dots" role="tablist" aria-label={`${work.title} medya`}>
+            {media.map((src, i) => (
               <button
                 key={`${work.id}-dot-${i}`}
                 type="button"
                 className="tk-dot"
-                aria-label={`Fotoğraf ${i + 1}`}
+                aria-label={isVideoUrl(src) ? `Video ${i + 1}` : `Fotoğraf ${i + 1}`}
                 aria-current={i === active ? "true" : undefined}
                 onClick={() => {
                   const rail = railRef.current;
@@ -192,7 +219,7 @@ function WorkPhotoRail({ work }: { work: TanidikalanWork }) {
               />
             ))}
           </div>
-          <p className="tk-hint">Fotoğrafları kaydır →</p>
+          <p className="tk-hint">Kaydır →</p>
         </>
       ) : null}
     </div>
@@ -231,7 +258,10 @@ export function TanidikalanCatalog() {
     return <div className="tk-loading">Katalog hazırlanıyor…</div>;
   }
 
-  const heroImage = workImages(catalog.works[0] || { imageUrl: "", images: [] })[0] || "";
+  const siteHref = catalog.website?.trim() || SITE_URL;
+  const heroImage = firstStillUrl(
+    workImages(catalog.works[0] || { imageUrl: "", images: [] })
+  );
 
   return (
     <div className="tk-shell">
@@ -239,7 +269,7 @@ export function TanidikalanCatalog() {
         <div className="tk-hero-media">
           {heroImage ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={displayImageSrc(heroImage, 1920)} alt="" />
+            <img src={displayMediaSrc(heroImage, 1920)} alt="" />
           ) : null}
           <div className="tk-hero-shade" />
         </div>
@@ -256,17 +286,20 @@ export function TanidikalanCatalog() {
         </div>
       </section>
 
+      <div className="tk-site-btn-wrap">
+        <SiteButton href={siteHref} />
+      </div>
+
       <section className="tk-section" id="eserler" aria-label="Seçili eserler">
         <div className="tk-section-head">
-          <p className="tk-kicker">Selected works</p>
-          <h2 className="tk-section-title">Altı heykel</h2>
+          <p className="tk-kicker">{catalog.subtitle || "Selected works"}</p>
           {catalog.intro ? <p className="tk-section-note">{catalog.intro}</p> : null}
         </div>
 
         <div className="tk-list">
           {catalog.works.map((work) => (
             <article className="tk-work" key={work.id} id={`work-${work.id}`}>
-              <WorkPhotoRail work={work} />
+              <WorkMediaRail work={work} />
               <div className="tk-work-body">
                 <div className="tk-meta-row">
                   <span>
@@ -306,6 +339,10 @@ export function TanidikalanCatalog() {
           ))}
         </div>
       </section>
+
+      <div className="tk-site-btn-wrap end">
+        <SiteButton href={siteHref} />
+      </div>
 
       <footer className="tk-artist">
         <h2>{catalog.artistName}</h2>

@@ -12,7 +12,13 @@ import { workImages } from "@/lib/tanidikalan-types";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const MAX_BYTES = 12 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 80 * 1024 * 1024;
+
+function isVideoFile(file: File): boolean {
+  if ((file.type || "").startsWith("video/")) return true;
+  return /\.(mp4|webm|mov|m4v)$/i.test(file.name || "");
+}
 
 export async function POST(request: NextRequest) {
   if (!(await verifyAdminAuth(request))) {
@@ -23,7 +29,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "Görsel depolama (R2) yapılandırılmamış. Vercel ortam değişkenlerini kontrol edin.",
+          "Medya depolama (R2) yapılandırılmamış. Vercel ortam değişkenlerini kontrol edin.",
       },
       { status: 503 }
     );
@@ -56,39 +62,61 @@ export async function POST(request: NextRequest) {
   if (!raw.length) {
     return NextResponse.json({ error: "Dosya boş" }, { status: 400 });
   }
-  if (raw.length > MAX_BYTES) {
-    return NextResponse.json(
-      { error: "Dosya çok büyük (en fazla 12 MB)" },
-      { status: 400 }
-    );
-  }
 
-  let jpeg: Buffer;
-  try {
-    jpeg = await sharp(raw)
-      .rotate()
-      .resize({ width: 2400, height: 2400, fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 88, mozjpeg: true })
-      .toBuffer();
-  } catch {
+  const video = isVideoFile(file);
+  const max = video ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+  if (raw.length > max) {
     return NextResponse.json(
       {
-        error:
-          "Görsel okunamadı. JPG/PNG/WEBP deneyin (iPhone HEIC bazen desteklenmez).",
+        error: video
+          ? "Video çok büyük (en fazla 80 MB). Daha kısa / sıkıştırılmış deneyin."
+          : "Dosya çok büyük (en fazla 12 MB)",
       },
       { status: 400 }
     );
   }
 
-  const safeName = `${workId}-${randomUUID().slice(0, 8)}.jpg`;
+  let uploadBuf: Buffer;
+  let contentType: string;
+  let safeName: string;
+
+  if (video) {
+    const ext =
+      file.type === "video/webm"
+        ? "webm"
+        : file.type === "video/quicktime" || /\.mov$/i.test(file.name)
+          ? "mov"
+          : "mp4";
+    uploadBuf = raw;
+    contentType = file.type || (ext === "webm" ? "video/webm" : "video/mp4");
+    safeName = `${workId}-${randomUUID().slice(0, 8)}.${ext}`;
+  } else {
+    try {
+      uploadBuf = await sharp(raw)
+        .rotate()
+        .resize({ width: 2400, height: 2400, fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 88, mozjpeg: true })
+        .toBuffer();
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            "Görsel okunamadı. JPG/PNG/WEBP veya MP4/WEBM video deneyin.",
+        },
+        { status: 400 }
+      );
+    }
+    contentType = "image/jpeg";
+    safeName = `${workId}-${randomUUID().slice(0, 8)}.jpg`;
+  }
+
   let url: string;
   try {
-    // Galeri yüklemeleriyle aynı kök: artworks/...
     const uploaded = await uploadPublicMedia(
       "artworks/tanidikalan",
       safeName,
-      jpeg,
-      "image/jpeg"
+      uploadBuf,
+      contentType
     );
     url = uploaded.url;
   } catch (e) {

@@ -11,7 +11,7 @@ import {
 } from "@/lib/admin-auth-client";
 import type { TanidikalanCatalog, TanidikalanWork } from "@/lib/tanidikalan-types";
 import { workImages } from "@/lib/tanidikalan-types";
-import { displayImageSrc } from "@/lib/tanidikalan-media";
+import { displayMediaSrc, isVideoUrl } from "@/lib/tanidikalan-media";
 
 const emptyWork = (n: number): TanidikalanWork => ({
   id: `work-${Date.now()}-${n}`,
@@ -44,24 +44,37 @@ function AdminWorkImage({
   onRemove: () => void;
 }) {
   const [failed, setFailed] = useState(false);
-  const preview = displayImageSrc(src, 640);
+  const preview = displayMediaSrc(src, 640);
+  const video = isVideoUrl(src);
 
   return (
     <div className="rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900">
       {failed ? (
         <div className="h-32 flex flex-col items-center justify-center text-center px-2 text-[11px] text-red-300">
-          <span>Görsel açılamadı</span>
+          <span>Medya açılamadı</span>
           <span className="mt-1 text-zinc-500 break-all">{src}</span>
         </div>
+      ) : video ? (
+        <video
+          src={preview}
+          className="w-full h-32 object-contain bg-zinc-950"
+          muted
+          playsInline
+          preload="metadata"
+          onError={() => setFailed(true)}
+        />
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={preview}
           alt=""
-          className="w-full h-32 object-cover bg-zinc-950"
+          className="w-full h-32 object-contain bg-zinc-950"
           onError={() => setFailed(true)}
         />
       )}
+      <div className="px-2 pt-1 text-[10px] uppercase tracking-wider text-zinc-500">
+        {video ? "Video" : "Fotoğraf"}
+      </div>
       <div className="flex flex-wrap gap-1 p-2">
         <button
           type="button"
@@ -272,7 +285,7 @@ export default function AdminTanidikalanPage() {
         if (data.catalog) latest = data.catalog as TanidikalanCatalog;
       }
       if (latest) setCatalog(latest);
-      setMessage("✅ Fotoğraf(lar) eklendi");
+      setMessage("✅ Medya eklendi");
     } catch (e) {
       alertUnlessAdminAuthError(e, "Yükleme başarısız");
       setMessage(e instanceof Error ? `❌ ${e.message}` : "❌ Yükleme başarısız");
@@ -458,18 +471,18 @@ export default function AdminTanidikalanPage() {
                 </div>
               ) : (
                 <div className="h-28 rounded-lg border border-dashed border-zinc-700 grid place-items-center text-zinc-500 text-sm">
-                  Fotoğraf yok
+                  Medya yok
                 </div>
               )}
 
               <label className="block">
                 <span className={label}>
-                  Fotoğraf ekle (birden fazla seçilebilir)
+                  Fotoğraf / video ekle (birden fazla seçilebilir)
                   {uploadingId === work.id ? " — yükleniyor…" : ""}
                 </span>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
                   multiple
                   className="block w-full text-sm text-zinc-400"
                   disabled={uploadingId === work.id}
