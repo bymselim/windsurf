@@ -11,6 +11,7 @@ import {
 } from "@/lib/admin-auth-client";
 import type { TanidikalanCatalog, TanidikalanWork } from "@/lib/tanidikalan-types";
 import { workImages } from "@/lib/tanidikalan-types";
+import { displayImageSrc } from "@/lib/tanidikalan-media";
 
 const emptyWork = (n: number): TanidikalanWork => ({
   id: `work-${Date.now()}-${n}`,
@@ -26,6 +27,69 @@ const emptyWork = (n: number): TanidikalanWork => ({
   images: [],
   sortOrder: n,
 });
+
+function AdminWorkImage({
+  src,
+  canLeft,
+  canRight,
+  onLeft,
+  onRight,
+  onRemove,
+}: {
+  src: string;
+  canLeft: boolean;
+  canRight: boolean;
+  onLeft: () => void;
+  onRight: () => void;
+  onRemove: () => void;
+}) {
+  const [failed, setFailed] = useState(false);
+  const preview = displayImageSrc(src, 640);
+
+  return (
+    <div className="rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900">
+      {failed ? (
+        <div className="h-32 flex flex-col items-center justify-center text-center px-2 text-[11px] text-red-300">
+          <span>Görsel açılamadı</span>
+          <span className="mt-1 text-zinc-500 break-all">{src}</span>
+        </div>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={preview}
+          alt=""
+          className="w-full h-32 object-cover bg-zinc-950"
+          onError={() => setFailed(true)}
+        />
+      )}
+      <div className="flex flex-wrap gap-1 p-2">
+        <button
+          type="button"
+          className="px-2 py-0.5 text-[11px] border border-zinc-700 rounded disabled:opacity-40"
+          disabled={!canLeft}
+          onClick={onLeft}
+        >
+          ←
+        </button>
+        <button
+          type="button"
+          className="px-2 py-0.5 text-[11px] border border-zinc-700 rounded disabled:opacity-40"
+          disabled={!canRight}
+          onClick={onRight}
+        >
+          →
+        </button>
+        <button
+          type="button"
+          className="px-2 py-0.5 text-[11px] border border-red-500/40 text-red-300 rounded"
+          onClick={onRemove}
+        >
+          Kaldır
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminTanidikalanPage() {
   const router = useRouter();
@@ -381,56 +445,15 @@ export default function AdminTanidikalanPage() {
               {images.length ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {images.map((src, imgIndex) => (
-                    <div
+                    <AdminWorkImage
                       key={`${work.id}-${src}-${imgIndex}`}
-                      className="rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={src}
-                        alt=""
-                        referrerPolicy="no-referrer"
-                        className="w-full h-32 object-cover bg-zinc-950"
-                        onError={(e) => {
-                          const el = e.currentTarget;
-                          el.style.display = "none";
-                          const sib = el.nextElementSibling;
-                          if (sib instanceof HTMLElement) sib.hidden = false;
-                        }}
-                      />
-                      <div
-                        hidden
-                        className="h-32 grid place-items-center text-center px-2 text-[11px] text-red-300"
-                      >
-                        Görsel açılamadı
-                        <span className="block mt-1 text-zinc-500 break-all">{src}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1 p-2">
-                        <button
-                          type="button"
-                          className="px-2 py-0.5 text-[11px] border border-zinc-700 rounded disabled:opacity-40"
-                          disabled={imgIndex === 0}
-                          onClick={() => moveImage(work.id, imgIndex, -1)}
-                        >
-                          ←
-                        </button>
-                        <button
-                          type="button"
-                          className="px-2 py-0.5 text-[11px] border border-zinc-700 rounded disabled:opacity-40"
-                          disabled={imgIndex === images.length - 1}
-                          onClick={() => moveImage(work.id, imgIndex, 1)}
-                        >
-                          →
-                        </button>
-                        <button
-                          type="button"
-                          className="px-2 py-0.5 text-[11px] border border-red-500/40 text-red-300 rounded"
-                          onClick={() => removeImage(work.id, imgIndex)}
-                        >
-                          Kaldır
-                        </button>
-                      </div>
-                    </div>
+                      src={src}
+                      canLeft={imgIndex > 0}
+                      canRight={imgIndex < images.length - 1}
+                      onLeft={() => moveImage(work.id, imgIndex, -1)}
+                      onRight={() => moveImage(work.id, imgIndex, 1)}
+                      onRemove={() => removeImage(work.id, imgIndex)}
+                    />
                   ))}
                 </div>
               ) : (

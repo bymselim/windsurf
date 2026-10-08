@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TanidikalanCatalog as Catalog, TanidikalanWork } from "@/lib/tanidikalan-types";
 import { workImages } from "@/lib/tanidikalan-types";
+import { displayImageSrc } from "@/lib/tanidikalan-media";
 
 const WHATSAPP_NUMBER =
   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "908505327262";
@@ -166,10 +167,9 @@ function WorkPhotoRail({ work }: { work: TanidikalanWork }) {
           <div className="tk-photo" data-photo key={`${work.id}-${src}-${i}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={src}
+              src={displayImageSrc(src, 1600)}
               alt={`${work.title} — ${i + 1}`}
               loading="lazy"
-              referrerPolicy="no-referrer"
             />
           </div>
         ))}
@@ -239,7 +239,7 @@ export function TanidikalanCatalog() {
         <div className="tk-hero-media">
           {heroImage ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={heroImage} alt="" referrerPolicy="no-referrer" />
+            <img src={displayImageSrc(heroImage, 1920)} alt="" />
           ) : null}
           <div className="tk-hero-shade" />
         </div>
