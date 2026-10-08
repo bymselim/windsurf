@@ -144,12 +144,11 @@ function CategorySwipeRail({
     if (!rail || !works.length) return;
     const slides = Array.from(rail.querySelectorAll<HTMLElement>("[data-slide]"));
     if (!slides.length) return;
-    const mid = rail.scrollLeft + rail.clientWidth / 2;
+    const left = rail.scrollLeft;
     let best = 0;
     let bestDist = Infinity;
     slides.forEach((slide, i) => {
-      const center = slide.offsetLeft + slide.offsetWidth / 2;
-      const dist = Math.abs(center - mid);
+      const dist = Math.abs(slide.offsetLeft - left);
       if (dist < bestDist) {
         bestDist = dist;
         best = i;
@@ -174,7 +173,7 @@ function CategorySwipeRail({
   const current = works[active] || works[0];
 
   return (
-    <div className="tk-photo-wrap">
+    <div className="tk-photo-wrap tk-photo-bleed">
       <div className="tk-photo-rail" ref={railRef}>
         {works.map((work, i) => {
           const src = work.imageUrl || work.images?.[0] || "";
@@ -214,7 +213,7 @@ function CategorySwipeRail({
                     ?.querySelectorAll<HTMLElement>("[data-slide]")
                     [i]?.scrollIntoView({
                       behavior: "smooth",
-                      inline: "center",
+                      inline: "start",
                       block: "nearest",
                     });
                 }}
@@ -226,7 +225,14 @@ function CategorySwipeRail({
       ) : null}
 
       {current ? (
-        <div className="tk-work-body" style={{ marginTop: 18, padding: "0 4px" }}>
+        <div
+          className="tk-work-body"
+          style={{
+            marginTop: 18,
+            padding: "0 clamp(20px, 5vw, 48px)",
+            maxWidth: "40rem",
+          }}
+        >
           <div className="tk-meta-row">
             <span>
               {current.number} / {current.category}

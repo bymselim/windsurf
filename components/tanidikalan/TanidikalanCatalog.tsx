@@ -174,7 +174,7 @@ function WorkMediaRail({ work }: { work: TanidikalanWork }) {
   }
 
   return (
-    <div className="tk-photo-wrap">
+    <div className="tk-photo-wrap tk-photo-bleed">
       <div className="tk-photo-rail" ref={railRef}>
         {media.map((src, i) => {
           const href = displayMediaSrc(src, 1920);
@@ -214,7 +214,7 @@ function WorkMediaRail({ work }: { work: TanidikalanWork }) {
                 onClick={() => {
                   const rail = railRef.current;
                   const slide = rail?.querySelectorAll<HTMLElement>("[data-photo]")[i];
-                  slide?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+                  slide?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
                 }}
               />
             ))}
