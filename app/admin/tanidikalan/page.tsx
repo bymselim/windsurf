@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { verifyAdminSession } from "@/lib/admin-auth-client";
+import {
+  ADMIN_LOGIN_PATH,
+  adminFetch,
+  alertUnlessAdminAuthError,
+  verifyAdminSession,
+} from "@/lib/admin-auth-client";
 import type { TanidikalanCatalog, TanidikalanWork } from "@/lib/tanidikalan-types";
 import { workImages } from "@/lib/tanidikalan-types";
 
@@ -26,9 +31,29 @@ export default function AdminTanidikalanPage() {
   const router = useRouter();
   const [auth, setAuth] = useState<boolean | null>(null);
   const [catalog, setCatalog] = useState<TanidikalanCatalog | null>(null);
+  const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+
+  const loadCatalog = async () => {
+    setLoadingCatalog(true);
+    setLoadError("");
+    try {
+      const res = await adminFetch("/api/admin/tanidikalan");
+      const data = (await res.json()) as TanidikalanCatalog;
+      if (!data || !Array.isArray(data.works)) {
+        throw new Error("Geçersiz katalog yanıtı");
+      }
+      setCatalog(data);
+    } catch (e) {
+      alertUnlessAdminAuthError(e, "Katalog yüklenemedi");
+      setLoadError(e instanceof Error ? e.message : "Katalog yüklenemedi");
+    } finally {
+      setLoadingCatalog(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -42,24 +67,13 @@ export default function AdminTanidikalanPage() {
   }, []);
 
   useEffect(() => {
-    if (auth === false) router.replace("/admin");
+    if (auth === false) router.replace(ADMIN_LOGIN_PATH);
   }, [auth, router]);
 
   useEffect(() => {
     if (!auth) return;
-    let cancelled = false;
-    void (async () => {
-      const res = await fetch("/api/admin/tanidikalan", { credentials: "include" });
-      if (!res.ok) {
-        if (!cancelled) setMessage("Katalog yüklenemedi");
-        return;
-      }
-      const data = (await res.json()) as TanidikalanCatalog;
-      if (!cancelled) setCatalog(data);
-    })();
-    return () => {
-      cancelled = true;
-    };
+    void loadCatalog();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount when auth becomes true
   }, [auth]);
 
   const updateMeta = <K extends keyof TanidikalanCatalog>(
@@ -159,9 +173,8 @@ export default function AdminTanidikalanPage() {
     setSaving(true);
     setMessage("");
     try {
-      const res = await fetch("/api/admin/tanidikalan", {
+      const res = await adminFetch("/api/admin/tanidikalan", {
         method: "PUT",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(catalog),
       });
@@ -170,6 +183,7 @@ export default function AdminTanidikalanPage() {
       setCatalog(data as TanidikalanCatalog);
       setMessage("✅ Kaydedildi — sıra ve görseller güncellendi");
     } catch (e) {
+      alertUnlessAdminAuthError(e, "Kaydedilemedi");
       setMessage(e instanceof Error ? `❌ ${e.message}` : "❌ Kaydedilemedi");
     } finally {
       setSaving(false);
@@ -185,9 +199,8 @@ export default function AdminTanidikalanPage() {
         const form = new FormData();
         form.set("workId", workId);
         form.set("file", file);
-        const res = await fetch("/api/admin/tanidikalan/upload", {
+        const res = await adminFetch("/api/admin/tanidikalan/upload", {
           method: "POST",
-          credentials: "include",
           body: form,
         });
         const data = await res.json();
@@ -197,13 +210,14 @@ export default function AdminTanidikalanPage() {
       if (latest) setCatalog(latest);
       setMessage("✅ Fotoğraf(lar) eklendi");
     } catch (e) {
+      alertUnlessAdminAuthError(e, "Yükleme başarısız");
       setMessage(e instanceof Error ? `❌ ${e.message}` : "❌ Yükleme başarısız");
     } finally {
       setUploadingId(null);
     }
   };
 
-  if (auth === null || !catalog) {
+  if (auth === null || (auth && loadingCatalog && !catalog)) {
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-400 flex items-center justify-center">
         Yükleniyor…
@@ -212,6 +226,34 @@ export default function AdminTanidikalanPage() {
   }
 
   if (!auth) return null;
+
+  if (loadError && !catalog) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="text-zinc-300">{loadError}</p>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => void loadCatalog()}
+            className="px-4 py-2 rounded-lg border border-amber-500/40 text-amber-300 text-sm"
+          >
+            Tekrar dene
+          </button>
+          <Link href="/admin" className="px-4 py-2 rounded-lg border border-zinc-700 text-sm text-zinc-300">
+            Admin
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!catalog) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-400 flex items-center justify-center">
+        Katalog bulunamadı
+      </div>
+    );
+  }
 
   const field =
     "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100";

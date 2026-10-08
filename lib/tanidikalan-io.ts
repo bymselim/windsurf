@@ -77,32 +77,58 @@ async function readSeedFile(): Promise<TanidikalanCatalog | null> {
   }
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("timeout")), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+const emptyCatalog = (): TanidikalanCatalog => ({
+  brand: "MELİKE SEVİNÇ",
+  subtitle: "SELECTED WORKS",
+  years: "",
+  tagline: "",
+  intro: "",
+  artistName: "Melike Sevinç",
+  artistRole: "Artist / Sculptor",
+  website: "",
+  instagram: "",
+  works: [],
+  updatedAt: new Date().toISOString(),
+});
+
 export async function readTanidikalanCatalog(): Promise<TanidikalanCatalog> {
-  const kvVal = await kvGetJson<TanidikalanCatalog>(KV_KEY);
-  const fromKv = normalizeCatalog(kvVal);
-  if (fromKv && fromKv.works.length) return fromKv;
+  try {
+    const kvVal = await withTimeout(kvGetJson<TanidikalanCatalog>(KV_KEY), 4000);
+    const fromKv = normalizeCatalog(kvVal);
+    if (fromKv && fromKv.works.length) return fromKv;
+  } catch {
+    // KV yok / zaman aşımı — seed dosyasına düş
+  }
 
   const seed = await readSeedFile();
   if (seed) {
-    if (await isKvAvailable()) {
-      await kvSetJson(KV_KEY, seed);
-    }
+    void (async () => {
+      try {
+        if (await isKvAvailable()) {
+          await withTimeout(kvSetJson(KV_KEY, seed), 4000);
+        }
+      } catch {
+        // seed yazımı başarısız olsa da okuma devam eder
+      }
+    })();
     return seed;
   }
 
-  return {
-    brand: "MELİKE SEVİNÇ",
-    subtitle: "SELECTED WORKS",
-    years: "",
-    tagline: "",
-    intro: "",
-    artistName: "Melike Sevinç",
-    artistRole: "Artist / Sculptor",
-    website: "",
-    instagram: "",
-    works: [],
-    updatedAt: new Date().toISOString(),
-  };
+  return emptyCatalog();
 }
 
 export async function writeTanidikalanCatalog(
