@@ -9,6 +9,12 @@ import { APP_NAME, APP_VERSION } from "@/lib/app-version";
 const NAV = [
   { href: "/erp", label: "ERP", desc: "Sipariş, gider ve raporlar — İş Paneli", icon: "⬡" },
   { href: "/c", label: "Hızlı mesajlar", desc: "Kayıtlı cevaplar — kopyala / yapıştır", icon: "⚡" },
+  {
+    href: "/admin/tanidikalan",
+    label: "Tanıdık Alan",
+    desc: "Sergi kataloğu — görseller ve eser bilgileri",
+    icon: "◇",
+  },
   { href: "/admin/artworks", label: "Artworks", desc: "Edit all artworks", icon: "🖼️" },
   { href: "/admin/uploads", label: "Uploads", desc: "Upload photos/videos", icon: "⬆️" },
   { href: "/admin/categories", label: "Categories", desc: "Manage categories", icon: "📁" },

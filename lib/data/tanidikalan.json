@@ -1,0 +1,110 @@
+{
+  "brand": "MELİKE SEVİNÇ",
+  "subtitle": "SELECTED WORKS",
+  "years": "2024 — 2026",
+  "tagline": "SCULPTURE · MIXED MEDIA · REAL SILVER",
+  "intro": "Six sculptural works bringing together resin, mixed media and real silver plating. The selection spans figurative, object-based and abstract forms, with reflective surfaces used as an active part of each work.",
+  "artistName": "Melike Sevinç",
+  "artistRole": "Artist / Sculptor",
+  "website": "https://www.melikesevinc.com",
+  "instagram": "https://www.instagram.com/bymelikesevinc",
+  "updatedAt": "2026-10-08T00:00:00.000Z",
+  "works": [
+    {
+      "id": "icon-inflated",
+      "number": "01",
+      "title": "ICON INFLATED",
+      "year": "2026",
+      "category": "SCULPTURE",
+      "material": "Mixed Media, Resin, Real Silver Plating, Solid Walnut",
+      "dimensions": "H: 115 cm  |  W: 185 cm  |  D: 45 cm",
+      "priceTR": "200.000 ₺",
+      "priceUSD": "$4,050",
+      "imageUrl": "/tanidikalan/01-icon-inflated.jpg",
+      "sortOrder": 1,
+      "images": [
+        "/tanidikalan/01-icon-inflated.jpg"
+      ]
+    },
+    {
+      "id": "astronaut-bunny",
+      "number": "02",
+      "title": "ASTRONAUT BUNNY",
+      "year": "2024",
+      "category": "SCULPTURE",
+      "material": "Mixed Media, Resin, Real Silver Plating",
+      "dimensions": "H: 95 cm  |  W: 45 cm  |  D: 35 cm",
+      "priceTR": "95.000 ₺",
+      "priceUSD": "$1,950",
+      "imageUrl": "/tanidikalan/02-astronaut-bunny.jpg",
+      "sortOrder": 2,
+      "images": [
+        "/tanidikalan/02-astronaut-bunny.jpg"
+      ]
+    },
+    {
+      "id": "bad-bunny",
+      "number": "03",
+      "title": "BAD BUNNY / w Balloons",
+      "year": "",
+      "category": "SCULPTURE",
+      "material": "Mixed Media, Resin, Real Silver Plating",
+      "dimensions": "H: 160 cm  |  W: 75 cm  |  D: 60 cm",
+      "priceTR": "170.000 ₺",
+      "priceUSD": "$3,450",
+      "imageUrl": "/tanidikalan/03-bad-bunny.jpg",
+      "sortOrder": 3,
+      "images": [
+        "/tanidikalan/03-bad-bunny.jpg"
+      ]
+    },
+    {
+      "id": "caretta",
+      "number": "04",
+      "title": "CARETTA",
+      "year": "",
+      "category": "SCULPTURE",
+      "material": "Mixed Media, Resin, Real Silver Plating",
+      "dimensions": "H: 120 cm  |  W: 90 cm  |  D: 45 cm",
+      "priceTR": "95.000 ₺",
+      "priceUSD": "$1,950",
+      "imageUrl": "/tanidikalan/04-caretta.jpg",
+      "sortOrder": 4,
+      "images": [
+        "/tanidikalan/04-caretta.jpg"
+      ]
+    },
+    {
+      "id": "stone",
+      "number": "05",
+      "title": "STONE",
+      "year": "",
+      "category": "SCULPTURE",
+      "material": "Mixed Media, Resin, Real Silver Plating",
+      "dimensions": "H: 95 cm  |  W: 38 cm  |  D: 30 cm",
+      "priceTR": "95.000 ₺",
+      "priceUSD": "$1,950",
+      "imageUrl": "/tanidikalan/05-stone.jpg",
+      "sortOrder": 5,
+      "images": [
+        "/tanidikalan/05-stone.jpg"
+      ]
+    },
+    {
+      "id": "unstable",
+      "number": "06",
+      "title": "UNSTABLE",
+      "year": "",
+      "category": "SCULPTURE",
+      "material": "Mixed Media, Resin, Real Silver Plating",
+      "dimensions": "H: 185 cm  |  W: 55 cm  |  D: 45 cm",
+      "priceTR": "190.000 ₺",
+      "priceUSD": "$3,850",
+      "imageUrl": "/tanidikalan/06-unstable.jpg",
+      "sortOrder": 6,
+      "images": [
+        "/tanidikalan/06-unstable.jpg"
+      ]
+    }
+  ]
+}
