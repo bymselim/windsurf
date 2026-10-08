@@ -165,7 +165,12 @@ function WorkPhotoRail({ work }: { work: TanidikalanWork }) {
         {images.map((src, i) => (
           <div className="tk-photo" data-photo key={`${work.id}-${src}-${i}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt={`${work.title} — ${i + 1}`} loading="lazy" />
+            <img
+              src={src}
+              alt={`${work.title} — ${i + 1}`}
+              loading="lazy"
+              referrerPolicy="no-referrer"
+            />
           </div>
         ))}
       </div>
@@ -234,7 +239,7 @@ export function TanidikalanCatalog() {
         <div className="tk-hero-media">
           {heroImage ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={heroImage} alt="" />
+            <img src={heroImage} alt="" referrerPolicy="no-referrer" />
           ) : null}
           <div className="tk-hero-shade" />
         </div>

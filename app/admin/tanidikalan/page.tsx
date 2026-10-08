@@ -386,7 +386,25 @@ export default function AdminTanidikalanPage() {
                       className="rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={src} alt="" className="w-full h-32 object-cover" />
+                      <img
+                        src={src}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        className="w-full h-32 object-cover bg-zinc-950"
+                        onError={(e) => {
+                          const el = e.currentTarget;
+                          el.style.display = "none";
+                          const sib = el.nextElementSibling;
+                          if (sib instanceof HTMLElement) sib.hidden = false;
+                        }}
+                      />
+                      <div
+                        hidden
+                        className="h-32 grid place-items-center text-center px-2 text-[11px] text-red-300"
+                      >
+                        Görsel açılamadı
+                        <span className="block mt-1 text-zinc-500 break-all">{src}</span>
+                      </div>
                       <div className="flex flex-wrap gap-1 p-2">
                         <button
                           type="button"

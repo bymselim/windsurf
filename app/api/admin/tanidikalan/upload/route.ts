@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
 import { randomUUID } from "crypto";
+import sharp from "sharp";
 import { verifyAdminAuth } from "@/lib/admin-auth-server";
 import { isR2Configured, uploadPublicMedia } from "@/lib/object-storage";
 import {
@@ -11,10 +10,23 @@ import {
 import { workImages } from "@/lib/tanidikalan-types";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+const MAX_BYTES = 12 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   if (!(await verifyAdminAuth(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isR2Configured()) {
+    return NextResponse.json(
+      {
+        error:
+          "Görsel depolama (R2) yapılandırılmamış. Vercel ortam değişkenlerini kontrol edin.",
+      },
+      { status: 503 }
+    );
   }
 
   let form: FormData;
@@ -33,9 +45,6 @@ export async function POST(request: NextRequest) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Dosya gerekli" }, { status: 400 });
   }
-  if (!file.type.startsWith("image/")) {
-    return NextResponse.json({ error: "Sadece görsel yüklenebilir" }, { status: 400 });
-  }
 
   const catalog = await readTanidikalanCatalog();
   const work = catalog.works.find((w) => w.id === workId);
@@ -43,29 +52,55 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Eser bulunamadı" }, { status: 404 });
   }
 
-  const buf = Buffer.from(await file.arrayBuffer());
-  const ext =
-    file.type === "image/png"
-      ? "png"
-      : file.type === "image/webp"
-        ? "webp"
-        : "jpg";
-  const safeName = `${workId}-${randomUUID().slice(0, 8)}.${ext}`;
+  const raw = Buffer.from(await file.arrayBuffer());
+  if (!raw.length) {
+    return NextResponse.json({ error: "Dosya boş" }, { status: 400 });
+  }
+  if (raw.length > MAX_BYTES) {
+    return NextResponse.json(
+      { error: "Dosya çok büyük (en fazla 12 MB)" },
+      { status: 400 }
+    );
+  }
 
+  let jpeg: Buffer;
+  try {
+    jpeg = await sharp(raw)
+      .rotate()
+      .resize({ width: 2400, height: 2400, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 88, mozjpeg: true })
+      .toBuffer();
+  } catch {
+    return NextResponse.json(
+      {
+        error:
+          "Görsel okunamadı. JPG/PNG/WEBP deneyin (iPhone HEIC bazen desteklenmez).",
+      },
+      { status: 400 }
+    );
+  }
+
+  const safeName = `${workId}-${randomUUID().slice(0, 8)}.jpg`;
   let url: string;
-  if (isR2Configured()) {
+  try {
+    // Galeri yüklemeleriyle aynı kök: artworks/...
     const uploaded = await uploadPublicMedia(
-      "tanidikalan",
+      "artworks/tanidikalan",
       safeName,
-      buf,
-      file.type || "image/jpeg"
+      jpeg,
+      "image/jpeg"
     );
     url = uploaded.url;
-  } else {
-    const dir = path.join(process.cwd(), "public", "tanidikalan");
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(path.join(dir, safeName), buf);
-    url = `/tanidikalan/${safeName}`;
+  } catch (e) {
+    return NextResponse.json(
+      {
+        error:
+          e instanceof Error
+            ? `Yükleme başarısız: ${e.message}`
+            : "Yükleme başarısız",
+      },
+      { status: 502 }
+    );
   }
 
   const current = workImages(work);
