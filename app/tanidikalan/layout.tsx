@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
-import { Fraunces, Sora } from "next/font/google";
+import { Cormorant_Garamond, Outfit } from "next/font/google";
 import "./tanidikalan.css";
 
-const display = Fraunces({
+const display = Cormorant_Garamond({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-tk-display",
   display: "swap",
 });
 
-const sans = Sora({
+const sans = Outfit({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600"],
   variable: "--font-tk-sans",
