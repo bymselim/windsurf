@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   NewCatalogPublic,
   NewCatalogPublicCategory,
@@ -127,15 +127,22 @@ function InquiryModal({
   );
 }
 
-function WorkMediaRail({ work }: { work: NewCatalogWork }) {
-  const media = work.images?.length ? work.images : [work.imageUrl].filter(Boolean);
+/** Bir kategorinin seçili eserleri — yatay kaydırma. */
+function CategorySwipeRail({
+  category,
+  onInquiry,
+}: {
+  category: NewCatalogPublicCategory;
+  onInquiry: (work: NewCatalogWork) => void;
+}) {
+  const works = category.works;
   const railRef = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState(0);
 
   const syncActive = useCallback(() => {
     const rail = railRef.current;
-    if (!rail || !media.length) return;
-    const slides = Array.from(rail.querySelectorAll<HTMLElement>("[data-photo]"));
+    if (!rail || !works.length) return;
+    const slides = Array.from(rail.querySelectorAll<HTMLElement>("[data-slide]"));
     if (!slides.length) return;
     const mid = rail.scrollLeft + rail.clientWidth / 2;
     let best = 0;
@@ -149,7 +156,7 @@ function WorkMediaRail({ work }: { work: NewCatalogWork }) {
       }
     });
     setActive(best);
-  }, [media.length]);
+  }, [works.length]);
 
   useEffect(() => {
     const rail = railRef.current;
@@ -160,39 +167,56 @@ function WorkMediaRail({ work }: { work: NewCatalogWork }) {
     return () => rail.removeEventListener("scroll", onScroll);
   }, [syncActive]);
 
-  if (!media.length) return <div className="tk-photo-empty">Medya yok</div>;
+  if (!works.length) {
+    return <div className="tk-photo-empty">Bu kategoride seçili eser yok</div>;
+  }
+
+  const current = works[active] || works[0];
 
   return (
     <div className="tk-photo-wrap">
       <div className="tk-photo-rail" ref={railRef}>
-        {media.map((src, i) => {
+        {works.map((work, i) => {
+          const src = work.imageUrl || work.images?.[0] || "";
           const href = displayMediaSrc(src, 1920);
           const video = isVideoUrl(src) || work.mediaType === "video";
           return (
-            <div className="tk-photo" data-photo key={`${work.id}-${i}`}>
+            <div className="tk-photo" data-slide key={work.id}>
               {video ? (
-                <video src={href} controls playsInline preload="metadata" />
+                <video
+                  src={href}
+                  controls
+                  playsInline
+                  preload={i === active ? "metadata" : "none"}
+                  aria-label={`${work.title}`}
+                />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={href} alt={`${work.title} — ${i + 1}`} loading="lazy" />
+                <img src={href} alt={work.title} loading="lazy" />
               )}
             </div>
           );
         })}
       </div>
-      {media.length > 1 ? (
+
+      {works.length > 1 ? (
         <>
-          <div className="tk-dots">
-            {media.map((_, i) => (
+          <div className="tk-dots" role="tablist" aria-label={`${category.name} eserleri`}>
+            {works.map((work, i) => (
               <button
-                key={i}
+                key={work.id}
                 type="button"
                 className="tk-dot"
+                aria-label={work.title}
                 aria-current={i === active ? "true" : undefined}
                 onClick={() => {
                   railRef.current
-                    ?.querySelectorAll<HTMLElement>("[data-photo]")
-                    [i]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+                    ?.querySelectorAll<HTMLElement>("[data-slide]")
+                    [i]?.scrollIntoView({
+                      behavior: "smooth",
+                      inline: "center",
+                      block: "nearest",
+                    });
                 }}
               />
             ))}
@@ -200,18 +224,47 @@ function WorkMediaRail({ work }: { work: NewCatalogWork }) {
           <p className="tk-hint">Kaydır →</p>
         </>
       ) : null}
+
+      {current ? (
+        <div className="tk-work-body" style={{ marginTop: 18, padding: "0 4px" }}>
+          <div className="tk-meta-row">
+            <span>
+              {current.number} / {current.category}
+            </span>
+            <span>
+              {active + 1} / {works.length}
+            </span>
+          </div>
+          <h3 className="tk-work-title">{current.title}</h3>
+          <dl className="tk-facts">
+            {current.dimensions ? (
+              <div>
+                <dt>Dimensions</dt>
+                <dd>{current.dimensions}</dd>
+              </div>
+            ) : null}
+          </dl>
+          {(current.priceTR || current.priceUSD) && (
+            <div className="tk-price">
+              {[current.priceTR, current.priceUSD].filter(Boolean).join("  /  ")}
+            </div>
+          )}
+          <button
+            type="button"
+            className="tk-inquiry-btn"
+            onClick={() => onInquiry(current)}
+          >
+            Talep et / Inquiry
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-export function NewCatalogApp({
-  initialCategoryId,
-}: {
-  initialCategoryId?: string;
-}) {
+export function NewCatalogApp() {
   const [catalog, setCatalog] = useState<NewCatalogPublic | null>(null);
   const [error, setError] = useState("");
-  const [activeCatId, setActiveCatId] = useState<string | null>(initialCategoryId || null);
   const [inquiryWork, setInquiryWork] = useState<NewCatalogWork | null>(null);
 
   useEffect(() => {
@@ -221,12 +274,7 @@ export function NewCatalogApp({
         const res = await fetch("/api/new", { cache: "no-store" });
         if (!res.ok) throw new Error("Katalog yüklenemedi");
         const data = (await res.json()) as NewCatalogPublic;
-        if (!cancelled) {
-          setCatalog(data);
-          if (!activeCatId && data.categories[0]) {
-            setActiveCatId(data.categories[0].id);
-          }
-        }
+        if (!cancelled) setCatalog(data);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Katalog yüklenemedi");
       }
@@ -234,24 +282,14 @@ export function NewCatalogApp({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const activeCat: NewCatalogPublicCategory | null = useMemo(() => {
-    if (!catalog) return null;
-    return catalog.categories.find((c) => c.id === activeCatId) || catalog.categories[0] || null;
-  }, [catalog, activeCatId]);
 
   if (error) return <div className="tk-error">{error}</div>;
   if (!catalog) return <div className="tk-loading">Katalog hazırlanıyor…</div>;
 
   const siteHref = catalog.website?.trim() || SITE_URL;
   const heroSrc =
-    firstStillUrl(
-      activeCat?.works?.[0]
-        ? [activeCat.coverUrl, activeCat.works[0].imageUrl]
-        : catalog.categories.map((c) => c.coverUrl).filter(Boolean)
-    ) || "";
+    firstStillUrl(catalog.categories.map((c) => c.coverUrl).filter(Boolean)) || "";
 
   return (
     <div className="tk-shell">
@@ -290,70 +328,30 @@ export function NewCatalogApp({
             Henüz seçili eser yok. Admin → New Katalog’dan kategorilere fotoğraf ekleyin.
           </div>
         ) : (
-          <>
-            <div className="tk-cat-rail" role="tablist" aria-label="Kategoriler">
-              {catalog.categories.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  role="tab"
-                  className={`tk-cat-chip${activeCat?.id === cat.id ? " is-active" : ""}`}
-                  aria-selected={activeCat?.id === cat.id}
-                  onClick={() => setActiveCatId(cat.id)}
-                >
-                  <span className="tk-cat-chip-name">{cat.name}</span>
-                  <span className="tk-cat-chip-count">{cat.workCount}</span>
-                </button>
-              ))}
-            </div>
-
-            {activeCat ? (
-              <div className="tk-list" style={{ marginTop: 28 }}>
-                {activeCat.intro ? (
-                  <p className="tk-section-note" style={{ marginBottom: 8 }}>
-                    {activeCat.intro}
-                  </p>
-                ) : null}
-                <p className="tk-kicker" style={{ marginBottom: 12 }}>
-                  {activeCat.name}
-                </p>
-                {activeCat.works.map((work) => (
-                  <article className="tk-work" key={work.id} id={`work-${work.id}`}>
-                    <WorkMediaRail work={work} />
-                    <div className="tk-work-body">
-                      <div className="tk-meta-row">
-                        <span>
-                          {work.number} / {work.category}
-                        </span>
-                        {work.year ? <span>{work.year}</span> : <span />}
-                      </div>
-                      <h3 className="tk-work-title">{work.title}</h3>
-                      <dl className="tk-facts">
-                        {work.dimensions ? (
-                          <div>
-                            <dt>Dimensions</dt>
-                            <dd>{work.dimensions}</dd>
-                          </div>
-                        ) : null}
-                      </dl>
-                      {(work.priceTR || work.priceUSD) && (
-                        <div className="tk-price">
-                          {[work.priceTR, work.priceUSD].filter(Boolean).join("  /  ")}
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        className="tk-inquiry-btn"
-                        onClick={() => setInquiryWork(work)}
-                      >
-                        Talep et / Inquiry
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : null}
-          </>
+          <div className="tk-list">
+            {catalog.categories.map((cat) => (
+              <section
+                key={cat.id}
+                className="tk-work"
+                id={`cat-${cat.id}`}
+                aria-label={cat.name}
+              >
+                <div className="tk-section-head" style={{ padding: 0, marginBottom: 14 }}>
+                  <p className="tk-kicker">Series</p>
+                  <h2 className="tk-section-title" style={{ fontSize: "clamp(1.6rem, 4.5vw, 2.2rem)" }}>
+                    {cat.name}
+                  </h2>
+                  {cat.intro ? (
+                    <p className="tk-section-note">{cat.intro}</p>
+                  ) : null}
+                </div>
+                <CategorySwipeRail
+                  category={cat}
+                  onInquiry={setInquiryWork}
+                />
+              </section>
+            ))}
+          </div>
         )}
       </section>
 
